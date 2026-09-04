@@ -1,0 +1,16 @@
+# 발표자료 원본과 파생물은 절대 올리지 않는다 (레포가 public)
+*.pptx
+*.ppt
+*.pdf
+ai/data/
+**/.cache/
+
+# 자격증명
+.env
+*.key
+
+# 파이썬
+__pycache__/
+*.py[cod]
+.venv/
+venv/
