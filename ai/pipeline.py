@@ -115,13 +115,23 @@ class Nouns:
         while i < len(toks):
             t = toks[i]
             if t.tag == NUM_TAG:
-                # 숫자 뒤 단위를 붙여 되살린다: 3 + 회 -> 3회
-                if i + 1 < len(toks) and toks[i + 1].tag in UNIT_TAGS and len(toks[i + 1].form) <= 2:
+                # 숫자 뒤 단위를 붙여 되살린다: 3 + 회 -> 3회, 41 + % -> 41%
+                # % 는 기호(SW)로 나오므로 따로 받아야 한다. 발표자료엔 퍼센트가 도처에 있어
+                # 이걸 놓치면 근거 판정이 통째로 틀린다.
+                if i + 1 < len(toks) and (
+                        (toks[i + 1].tag in UNIT_TAGS and len(toks[i + 1].form) <= 2)
+                        or toks[i + 1].form in ("%", "㎡", "℃")):
                     out.append(t.form + toks[i + 1].form)
                     i += 2
                     continue
                 out.append(t.form)
             elif t.tag in NOUN_TAGS and len(t.form) >= 2:
+                # 영문 뒤 숫자를 붙인다: YOLOv + 8 -> YOLOv8
+                if (t.tag == "SL" and i + 1 < len(toks) and toks[i + 1].tag == NUM_TAG
+                        and len(toks[i + 1].form) <= 2):
+                    out.append(t.form + toks[i + 1].form)
+                    i += 2
+                    continue
                 out.append(t.form)
             i += 1
         return out
