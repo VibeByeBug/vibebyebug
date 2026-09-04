@@ -2,9 +2,12 @@
 
 백엔드가 붙일 대상이 이 파일이다. STT 구현은 모른다. 텍스트만 받는다.
 
-2단계로 돌려주는 이유:
-  1단계 BM25 (~5ms)      질문이 끝나자마자 뭔가 보여야 한다. 빈 화면이 제일 나쁘다.
-  2단계 하이브리드(~220ms) 더 정확한 것으로 조용히 갱신한다.
+기다렸다 한 번에 준다. 처음엔 BM25 로 즉시 띄우고 정확한 결과로 갱신하는 2단계를
+설계했는데, 실측해보니 갱신이 428ms 에 도착했고 8개 중 4개에서 1위 카드가 교체됐다.
+428ms 는 발표자가 화면으로 눈을 옮기는 시간과 비슷하다 - 1단계를 읽을 틈도 없이
+눈이 닿는 순간 내용이 바뀐다. 값은 못 하고 흔들림만 남는다.
+
+그래서 단일 단계로 간다. 428ms 빈 화면은 사람이 '느리다'고 느끼는 구간에 한참 못 미친다.
 
 키워드는 만들지 않고 뽑는다. 계획서의 '환각 방지'가 여기서 지켜진다.
 슬라이드에 실제로 있는 줄을 고르고, 그 줄에서 명사만 꺼낼 뿐이다.
@@ -51,6 +54,25 @@ NUM_TAG = "SN"
 UNIT_TAGS = {"NNB", "NNG"}
 
 
+# 2단계 검색기 프리셋. 어느 걸 쓸지는 STT 가 예산을 얼마나 쓰느냐로 정해진다.
+#
+# 문서 289장 / 질문 45개 / 질문 하나씩 측정 (2026-09-05):
+#
+#   이름        구성                R@3     p50     p95     색인
+#   fast        BM25 만            80.0%   0.7ms   1.2ms     0초
+#   balanced    BM25 + e5-small    88.9%   169ms   428ms    62초
+#   accurate    BM25 + BGE-M3      93.3%   584ms  2215ms   721초
+#
+# 예산은 p50 이 아니라 p95 로 잡는다. 평균이 예산 안이어도 스무 번에 한 번 넘으면
+# 발표 중에는 그게 사고다. accurate 는 p95 2.2초로 1초 예산의 두 배라 핫패스에서 못 쓴다.
+PRESETS = {
+    "fast":     None,                                 # 2단계 없음
+    "balanced": "intfloat/multilingual-e5-small",
+    "accurate": "BAAI/bge-m3",
+}
+DEFAULT_PRESET = "balanced"
+
+
 @dataclass
 class Source:
     slide: int
@@ -93,13 +115,23 @@ class Nouns:
         while i < len(toks):
             t = toks[i]
             if t.tag == NUM_TAG:
-                # 숫자 뒤 단위를 붙여 되살린다: 3 + 회 -> 3회
-                if i + 1 < len(toks) and toks[i + 1].tag in UNIT_TAGS and len(toks[i + 1].form) <= 2:
+                # 숫자 뒤 단위를 붙여 되살린다: 3 + 회 -> 3회, 41 + % -> 41%
+                # % 는 기호(SW)로 나오므로 따로 받아야 한다. 발표자료엔 퍼센트가 도처에 있어
+                # 이걸 놓치면 근거 판정이 통째로 틀린다.
+                if i + 1 < len(toks) and (
+                        (toks[i + 1].tag in UNIT_TAGS and len(toks[i + 1].form) <= 2)
+                        or toks[i + 1].form in ("%", "㎡", "℃")):
                     out.append(t.form + toks[i + 1].form)
                     i += 2
                     continue
                 out.append(t.form)
             elif t.tag in NOUN_TAGS and len(t.form) >= 2:
+                # 영문 뒤 숫자를 붙인다: YOLOv + 8 -> YOLOv8
+                if (t.tag == "SL" and i + 1 < len(toks) and toks[i + 1].tag == NUM_TAG
+                        and len(toks[i + 1].form) <= 2):
+                    out.append(t.form + toks[i + 1].form)
+                    i += 2
+                    continue
                 out.append(t.form)
             i += 1
         return out
@@ -177,7 +209,10 @@ def _keywords(words: list[str], qwords: set, idf: dict, n: int = 5) -> list[str]
 
 
 class ReadyQ:
-    def __init__(self, chunks_path: Path | str):
+    def __init__(self, chunks_path: Path | str, preset: str = DEFAULT_PRESET):
+        if preset not in PRESETS:
+            raise ValueError(f"모르는 프리셋: {preset} (가능: {', '.join(PRESETS)})")
+        self.preset = preset
         self.rows = [json.loads(l) for l in Path(chunks_path).open(encoding="utf-8")]
         docs = [r["text"] for r in self.rows]
 
@@ -195,16 +230,28 @@ class ReadyQ:
         self.fast = BM25()
         self.fast.index(docs)
 
-        self.slow = Hybrid(BM25(), STEmbedder("BAAI/bge-m3"))
+        model_id = PRESETS[preset]
+        self.slow = Hybrid(BM25(), STEmbedder(model_id)) if model_id else None
         self._slow_docs = docs
         self._slow_ready = False
 
     def warm(self) -> float:
-        """임베딩 모델을 미리 올린다. 발표 시작 전에 부른다."""
+        """임베딩 모델을 올리고 문서를 색인한다. 발표 시작 전에 부른다.
+
+        fast 프리셋은 2단계가 없으므로 할 일이 없다.
+        balanced 는 문서 289장 기준 ~62초, accurate 는 ~721초 걸린다.
+        """
+        if self.slow is None:
+            self._slow_ready = True
+            return 0.0
         t0 = time.time()
         self.slow.index(self._slow_docs)
         self._slow_ready = True
         return time.time() - t0
+
+    @property
+    def has_stage2(self) -> bool:
+        return self.slow is not None
 
     def _cue(self, question: str, hits, stage: str, k: int, t0: float) -> Cue:
         qtype = classify(question)
@@ -228,15 +275,28 @@ class ReadyQ:
             latency_ms=round((time.time() - t0) * 1000, 2),
         )
 
-    def fast_cue(self, question: str, k: int = 3) -> Cue:
-        """1단계 — 질문이 끝나자마자 띄운다."""
+    def cue(self, question: str, k: int = 3) -> Cue:
+        """질문 하나 -> 화면에 띄울 것. 백엔드가 부를 유일한 메서드다.
+
+        기다렸다 한 번에 준다. 중간 결과를 먼저 띄우지 않는다.
+        프리셋에 따라 BM25 만 쓰거나(fast) 하이브리드를 쓴다(balanced/accurate).
+        """
+        if self.slow is not None and not self._slow_ready:
+            raise RuntimeError("warm() 을 먼저 부르세요 (임베딩 모델 로딩)")
+        t0 = time.time()
+        engine = self.slow if self.slow is not None else self.fast
+        return self._cue(question, engine.search([question], k)[0], self.preset, k, t0)
+
+    # 아래 둘은 진단용이다. 두 방식의 결과를 비교해볼 때만 쓴다.
+    def _fast_cue(self, question: str, k: int = 3) -> Cue:
         t0 = time.time()
         return self._cue(question, self.fast.search([question], k)[0], "fast", k, t0)
 
-    def refined_cue(self, question: str, k: int = 3) -> Cue:
-        """2단계 — 더 정확한 것으로 갱신한다. warm() 이 선행돼야 한다."""
+    def _refined_cue(self, question: str, k: int = 3) -> Cue:
+        if self.slow is None:
+            raise RuntimeError(f"'{self.preset}' 프리셋은 임베딩 단계가 없습니다.")
         if not self._slow_ready:
-            raise RuntimeError("warm() 을 먼저 부르세요 (임베딩 모델 로딩)")
+            raise RuntimeError("warm() 을 먼저 부르세요")
         t0 = time.time()
         return self._cue(question, self.slow.search([question], k)[0], "refined", k, t0)
 
@@ -244,22 +304,20 @@ class ReadyQ:
 if __name__ == "__main__":
     import argparse
 
-    ap = argparse.ArgumentParser(description="핫패스 시연 - 질문 하나를 2단계로 처리")
+    ap = argparse.ArgumentParser(description="핫패스 시연 - 질문 하나를 처리")
     ap.add_argument("chunks", type=Path)
     ap.add_argument("question")
-    ap.add_argument("--refine", action="store_true", help="2단계까지 (임베딩 로딩 필요)")
+    ap.add_argument("--preset", choices=list(PRESETS), default=DEFAULT_PRESET)
     a = ap.parse_args()
 
     t0 = time.time()
-    rq = ReadyQ(a.chunks)
-    print(f"# 색인 준비 {time.time() - t0:.1f}초 (발표 시작 전 1회)")
+    rq = ReadyQ(a.chunks, preset=a.preset)
+    print(f"# 프리셋 {a.preset} / 색인 준비 {time.time() - t0:.1f}초 (발표 시작 전 1회)")
 
-    print("\n# 1단계 - 발화 종료 즉시")
-    print(json.dumps(rq.fast_cue(a.question).to_message(), ensure_ascii=False, indent=2))
-
-    if a.refine:
+    if rq.has_stage2:
         t0 = time.time()
         rq.warm()
-        print(f"\n# 임베딩 로딩 {time.time() - t0:.1f}초 (발표 시작 전 1회)")
-        print("\n# 2단계 - 갱신")
-        print(json.dumps(rq.refined_cue(a.question).to_message(), ensure_ascii=False, indent=2))
+        print(f"# 임베딩 준비 {time.time() - t0:.1f}초 (발표 시작 전 1회)")
+
+    print()
+    print(json.dumps(rq.cue(a.question).to_message(), ensure_ascii=False, indent=2))
