@@ -152,6 +152,9 @@ def _cache_key(path: Path, provider: str, model: str) -> str:
 def _retry_delay(err: Exception) -> float | None:
     """429 응답에 서버가 알려준 대기 시간이 있으면 꺼낸다."""
     text = str(err)
+    # 503 = 모델 혼잡. 잠시 뒤 되는 경우가 대부분이라 429 와 같이 재시도한다.
+    if "UNAVAILABLE" in text or "503" in text or "high demand" in text:
+        return 0.0
     if "RESOURCE_EXHAUSTED" not in text and "429" not in text:
         return None
     m = re.search(r"retryDelay.{0,4}?(\d+(?:\.\d+)?)s", text)
