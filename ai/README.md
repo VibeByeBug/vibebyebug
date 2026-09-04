@@ -294,12 +294,30 @@ BM25 는 드문 단어에 높은 점수를 주는데 흔한 단어를 얹으니 
 백엔드가 붙일 대상이다. STT 구현을 모르고 텍스트만 받는다.
 
 ```python
-rq = ReadyQ("data/chunks.jsonl")   # 색인 ~8초, 발표 시작 전 1회
-rq.warm()                           # 색인 62초(e5-small) / 721초(BGE-M3)
+rq = ReadyQ("data/chunks.jsonl")                    # 기본 = balanced
+rq.warm()                                            # 발표 시작 전 1회
 
-cue = rq.fast_cue(question)         # 1단계 ~1.2ms  -> cue.evidence 로 즉시 전송
-cue = rq.refined_cue(question)      # 2단계 p95 428ms (e5-small 기준)
+cue = rq.fast_cue(question)         # 1단계  -> cue.evidence 로 즉시 전송
+cue = rq.refined_cue(question)      # 2단계  -> 같은 형식으로 갱신
 ```
+
+2단계 검색기는 프리셋으로 고른다. 어느 걸 쓸지는 STT 가 예산을 얼마나 쓰느냐로 정해진다.
+
+| 프리셋 | 구성 | R@3 | p50 | p95 | 색인 |
+|---|---|---|---|---|---|
+| `fast` | BM25 만 (2단계 없음) | 80.0% | 0.7ms | 1.2ms | 0초 |
+| **`balanced`** (기본) | BM25 + e5-small | 88.9% | 169ms | 428ms | 62초 |
+| `accurate` | BM25 + BGE-M3 | 93.3% | 584ms | 2,215ms | 721초 |
+
+```python
+rq = ReadyQ("data/chunks.jsonl", preset="fast")      # 2단계 없음
+```
+```bash
+python pipeline.py data/chunks.jsonl "질문" --preset fast
+```
+
+`fast` 는 `warm()` 이 0초에 끝나고, `refined_cue()` 를 부르면 **조용히 넘어가지 않고**
+왜 안 되는지 말한다. 조용한 실패 경로를 만들지 않는다.
 
 ```bash
 python pipeline.py data/chunks_tomjelly.jsonl "이 분석의 한계는 뭐라고 보시나요?"
