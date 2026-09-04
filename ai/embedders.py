@@ -177,9 +177,96 @@ class Hybrid(Retriever):
         return out
 
 
+
+# --- 구간 단위 채점 ------------------------------------------------------
+
+class MaxPassage(Retriever):
+    """슬라이드를 겹치는 구간으로 쪼개 채점하고, 슬라이드당 최고점만 남긴다.
+
+    왜 필요한가:
+    절차형 질문("순위를 매길 때 뭘 먼저 보나요")의 답은 긴 슬라이드 안의 한 줄
+    ("선정 규칙 : (1) 사고 유무 -> (2) 보수 횟수")에 있다. 슬라이드 전체를 하나로
+    채점하면, 처음부터 끝까지 그 주제인 다른 슬라이드가 이겨버린다.
+    구간으로 쪼개면 '답이 있는 한 줄'이 그 구간을 대표하게 되어 경쟁이 가능해진다.
+
+    인용 단위는 그대로 슬라이드다. 채점만 구간에서 하고 출처는 슬라이드로 돌려준다.
+    """
+
+    def __init__(self, inner: Retriever, window: int = 220, stride: int = 110):
+        self.inner, self.window, self.stride = inner, window, stride
+        self.name = f"maxpass({inner.name})"
+
+    def _split(self, text: str) -> list[str]:
+        # 줄 단위를 유지하면서 window 글자쯤 모아 구간을 만든다.
+        # 줄 중간에서 자르면 "(1) 사고 유무 -> (2) 보수 횟수" 같은 한 줄이 두 동강 난다.
+        lines = [x for x in text.split(chr(10)) if x.strip()]
+        if not lines:
+            return [text]
+        chunks, cur, n = [], [], 0
+        for line in lines:
+            cur.append(line)
+            n += len(line)
+            if n >= self.window:
+                chunks.append(chr(10).join(cur))
+                # stride 만큼 겹치도록 뒤쪽 줄을 남긴다
+                keep, kn = [], 0
+                for l in reversed(cur):
+                    if kn >= self.stride:
+                        break
+                    keep.insert(0, l)
+                    kn += len(l)
+                cur, n = keep, kn
+        if cur:
+            chunks.append(chr(10).join(cur))
+        return chunks or [text]
+
+    def index(self, docs: list[str]) -> None:
+        self.owner = []          # 구간 -> 원래 문서 번호
+        passages = []
+        for i, d in enumerate(docs):
+            for c in self._split(d):
+                passages.append(c)
+                self.owner.append(i)
+        self.n_docs = len(docs)
+        self.inner.index(passages)
+
+    def search(self, queries, k):
+        # 구간이 문서보다 많으므로 넉넉히 뽑아 문서 단위로 접는다
+        raw = self.inner.search(queries, min(len(self.owner), max(k * 12, 60)))
+        out = []
+        for hits in raw:
+            best = {}
+            for pi, score in hits:
+                d = self.owner[pi]
+                if score > best.get(d, float("-inf")):
+                    best[d] = score
+            top = sorted(best.items(), key=lambda x: -x[1])[:k]
+            out.append([(int(d), float(s)) for d, s in top])
+        return out
+
+
+class QueryExpand(Retriever):
+    """[실험용] 질의만 바꿔서 안쪽 검색기에 넘긴다. 문서 색인은 건드리지 않는다.
+
+    유형별 확장어를 붙여 어휘 격차를 메우는 용도다(qtype.expand 참고).
+    검색기 자체는 그대로이므로, 확장이 손해면 이 껍데기만 벗기면 된다.
+    """
+
+    def __init__(self, inner: Retriever, fn):
+        self.inner, self.fn = inner, fn
+        self.name = f"expand({inner.name})"
+
+    def index(self, docs):
+        self.inner.index(docs)
+
+    def search(self, queries, k):
+        return self.inner.search([self.fn(q) for q in queries], k)
+
 REGISTRY = {
     "bm25": lambda: BM25(),
     "bge-m3": lambda: STEmbedder("BAAI/bge-m3"),
     "kure-v1": lambda: STEmbedder("nlpai-lab/KURE-v1"),
     "gemini-embed": lambda: GeminiEmbedder(),
+    "maxpass-bm25": lambda: MaxPassage(BM25()),
+    "maxpass-bge": lambda: MaxPassage(STEmbedder("BAAI/bge-m3")),
 }
