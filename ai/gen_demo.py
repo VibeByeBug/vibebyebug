@@ -1,7 +1,11 @@
-"""데모용 실측 데이터 생성 - 실제 파이프라인을 돌려 1단계/2단계 결과를 뽑는다."""
+"""데모용 실측 데이터 - 실제 파이프라인을 돌려 1단계/2단계 결과와 지연을 뽑는다.
+
+데모의 목적은 하나다: 2단계에서 화면이 바뀌는 걸 발표자가 견딜 수 있는지 눈으로 보는 것.
+그래서 지연도 결과도 실측값을 쓴다. 꾸며낸 타이밍으로는 판단할 수 없다.
+"""
 import json, sys, time
 sys.path.insert(0, '.')
-from pipeline import ReadyQ
+from pipeline import ReadyQ, DEFAULT_PRESET
 
 QUESTIONS = [
     "포트홀 보수 이력은 얼마나 모으신 거예요?",
@@ -14,32 +18,34 @@ QUESTIONS = [
     "개별 사고를 미리 예측할 수 있는 건가요?",
 ]
 
-t0 = time.time()
 rq = ReadyQ("data/chunks_tomjelly.jsonl")
-print(f"색인 {time.time()-t0:.1f}초", flush=True)
-t0 = time.time()
-rq.warm()
-warm_s = time.time() - t0
-print(f"임베딩 로딩 {warm_s:.1f}초", flush=True)
+t0 = time.time(); rq.warm(); warm_s = time.time() - t0
+print(f"프리셋 {DEFAULT_PRESET} / warm {warm_s:.1f}초", flush=True)
 
-rq.fast_cue("워밍업")            # 첫 호출 편향 제거
-rq.refined_cue("워밍업")
+rq.fast_cue("워밍업"); rq.refined_cue("워밍업")
 
-out = []
+cases = []
 for q in QUESTIONS:
-    f = rq.fast_cue(q, k=5)
-    r = rq.refined_cue(q, k=5)
-    out.append({
+    f = rq.fast_cue(q, k=3)
+    r = rq.refined_cue(q, k=3)
+    fs = [s.slide for s in f.sources]
+    rs = [s.slide for s in r.sources]
+    cases.append({
         "question": q,
-        "fast": f.to_message(),
-        "refined": r.to_message(),
-        "changed": [s.slide for s in f.sources[:3]] != [s.slide for s in r.sources[:3]],
+        "qtype": f.question_type,
+        "fast": {"latency_ms": f.latency_ms, "keywords": f.keywords,
+                 "sources": [{"slide": s.slide, "snippet": s.snippet} for s in f.sources]},
+        "refined": {"latency_ms": r.latency_ms, "keywords": r.keywords,
+                    "sources": [{"slide": s.slide, "snippet": s.snippet} for s in r.sources]},
+        "deflect": f.deflect,
+        "top1_changed": fs[:1] != rs[:1],
+        "top3_changed": fs != rs,
     })
-    print(f"  {q[:30]}  {f.latency_ms:.1f}ms -> {r.latency_ms:.1f}ms  "
-          f"{'바뀜' if out[-1]['changed'] else '동일'}", flush=True)
+    print(f"  {q[:26]:<28} {f.latency_ms:>6.1f} -> {r.latency_ms:>7.1f}ms  "
+          f"{fs} -> {rs}  {'1위바뀜' if cases[-1]['top1_changed'] else ('순서바뀜' if cases[-1]['top3_changed'] else '동일')}",
+          flush=True)
 
-json.dump({"warm_seconds": round(warm_s, 1), "cases": out},
-          open("data/demo_cases.json", "w", encoding="utf-8"),
-          ensure_ascii=False, indent=1)
-n_changed = sum(1 for c in out if c["changed"])
-print(f"\n2단계에서 순서가 바뀐 질문: {n_changed}/{len(out)}")
+json.dump({"preset": DEFAULT_PRESET, "warm_seconds": round(warm_s, 1), "cases": cases},
+          open("data/demo_cases.json", "w", encoding="utf-8"), ensure_ascii=False, indent=1)
+print(f"\n1위 바뀜 {sum(c['top1_changed'] for c in cases)}/{len(cases)}  "
+      f"상위3 바뀜 {sum(c['top3_changed'] for c in cases)}/{len(cases)}")
