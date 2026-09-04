@@ -29,9 +29,19 @@ def evaluate(retriever, docs, questions, gold_sets):
     retriever.index(docs)
     t_index = time.time() - t0
 
-    t0 = time.time()
-    results = retriever.search([q["question"] for q in questions], max(KS))
-    t_search = time.time() - t0
+    # 지연은 반드시 '질문 하나씩' 재야 한다.
+    # 질문을 묶어 넣고 개수로 나누면 모델 호출 한 번을 여러 질문이 나눠 써서
+    # 실제보다 싸게 나온다. 실제 서비스는 질문이 하나씩 들어온다.
+    # (이 방식으로 재서 217ms 라고 잘못 보고한 적이 있다 - 실제는 595ms 였다)
+    results = []
+    lat = []
+    for q in questions:
+        t0 = time.time()
+        results.extend(retriever.search([q["question"]], max(KS)))
+        lat.append(time.time() - t0)
+    lat.sort()
+    t_p50 = lat[len(lat) // 2]
+    t_p95 = lat[min(len(lat) - 1, int(len(lat) * 0.95))]
 
     recall = {k: 0 for k in KS}
     rr_total = 0.0
@@ -56,7 +66,8 @@ def evaluate(retriever, docs, questions, gold_sets):
         "recall": {k: recall[k] / n for k in KS},
         "mrr": rr_total / n,
         "t_index": t_index,
-        "t_search_per_q": t_search / n,
+        "t_p50": t_p50,
+        "t_p95": t_p95,
         "misses": misses,
     }
 
@@ -111,6 +122,10 @@ def main() -> int:
 
     if args.hybrid and "+" in args.hybrid:
         a, b = [x.strip() for x in args.hybrid.split("+", 1)]
+        for name in (a, b):          # hybrid 에만 쓰인 검색기도 자동으로 준비한다
+            if name not in built and name in REGISTRY:
+                print(f"  {name} 준비 중 (hybrid 용)...", flush=True)
+                built[name] = REGISTRY[name]()
         if a in built and b in built:
             print(f"  hybrid({a}+{b}) 실행 중...", flush=True)
             try:
@@ -124,13 +139,15 @@ def main() -> int:
         return 1
 
     print("\n" + "=" * 74)
-    print(f"{'검색기':<24} {'R@1':>7} {'R@3':>7} {'R@5':>7} {'MRR':>7} {'질의ms':>8}")
-    print("-" * 74)
+    print(f"{'검색기':<26} {'R@1':>6} {'R@3':>6} {'R@5':>6} {'MRR':>6} "
+          f"{'p50ms':>8} {'p95ms':>8} {'색인초':>7}")
+    print("-" * 84)
     for r in sorted(reports, key=lambda x: -x["recall"][3]):
-        print(f"{r['name']:<24} "
-              f"{r['recall'][1]:>7.1%} {r['recall'][3]:>7.1%} {r['recall'][5]:>7.1%} "
-              f"{r['mrr']:>7.3f} {r['t_search_per_q'] * 1000:>8.1f}")
-    print("=" * 74)
+        print(f"{r['name']:<26} "
+              f"{r['recall'][1]:>6.1%} {r['recall'][3]:>6.1%} {r['recall'][5]:>6.1%} "
+              f"{r['mrr']:>6.3f} {r['t_p50'] * 1000:>8.1f} {r['t_p95'] * 1000:>8.1f} "
+              f"{r['t_index']:>7.1f}")
+    print("=" * 84)
 
     best = max(reports, key=lambda x: x["recall"][3])
     print(f"\nRecall@3 기준 1위: {best['name']} ({best['recall'][3]:.1%})")

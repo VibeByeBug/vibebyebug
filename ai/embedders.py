@@ -266,6 +266,9 @@ REGISTRY = {
     "bm25": lambda: BM25(),
     "bge-m3": lambda: STEmbedder("BAAI/bge-m3"),
     "kure-v1": lambda: STEmbedder("nlpai-lab/KURE-v1"),
+    # 작은 후보 - 실시간에 인코딩하는 건 질문 한 줄뿐이라 큰 모델이 과할 수 있다
+    "e5-small": lambda: STEmbedder("intfloat/multilingual-e5-small"),
+    "ko-sroberta": lambda: STEmbedder("jhgan/ko-sroberta-multitask"),
     "gemini-embed": lambda: GeminiEmbedder(),
     "maxpass-bm25": lambda: MaxPassage(BM25()),
     "maxpass-bge": lambda: MaxPassage(STEmbedder("BAAI/bge-m3")),
