@@ -25,6 +25,7 @@ from pathlib import Path
 
 from embedders import BM25, Hybrid, STEmbedder, _tokens
 from qtype import classify
+from weak_profile import WeakProfile
 
 # 유형별로 슬라이드에서 '무엇을 보여줄지'가 다르다.
 # 검색에 유형을 쓰는 건 실패했지만(README 참고), 무엇을 띄울지 고르는 데는 맞다.
@@ -86,6 +87,7 @@ class Cue:
     keywords: list[str] = field(default_factory=list)
     sources: list[Source] = field(default_factory=list)
     deflect: list[str] = field(default_factory=list)
+    weak_type: bool = False   # 연습에서 이 유형에 약했나 (화면 강조용)
     stage: str = "fast"
     latency_ms: float = 0.0
 
@@ -190,8 +192,13 @@ def _best_line(prepared: list[tuple[str, set]], qwords: set, qtype: str, idf: di
     return best
 
 
-def _keywords(words: list[str], qwords: set, idf: dict, n: int = 5) -> list[str]:
-    """고른 줄에서 화면에 띄울 말을 뽑는다. 만들지 않고 뽑기만 한다."""
+def _keywords(words: list[str], qwords: set, idf: dict, n: int = 5,
+              weak=None, page: int = 0) -> list[str]:
+    """고른 줄에서 화면에 띄울 말을 뽑는다. 만들지 않고 뽑기만 한다.
+
+    weak 가 있으면 연습에서 자꾸 놓친 근거를 앞으로 당긴다. 발표자가 제일 까먹는
+    것이 맨 앞에 와야 한다.
+    """
     seen, scored = set(), []
     for w in words:
         key = w.lower()
@@ -203,16 +210,21 @@ def _keywords(words: list[str], qwords: set, idf: dict, n: int = 5) -> list[str]
         score = idf.get(key, 1.0)
         if _is_number(w):
             score += 2.5          # 수치 우선 - Q&A 는 이걸 물어본다
+        if weak is not None:
+            score += weak.boost(page, w)   # 연습에서 놓친 것일수록 앞으로
         scored.append((score, w))
     scored.sort(key=lambda x: -x[0])
     return [w for _, w in scored[:n]]
 
 
 class ReadyQ:
-    def __init__(self, chunks_path: Path | str, preset: str = DEFAULT_PRESET):
+    def __init__(self, chunks_path: Path | str, preset: str = DEFAULT_PRESET,
+                 weak_path: Path | str | None = None):
         if preset not in PRESETS:
             raise ValueError(f"모르는 프리셋: {preset} (가능: {', '.join(PRESETS)})")
         self.preset = preset
+        # 연습 기록. 없으면 빈 것으로 동작한다 - 실전에서 멈추면 안 된다.
+        self.weak = WeakProfile.load(weak_path)
         self.rows = [json.loads(l) for l in Path(chunks_path).open(encoding="utf-8")]
         docs = [r["text"] for r in self.rows]
 
@@ -263,7 +275,8 @@ class ReadyQ:
             if not line:
                 continue
             srcs.append(Source(slide=r["page"], snippet=line[:120], source=r["source"]))
-            for w in _keywords(self.line_words[i].get(line, []), qwords, self.idf):
+            for w in _keywords(self.line_words[i].get(line, []), qwords,
+                               self.idf, weak=self.weak, page=r["page"]):
                 if w not in kws:
                     kws.append(w)
         return Cue(
@@ -271,6 +284,7 @@ class ReadyQ:
             keywords=kws[:6],
             sources=srcs,
             deflect=DEFLECT if qtype == "한계반론" else [],
+            weak_type=self.weak.weak_type(qtype),
             stage=stage,
             latency_ms=round((time.time() - t0) * 1000, 2),
         )

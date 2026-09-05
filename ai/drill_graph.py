@@ -28,7 +28,7 @@ from langgraph.checkpoint.memory import MemorySaver
 from langgraph.graph import END, StateGraph
 from langgraph.types import interrupt
 
-from mock_defense import _call_retry, key_facts
+from mock_defense import key_facts
 from pipeline import ReadyQ, _best_line, _idf
 
 # 이 이상 파고들지 않는다. 연습이지 심문이 아니다.
@@ -36,20 +36,7 @@ MAX_FOLLOWUP = 2
 # 이만큼 근거를 댔으면 넘어간다
 ENOUGH = 0.7
 
-FOLLOWUP_PROMPT = """발표 심사위원이라고 생각하고 꼬리질문을 하나만 만들어줘.
-
-원래 질문: {question}
-발표자 답변: {answer}
-
-발표자가 아직 언급하지 않은 것: {missed_hint}
-
-규칙:
-1. 답을 알려주지 마. 언급하지 않은 그 내용을 **말하게 만드는** 질문이어야 해.
-   나쁜 예: "41%가 맞나요?"      좋은 예: "그 비율이 구체적으로 얼마였죠?"
-2. 한 문장. 실제 말투로.
-3. 질문만 출력해. 다른 말 붙이지 마."""
-
-# 모델을 못 쓰거나 답을 흘렸을 때 쓰는 대체 질문. 지어낼 여지가 없다.
+# 미리 만든 꼬리질문이 없거나 두 번째 되물음일 때 쓴다. 지어낼 여지가 없다.
 FALLBACK = {
     "number": "그 부분 구체적인 수치를 말씀해주실 수 있나요?",
     "other":  "방금 말씀하신 근거를 자료 어디에서 확인할 수 있는지 짚어주시겠어요?",
@@ -66,6 +53,7 @@ class DrillState(TypedDict):
     depth: int                # 꼬리질문 횟수
     snippet: str
     pending_ask: str          # 지금 던질 질문 (원질문 또는 꼬리질문)
+    prepared_followup: str    # gen 단계에서 미리 만들어 둔 되물음
 
 
 def _norm(s: str) -> str:
@@ -76,8 +64,8 @@ def _is_num(w: str) -> bool:
     return bool(re.match(r"^\d", w))
 
 
-def build(rq: ReadyQ, idf: dict, provider: str | None, model: str | None):
-    """그래프를 만든다. provider 가 None 이면 꼬리질문은 템플릿만 쓴다."""
+def build(rq: ReadyQ, idf: dict):
+    """그래프를 만든다. 연습 중에는 모델을 부르지 않는다 - 꼬리질문은 미리 만들어 둔 것을 쓴다."""
 
     def ask(state: DrillState) -> DrillState:
         # 여기서 멈춰 사람 답변을 기다린다. 웹앱이면 여기서 응답을 내보내고
@@ -103,29 +91,25 @@ def build(rq: ReadyQ, idf: dict, provider: str | None, model: str | None):
         return {**state, "covered": covered, "turns": turns}
 
     def followup(state: DrillState) -> DrillState:
+        """되물을 질문을 고른다. 연습 중에는 모델을 부르지 않는다.
+
+        발표자가 화면 앞에서 기다리는 중이라, 여기서 모델을 부르면 속도 제한에 걸려
+        몇 분씩 멈춘다. 꼬리질문은 gen 단계에서 미리 만들어 둔다(mock_defense.gen).
+        """
         missed = [f for f in state["facts"] if f not in state["covered"]]
         kind = "number" if any(_is_num(f) for f in missed) else "other"
-        q = FALLBACK[kind]
 
-        if provider:
-            hint = ", ".join(missed[:3])
-            try:
-                # 재시도를 1회로 묶는다. 여기는 배치가 아니라 발표자가 화면 앞에서
-                # 기다리는 중이다 - 속도 제한에 걸려 5분 기다리느니 템플릿이 낫다.
-                # 제대로 된 해법은 gen 단계에서 꼬리질문을 미리 만들어두는 것이다.
-                out = _call_retry(
-                    FOLLOWUP_PROMPT.format(question=state["question"],
-                                           answer=state["turns"][-1]["answer"],
-                                           missed_hint=hint),
-                    provider, model, attempts=1).strip().splitlines()
-                cand = next((l.strip() for l in out if len(l.strip()) > 6), "")
-                # 답을 흘렸으면 버린다. 연습이 안 되는 꼬리질문은 없느니만 못하다.
-                if cand and not any(_norm(f) in _norm(cand) for f in missed):
-                    q = cand
-            except Exception:
-                pass          # 템플릿으로 간다
+        q = state.get("prepared_followup") or ""
+        # 미리 만든 것은 한 번만 쓴다. 두 번째부터는 같은 말을 반복하지 않도록 템플릿으로.
+        if q and state["depth"] == 0:
+            # 답을 흘리면 버린다 (gen 에서도 거르지만 여기서 한 번 더)
+            if any(_norm(f) in _norm(q) for f in missed):
+                q = ""
+        else:
+            q = ""
 
-        return {**state, "pending_ask": q, "depth": state["depth"] + 1}
+        return {**state, "pending_ask": q or FALLBACK[kind],
+                "depth": state["depth"] + 1}
 
     def enough(state: DrillState) -> str:
         if state["depth"] >= MAX_FOLLOWUP:
@@ -153,15 +137,17 @@ def build(rq: ReadyQ, idf: dict, provider: str | None, model: str | None):
 
 
 def make_state(question: str, qtype: str, gold_page: int,
-               rq: ReadyQ, idf: dict) -> DrillState:
+               rq: ReadyQ, idf: dict, prepared_followup: str = "") -> DrillState:
     row = next((r for r in rq.rows if r["page"] == gold_page), None)
     if row is None:
         return DrillState(question=question, qtype=qtype, gold_page=gold_page,
                           facts=[], covered=[], turns=[], depth=0,
-                          snippet="", pending_ask=question)
+                          snippet="", pending_ask=question,
+                          prepared_followup=prepared_followup)
     i = rq.rows.index(row)
     qwords = {w.lower() for w in rq.nouns(question)}
     line = _best_line(rq.prepared[i], qwords, qtype, rq.idf) or row["text"][:120]
     return DrillState(question=question, qtype=qtype, gold_page=gold_page,
                       facts=key_facts(line, rq.nouns, idf), covered=[],
-                      turns=[], depth=0, snippet=line, pending_ask=question)
+                      turns=[], depth=0, snippet=line, pending_ask=question,
+                      prepared_followup=prepared_followup)
