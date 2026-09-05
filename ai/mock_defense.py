@@ -26,6 +26,7 @@ from pathlib import Path
 
 from caption import PROVIDERS, detect_provider, load_env, _retry_delay
 from pipeline import ReadyQ, Nouns, _idf, _is_number, _useful_number, STOP
+from weak_profile import WeakProfile, DEFAULT_PATH
 
 # 유형별로 따로 뽑는다. 한꺼번에 시키면 사실확인만 잔뜩 나온다 - 실제로 그런 편향이 있었다.
 TYPE_BRIEF = {
@@ -54,6 +55,24 @@ PROMPT = """아래는 어떤 발표의 슬라이드 내용이야. 슬라이드�
 
 --- 슬라이드 내용 ---
 {slides}"""
+
+
+FOLLOWUP_PROMPT = """발표 심사위원이 되어 꼬리질문을 만들어줘.
+
+아래는 질문 목록이다. 각 줄은 [번호] 질문 / 발표자가 꼭 말해야 할 근거 순이다.
+발표자가 그 근거를 말하지 않았을 때 **말하게 만드는** 되물음을 하나씩 만들어줘.
+
+지켜야 할 것:
+1. 답을 알려주지 마. 근거 자체를 질문에 넣으면 안 된다.
+   나쁜 예: "41%가 맞나요?"      좋은 예: "그 비율이 구체적으로 얼마였죠?"
+2. 한 문장. 실제 말투로.
+3. 근거가 여러 개면 그중 가장 중요한 하나를 겨냥해.
+
+출력 형식 (다른 말 붙이지 말고 이것만):
+번호<TAB>꼬리질문
+
+--- 질문 목록 ---
+{items}"""
 
 
 @dataclass
@@ -149,6 +168,45 @@ def generate(chunks: Path, out: Path, per_type: int, min_chars: int,
     if not made:
         print("생성된 질문이 없습니다", file=sys.stderr)
         return 4
+
+    # 꼬리질문을 여기서 미리 만든다.
+    # 연습 중에 만들면 발표자가 화면 앞에서 기다리는 동안 모델을 부르게 된다.
+    # 무료 등급 속도 제한에 걸려 질문 하나에 몇 분씩 멈췄다. 호출도 한 번으로 묶는다.
+    print()
+    print("[꼬리질문 미리 생성] 호출 1회")
+    from pipeline import ReadyQ, _idf
+    rq = ReadyQ(chunks, preset="fast")
+    idf = _idf(rq.rows, rq.nouns)
+    for m in made:
+        c = judge("", m["question"], m["gold_page"], rq, idf)
+        m["facts"] = c.facts
+        m["snippet"] = c.snippet
+
+    items = chr(10).join(
+        f"[{i}] {m['question']} / 근거: {', '.join(m['facts'][:4])}"
+        for i, m in enumerate(made, 1) if m["facts"])
+    try:
+        raw = _call_retry(FOLLOWUP_PROMPT.format(items=items), provider, model)
+        got = {}
+        for line in raw.splitlines():
+            mt = re.match(r"^\D{0,3}(\d{1,3})\s*(?:	|\||:|\.|\))\s*(.+)$", line.strip())
+            if mt:
+                got[int(mt.group(1))] = mt.group(2).strip()
+    except Exception as e:
+        print(f"  실패 — 연습 때 템플릿을 쓴다: {e}", file=sys.stderr)
+        got = {}
+
+    leaked = 0
+    for i, m in enumerate(made, 1):
+        q = got.get(i, "")
+        # 답을 흘렸으면 버린다. 연습이 안 되는 꼬리질문은 없느니만 못하다.
+        if q and any(_norm(f) in _norm(q) for f in m.get("facts", [])):
+            leaked += 1
+            q = ""
+        m["followup"] = q
+    ok = sum(1 for m in made if m.get("followup"))
+    print(f"  {ok}/{len(made)}개 준비" + (f" (답 유출로 버린 것 {leaked}개)" if leaked else ""))
+
     out.parent.mkdir(parents=True, exist_ok=True)
     with out.open("w", encoding="utf-8") as f:
         for m in made:
@@ -257,6 +315,8 @@ def drill(chunks: Path, questions: Path, shuffle: bool, limit: int) -> int:
 
     rq = ReadyQ(chunks, preset="fast")     # 판정은 실시간이 아니므로 가벼운 걸로 충분
     idf = _idf(rq.rows, rq.nouns)
+    # 이번 연습에서 무엇을 놓쳤는지 쌓는다. 실전 화면이 이걸 읽는다.
+    weak = WeakProfile.load(DEFAULT_PATH)
 
     results = []
     for n, q in enumerate(qs, 1):
@@ -271,6 +331,7 @@ def drill(chunks: Path, questions: Path, shuffle: bool, limit: int) -> int:
             continue
         c = judge(ans, q["question"], q["gold_page"], rq, idf)
         results.append(c)
+        weak.record(q["gold_page"], q["qtype"], c.facts, c.covered)
         bar = "#" * int(c.ratio * 10)
         print(f"  커버리지 {c.ratio:.0%} {bar}")
         if c.missed:
@@ -279,9 +340,12 @@ def drill(chunks: Path, questions: Path, shuffle: bool, limit: int) -> int:
 
     if not results:
         return 0
+    weak.save(DEFAULT_PATH)
     avg = sum(c.ratio for c in results) / len(results)
     print("=" * 60)
     print(f"답한 질문 {len(results)}개 · 평균 커버리지 {avg:.0%}")
+    print(f"약점 기록 -> {DEFAULT_PATH} (연습 {weak.sessions}회 누적)")
+    print("  실전에서 이 근거들이 키워드 앞쪽에 오게 된다.")
     weak = sorted(results, key=lambda c: c.ratio)[:3]
     if weak and weak[0].ratio < 1.0:
         print("\n약했던 질문:")

@@ -152,6 +152,10 @@ def _cache_key(path: Path, provider: str, model: str) -> str:
 def _retry_delay(err: Exception) -> float | None:
     """429 응답에 서버가 알려준 대기 시간이 있으면 꺼낸다."""
     text = str(err)
+    # 일일 할당량은 기다려도 안 풀린다. 무료 등급 Gemini 는 하루 20회다.
+    # 이걸 분당 제한과 같이 취급하면 내일까지 안 풀릴 것을 50초씩 다섯 번 기다린다.
+    if "PerDay" in text or "PerDayPerProject" in text:
+        return None
     # 503 = 모델 혼잡. 잠시 뒤 되는 경우가 대부분이라 429 와 같이 재시도한다.
     if "UNAVAILABLE" in text or "503" in text or "high demand" in text:
         return 0.0
