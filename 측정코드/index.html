@@ -1,0 +1,89 @@
+<!DOCTYPE html>
+<html>
+    <head>
+        <title>Ready-Q 실시간 음성인식 테스트</title>
+        <style>
+            body { font-family: sans-serif; padding: 20px; }
+            #mic-btn { padding: 10px 20px; font-size: 16px; background-color: #ff4757; color: white; border: none; border-radius: 5px; cursor: pointer; }
+            #mic-btn.recording { background-color: #2ed573; }
+            .box { margin-top: 20px; padding: 10px; border: 1px solid #ccc; background: #f9f9f9; min-height: 50px; }
+        </style>
+    </head>
+    <body>
+        <h1>Ready-Q 실시간 음성인식(STT) 테스트</h1>
+        <button id="mic-btn" onclick="toggleRecording()">마이크 켜기</button>
+        
+        <h3>🗣️ 내가 한 말 (인식된 질문):</h3>
+        <div id="recognized-text" class="box"></div>
+        
+        <h3>🛡️ 서버 응답 (방어 논리):</h3>
+        <ul id='messages' class="box" style="list-style-type: none; padding-left: 10px;"></ul>
+
+        <script>
+            var ws = new WebSocket("ws://localhost:8000/ws");
+            
+            ws.onmessage = function(event) {
+                var messages = document.getElementById('messages');
+                var message = document.createElement('li');
+                message.innerHTML = "<b>" + event.data + "</b>";
+                messages.appendChild(message);
+            };
+
+            var recognition = new (window.SpeechRecognition || window.webkitSpeechRecognition)();
+            recognition.lang = 'ko-KR';
+            recognition.interimResults = true;       
+            // [QA] 중간 결과 켜기 - 지연 측정의 전제조건 false -> true로 바꿈
+            recognition.continuous = true;
+
+            var isRecording = false;
+            var micBtn = document.getElementById("mic-btn");
+            var recognizedBox = document.getElementById("recognized-text");
+
+            // [QA 측정용] STT 지연 = "마지막 중간 결과 도착" -> "최종 결과 도착"
+            var lastInterimAt = null;                // 마지막으로 말이 들어온 시각
+            var lags = [];                           // 측정값 모으는 곳
+
+            recognition.onresult = function(event) {
+                var now = performance.now();
+                var result = event.results[event.results.length - 1];
+                var transcript = result[0].transcript;
+
+                if (!result.isFinal) {
+                    // 중간 결과: 시각만 기록하고 화면은 건드리지 않는다 (원본 동작 유지)
+                    lastInterimAt = now;
+                    return;
+                }
+
+                // 최종 결과: 여기까지 걸린 시간이 STT 지연
+                var sttLagMs = lastInterimAt ? Math.round(now - lastInterimAt) : null;
+                if (sttLagMs !== null) lags.push(sttLagMs);
+                console.log("STT 지연:", sttLagMs, "ms  |  누적", lags.length, "건");
+
+                recognizedBox.innerHTML += transcript + "<br>";   // 원본 그대로 (줄 수로 쪼개짐 확인 가능)
+                ws.send(transcript);                              // 서버 계약도 그대로
+                lastInterimAt = null;
+            };
+
+            // 케이스북 10개 녹음이 끝난 뒤 브라우저 콘솔에서 report() 를 쳐서 결과 확인
+            function report() {
+                if (lags.length === 0) { console.log("측정된 값이 없습니다."); return; }
+                var s = lags.slice().sort(function(a, b) { return a - b; });
+                var q = function(p) { return s[Math.min(s.length - 1, Math.floor(s.length * p))]; };
+                console.log("n=" + s.length + "  p50=" + q(0.5) + "ms  p95=" + q(0.95) + "ms  max=" + s[s.length - 1] + "ms");
+            }
+
+            function toggleRecording() {
+                if (isRecording) {
+                    recognition.stop();
+                    micBtn.innerText = "마이크 켜기";
+                    micBtn.classList.remove("recording");
+                } else {
+                    recognition.start();
+                    micBtn.innerText = "듣는 중... (마이크 끄기)";
+                    micBtn.classList.add("recording");
+                }
+                isRecording = !isRecording;
+            }
+        </script>
+    </body>
+</html>
