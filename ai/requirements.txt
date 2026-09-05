@@ -1,0 +1,35 @@
+# Ready-Q AI 모듈
+#   pip install -r ai/requirements.txt
+#
+# 버전을 == 로 고정한다. 안 고정하면 사람마다 다른 버전이 깔려서
+# "내 컴퓨터에선 되는데" 가 생긴다.
+
+# ── 발표자료 읽기 ────────────────────────────────────────────
+python-pptx==1.0.2          # import pptx    - PPTX 파싱
+PyMuPDF==1.27.2.3           # import fitz    - PDF 파싱 / 슬라이드 렌더
+
+# ── 검색 ────────────────────────────────────────────────────
+numpy==2.2.2
+sentence-transformers==5.0.0
+# torch 는 sentence-transformers 가 끌고 오지만, 버전에 따라 임베딩 결과가
+# 미세하게 달라질 수 있어 같이 고정한다.
+torch==2.13.0
+transformers==4.53.2
+
+# ── 한국어 처리 ──────────────────────────────────────────────
+kiwipiepy==0.23.2           # 형태소 분석 - 키워드에서 명사만 뽑는 데 쓴다
+
+# ── LLM (발표 전 작업에만) ───────────────────────────────────
+# 실시간 구간에서는 LLM 을 부르지 않는다. 캡션·예상질문 생성용이다.
+google-genai==2.22.0        # from google import genai  (신 SDK)
+                            # 구 SDK 인 google-generativeai 와 다르다. 섞으면 충돌한다.
+openai==2.45.0              # 제공사 교체용 (caption.py --provider openai)
+# anthropic                 # 필요해지면 주석 해제
+
+# ── 모의 디펜스 꼬리질문 ─────────────────────────────────────
+langgraph==1.2.9
+
+# ── 윈도우 전용 ──────────────────────────────────────────────
+# PPTX 를 슬라이드 이미지로 내보낼 때 PowerPoint 를 쓴다(render.py).
+# PDF 만 다룰 거면 없어도 된다.
+pywin32==308 ; sys_platform == "win32"
