@@ -26,6 +26,7 @@ from pathlib import Path
 from embedders import BM25, Hybrid, STEmbedder, _tokens
 from qtype import classify
 from weak_profile import WeakProfile
+import qa_log
 
 # 유형별로 슬라이드에서 '무엇을 보여줄지'가 다르다.
 # 검색에 유형을 쓰는 건 실패했지만(README 참고), 무엇을 띄울지 고르는 데는 맞다.
@@ -266,12 +267,18 @@ def _keywords(words: list[str], qwords: set, idf: dict, n: int = 5,
 
 class ReadyQ:
     def __init__(self, chunks_path: Path | str, preset: str = DEFAULT_PRESET,
-                 weak_path: Path | str | None = None):
+                 weak_path: Path | str | None = None,
+                 log_path: Path | str | None = qa_log.DEFAULT_PATH,
+                 session: str = ""):
         if preset not in PRESETS:
             raise ValueError(f"모르는 프리셋: {preset} (가능: {', '.join(PRESETS)})")
         self.preset = preset
         # 연습 기록. 없으면 빈 것으로 동작한다 - 실전에서 멈추면 안 된다.
         self.weak = WeakProfile.load(weak_path)
+        # 실전 기록. 사후 리포트의 재료다. None 이면 기록하지 않는다.
+        self.log_path = log_path
+        self.session = session
+        self.expected = []          # set_expected() 로 넣으면 적중률도 기록
         self.rows = [json.loads(l) for l in Path(chunks_path).open(encoding="utf-8")]
         docs = [r["text"] for r in self.rows]
 
@@ -352,18 +359,32 @@ class ReadyQ:
 
         # 1단계 - 잡음인가. 헛기침이나 소음에 검색이 돌면 엉뚱한 근거가 뜬다.
         if is_noise(question, self.nouns):
-            return self._empty(question, "ignored", t0)
+            c = self._empty(question, "ignored", t0)
+            self._log(c, question)
+            return c
 
         # 2단계 - 발표자료와 관련이 있는가.
         # 검색 엔진은 무조건 상위 k 개를 돌려주므로, 여기서 걸러야 '근거 없음'이 나온다.
         if known_ratio(question, self.nouns, self.idf) < MIN_KNOWN_RATIO:
-            return self._empty(question, "no_evidence", t0, NO_EVIDENCE_ADVICE)
+            c = self._empty(question, "no_evidence", t0, NO_EVIDENCE_ADVICE)
+            self._log(c, question)
+            return c
 
         if self.slow is not None and not self._slow_ready:
             raise RuntimeError("warm() 을 먼저 부르세요 (임베딩 모델 로딩)")
-        t0 = time.time()
         engine = self.slow if self.slow is not None else self.fast
-        return self._cue(question, engine.search([question], k)[0], self.preset, k, t0)
+        cue = self._cue(question, engine.search([question], k)[0], self.preset, k, t0)
+        self._log(cue, question)
+        return cue
+
+    def _log(self, cue: Cue, question: str) -> None:
+        if self.log_path:
+            qa_log.append(cue, question, self.log_path, self.session,
+                          self.expected or None)
+
+    def set_expected(self, questions: list[dict]) -> None:
+        """모의 디펜스에서 뽑아둔 예상 질문. 넣으면 적중률까지 기록한다."""
+        self.expected = questions or []
 
     # 아래 둘은 진단용이다. 두 방식의 결과를 비교해볼 때만 쓴다.
     def _fast_cue(self, question: str, k: int = 3) -> Cue:
