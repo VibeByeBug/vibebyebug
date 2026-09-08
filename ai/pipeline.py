@@ -42,6 +42,51 @@ DEFLECT = [
     "정확히 답하려면 질문 범위를 조금 좁혀주실 수 있을까요?",
 ]
 
+# ── 잡음 방어 ────────────────────────────────────────────────────────
+# 헛기침, 현장 소음, 짧은 침묵에 검색이 돌면 엉뚱한 슬라이드가 뜬다.
+# 발표자가 그걸 보고 헷갈리느니 아무것도 안 뜨는 게 낫다.
+MIN_CHARS = 6          # 이보다 짧으면 질문으로 안 본다
+MIN_NOUNS = 1          # 명사가 하나도 없으면 말이 아니다
+
+# STT 가 잡음을 이런 걸로 옮기는 경우가 많다
+FILLER = {"어", "음", "아", "그", "저", "네", "예", "응", "엄", "흠", "저기",
+          "그니까", "그러니까", "뭐", "이제", "약간", "좀"}
+
+# ── 근거 없음 ────────────────────────────────────────────────────────
+# 검색 엔진은 무조건 상위 k 개를 돌려준다. 발표자료와 무관한 질문에도 뭔가 나온다.
+# 질문에 쓰인 낱말이 발표자료에 아예 없으면 근거가 없는 것으로 본다.
+# (문턱값은 실제 질문으로 재서 잡았다 - calibrate_guard.py 참고)
+MIN_KNOWN_RATIO = 0.26
+
+# 근거가 없을 때 발표자에게 제안할 말. 지어내지 않고 정해둔 문장만 쓴다.
+NO_EVIDENCE_ADVICE = [
+    "그 부분은 이번 분석 범위에 넣지 않았습니다.",
+    "질문 의도를 조금만 더 구체적으로 말씀해주시겠어요?",
+    "확인해서 따로 답변 드리겠습니다.",
+]
+
+
+def is_noise(text: str, nouns_fn) -> bool:
+    """질문이 아니라 잡음인가."""
+    t = (text or "").strip()
+    if len(t) < MIN_CHARS:
+        return True
+    words = nouns_fn(t)
+    if len(words) < MIN_NOUNS:
+        return True
+    # 명사가 있어도 전부 추임새면 잡음이다
+    return all(w in FILLER for w in words)
+
+
+def known_ratio(question: str, nouns_fn, idf: dict) -> float:
+    """질문에 쓰인 낱말 중 발표자료에 실제로 있는 비율."""
+    words = [w for w in nouns_fn(question) if w not in FILLER and len(w) >= 2]
+    if not words:
+        return 0.0
+    known = sum(1 for w in words if w.lower() in idf)
+    return known / len(words)
+
+
 # 명사이긴 하나 화면에 띄워봐야 아무 정보도 주지 않는 말
 STOP = {
     "경우", "위해", "통해", "대한", "때문", "여기", "거기", "정도", "부분", "다음",
@@ -87,6 +132,8 @@ class Cue:
     keywords: list[str] = field(default_factory=list)
     sources: list[Source] = field(default_factory=list)
     deflect: list[str] = field(default_factory=list)
+    status: str = "ok"        # ok | ignored | no_evidence
+    advice: list[str] = field(default_factory=list)  # 근거가 없을 때 할 말
     weak_type: bool = False   # 연습에서 이 유형에 약했나 (화면 강조용)
     stage: str = "fast"
     latency_ms: float = 0.0
@@ -265,6 +312,12 @@ class ReadyQ:
     def has_stage2(self) -> bool:
         return self.slow is not None
 
+    def _empty(self, question: str, status: str, t0: float, advice=None) -> Cue:
+        """검색을 안 하고 돌려보낸다. 화면은 '근거 없음' 상태를 그리면 된다."""
+        return Cue(question_type=classify(question) if status != "ignored" else "",
+                   status=status, advice=advice or [],
+                   latency_ms=round((time.time() - t0) * 1000, 2))
+
     def _cue(self, question: str, hits, stage: str, k: int, t0: float) -> Cue:
         qtype = classify(question)
         qwords = {w.lower() for w in self.nouns(question)}
@@ -295,6 +348,17 @@ class ReadyQ:
         기다렸다 한 번에 준다. 중간 결과를 먼저 띄우지 않는다.
         프리셋에 따라 BM25 만 쓰거나(fast) 하이브리드를 쓴다(balanced/accurate).
         """
+        t0 = time.time()
+
+        # 1단계 - 잡음인가. 헛기침이나 소음에 검색이 돌면 엉뚱한 근거가 뜬다.
+        if is_noise(question, self.nouns):
+            return self._empty(question, "ignored", t0)
+
+        # 2단계 - 발표자료와 관련이 있는가.
+        # 검색 엔진은 무조건 상위 k 개를 돌려주므로, 여기서 걸러야 '근거 없음'이 나온다.
+        if known_ratio(question, self.nouns, self.idf) < MIN_KNOWN_RATIO:
+            return self._empty(question, "no_evidence", t0, NO_EVIDENCE_ADVICE)
+
         if self.slow is not None and not self._slow_ready:
             raise RuntimeError("warm() 을 먼저 부르세요 (임베딩 모델 로딩)")
         t0 = time.time()
