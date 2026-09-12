@@ -5,3 +5,16 @@ https://www.figma.com/design/tONbJ6BMPgvGz1omW9LtGK/Ready-Q_%EB%A1%9C%EC%9A%B0%E
 
 [Ready_Q_사용자_흐름도]  
 https://www.figma.com/board/7NrG0Vr2SzRNORvIYAfdbg/Ready-Q-%EC%82%AC%EC%9A%A9%EC%9E%90-%ED%9D%90%EB%A6%84%EB%8F%84-v2?node-id=0-1&t=fdBLZMXaEcxxPxCt-1
+
+## Frontend
+
+React (Vite + TypeScript) + Tailwind CSS. See `src/` for the app source.
+
+### Setup
+
+```bash
+npm install
+npm run dev
+```
+
+Set `VITE_WS_URL` in a `.env` file to point at the backend WebSocket (defaults to `ws://localhost:8000/ws`).
