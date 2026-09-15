@@ -6,7 +6,8 @@ export type ScreenName =
   | 'recognized'
   | 'textInput'
   | 'hud'
-  | 'error';
+  | 'error'
+  | 'postSession';
 
 export type PreparingStatus = 'uploading' | 'analyzing' | 'ready' | 'failed';
 

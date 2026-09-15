@@ -1,7 +1,9 @@
 import { useState } from 'react';
 import { ErrorScreen } from './components/ErrorScreen';
+import { Header } from './components/Header';
 import { Hud } from './components/Hud';
 import { MicControl } from './components/MicControl';
+import { PostSessionTabs } from './components/PostSessionTabs';
 import { PreparingScreen } from './components/PreparingScreen';
 import { RecognizedQuestion } from './components/RecognizedQuestion';
 import { StartScreen } from './components/StartScreen';
@@ -21,6 +23,7 @@ const SCREENS: { key: ScreenName; label: string }[] = [
   { key: 'textInput', label: '텍스트 입력' },
   { key: 'hud', label: 'HUD' },
   { key: 'error', label: '오류 안내' },
+  { key: 'postSession', label: '사후 화면' },
 ];
 
 function App() {
@@ -40,67 +43,80 @@ function App() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-100 px-4 py-10">
-      <div className="mx-auto mb-6 flex w-full max-w-2xl flex-wrap gap-2">
-        {SCREENS.map((item) => (
-          <button
-            key={item.key}
-            type="button"
-            onClick={() => setScreen(item.key)}
-            className={`rounded-full px-3 py-1 text-xs font-medium transition-colors ${
-              screen === item.key ? 'bg-orange-500 text-white' : 'bg-white text-gray-500 hover:bg-orange-50'
-            }`}
-          >
-            {item.label}
-          </button>
-        ))}
-      </div>
+    <div className="min-h-screen bg-gray-100">
+      <Header />
 
-      {screen === 'start' && <StartScreen onStart={() => setScreen('upload')} />}
+      <div className="px-4 py-10">
+        <div className="mx-auto mb-6 flex w-full max-w-2xl flex-wrap gap-2">
+          {SCREENS.map((item) => (
+            <button
+              key={item.key}
+              type="button"
+              onClick={() => setScreen(item.key)}
+              className={`rounded-full px-3 py-1 text-xs font-medium transition-colors ${
+                screen === item.key ? 'bg-orange-500 text-white' : 'bg-white text-gray-500 hover:bg-orange-50'
+              }`}
+            >
+              {item.label}
+            </button>
+          ))}
+        </div>
 
-      {screen === 'upload' && <UploadScreen onNext={() => setScreen('preparing')} />}
+        {screen === 'start' && <StartScreen onStart={() => setScreen('upload')} />}
 
-      {screen === 'preparing' && (
-        <PreparingScreen onReady={() => setScreen('mic')} onRetry={() => setScreen('upload')} />
-      )}
+        {screen === 'upload' && <UploadScreen onNext={() => setScreen('preparing')} />}
 
-      {screen === 'mic' && (
-        <MicControl
-          onPartialResult={handlePartialResult}
-          onFinalResult={handleFinalResult}
-          onSttError={() => setScreen('textInput')}
-        />
-      )}
+        {screen === 'preparing' && (
+          <PreparingScreen onReady={() => setScreen('mic')} onRetry={() => setScreen('upload')} />
+        )}
 
-      {screen === 'recognized' && (
-        <RecognizedQuestion
-          partialText={question.partialText}
-          finalText={question.finalText}
-          isConfirmed={question.isConfirmed}
-        />
-      )}
+        {screen === 'mic' && (
+          <MicControl
+            onPartialResult={handlePartialResult}
+            onFinalResult={handleFinalResult}
+            onSttError={() => setScreen('textInput')}
+          />
+        )}
 
-      {screen === 'textInput' && (
-        <TextInputFallback
-          onSubmit={(text) => {
-            setQuestion({ partialText: text, finalText: text, isConfirmed: true });
-            setScreen('hud');
-          }}
-        />
-      )}
+        {screen === 'recognized' && (
+          <RecognizedQuestion
+            partialText={question.partialText}
+            finalText={question.finalText}
+            isConfirmed={question.isConfirmed}
+          />
+        )}
 
-      {screen === 'hud' && (
-        <>
-          <div className="mx-auto mb-4 max-w-2xl text-sm text-gray-500">
-            WebSocket: {isConnected ? '연결됨' : '연결 대기 중'}
+        {screen === 'textInput' && (
+          <TextInputFallback
+            onSubmit={(text) => {
+              setQuestion({ partialText: text, finalText: text, isConfirmed: true });
+              setScreen('hud');
+            }}
+          />
+        )}
+
+        {screen === 'hud' && (
+          <div className="mx-auto flex w-full max-w-2xl flex-col gap-4">
+            <div className="text-sm text-gray-500">
+              WebSocket: {isConnected ? '연결됨' : '연결 대기 중'}
+            </div>
+            <Hud result={lastResult ?? mockQaResult} />
+            <button
+              type="button"
+              onClick={() => setScreen('postSession')}
+              className="self-start rounded-lg border border-gray-300 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50"
+            >
+              질문 로그 저장하고 마치기
+            </button>
           </div>
-          <Hud result={lastResult ?? mockQaResult} />
-        </>
-      )}
+        )}
 
-      {screen === 'error' && (
-        <ErrorScreen onEditQuestion={() => setScreen('textInput')} onRetry={() => setScreen('mic')} />
-      )}
+        {screen === 'error' && (
+          <ErrorScreen onEditQuestion={() => setScreen('textInput')} onRetry={() => setScreen('mic')} />
+        )}
+
+        {screen === 'postSession' && <PostSessionTabs />}
+      </div>
     </div>
   );
 }
