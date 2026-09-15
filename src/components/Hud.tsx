@@ -30,7 +30,7 @@ export function Hud({ result }: HudProps) {
         {result.keywords.map((keyword) => (
           <span
             key={keyword}
-            className="rounded-full bg-blue-50 px-3 py-1 text-blue-800"
+            className="rounded-full bg-orange-50 px-3 py-1 text-orange-800"
             style={{ fontSize: '15px' }}
           >
             {keyword}
@@ -54,7 +54,7 @@ export function Hud({ result }: HudProps) {
           type="button"
           onClick={() => setExpanded((prev) => !prev)}
           disabled={!canExpand}
-          className="mt-1 self-start rounded-md px-3 py-1.5 text-sm font-medium text-blue-700 disabled:cursor-not-allowed disabled:text-gray-400 enabled:hover:bg-blue-50"
+          className="mt-1 self-start rounded-md px-3 py-1.5 text-sm font-medium text-orange-700 disabled:cursor-not-allowed disabled:text-gray-400 enabled:hover:bg-orange-50"
         >
           {expanded ? '접기' : '더보기'}
         </button>
