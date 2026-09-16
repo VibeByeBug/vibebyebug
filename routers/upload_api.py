@@ -3,6 +3,7 @@ import uuid
 from fastapi import APIRouter, UploadFile, File, HTTPException
 
 from indexing import build_index, chunks_path
+import engine_store
 
 router = APIRouter(
     prefix="/api/upload",
@@ -49,11 +50,17 @@ async def upload_pdf(file: UploadFile = File(...)):
             "next": index.get("next"),
         })
 
+    # 6. 준비(warm) 를 백그라운드로 시작한다.
+    #    임베딩 모델 로딩 + 색인이 1분 가까이 걸리므로 여기서 기다리지 않는다.
+    #    프론트는 /api/upload/status/{id} 를 폴링해 '준비완료' 를 기다린다.
+    engine_store.start_warmup(presentation_id, index["chunks_path"])
+
     return {
         "status": "success",
         "presentation_id": presentation_id,
         "filename": file.filename,
         "slides": index["slides"],
+        "state": engine_store.PENDING,
         "quality": index["quality"],      # 준비 상태 화면에서 '근거로 못 쓰는 슬라이드' 고지용
         "message": "파일 업로드 및 자료 분석이 완료되었습니다."
     }
@@ -91,6 +98,23 @@ async def delete_presentation(presentation_id: str):
         chunks = chunks_path(presentation_id)
         if chunks.exists():
             chunks.unlink()
+        engine_store.drop(presentation_id)
         return {"status": "success", "message": f"{presentation_id} 파일이 삭제되었습니다."}
     else:
         raise HTTPException(status_code=404, detail="해당 파일을 찾을 수 없습니다.")
+
+
+@router.get("/status/{presentation_id}")
+async def presentation_status(presentation_id: str):
+    """자료 준비 상태. 프론트의 '자료 준비 상태 화면'이 이걸 폴링한다.
+
+    state: 분석중 / 준비완료 / 실패 / 없음
+    """
+    st = engine_store.get_status(presentation_id)
+
+    # 서버가 재시작되면 엔진이 사라진다. 청크가 남아 있으면 다시 준비를 건다.
+    if st["state"] == engine_store.MISSING and chunks_path(presentation_id).exists():
+        engine_store.start_warmup(presentation_id, chunks_path(presentation_id))
+        st = engine_store.get_status(presentation_id)
+
+    return st
