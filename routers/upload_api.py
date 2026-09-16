@@ -2,6 +2,8 @@ import os
 import uuid
 from fastapi import APIRouter, UploadFile, File, HTTPException
 
+from indexing import build_index, chunks_path
+
 router = APIRouter(
     prefix="/api/upload",
     tags=["Upload & Data Management"]
@@ -34,11 +36,26 @@ async def upload_pdf(file: UploadFile = File(...)):
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"파일 저장 중 오류 발생: {str(e)}")
         
+    # 5. 검색용 청크 생성 (ReadyQ 는 chunks.jsonl 이 있어야 뜬다)
+    #    텍스트가 한 글자도 안 나오면 여기서 실패로 알린다 - 조용히 넘기면
+    #    발표자가 '검색이 안 되는 자료'인 줄 모른 채 발표에 들어가게 된다.
+    index = build_index(file_path, presentation_id)
+
+    if not index["ok"]:
+        os.remove(file_path)   # 쓸 수 없는 자료는 남겨두지 않는다
+        raise HTTPException(status_code=422, detail={
+            "reason": index["reason"],
+            "message": index["message"],
+            "next": index.get("next"),
+        })
+
     return {
-        "status": "success", 
+        "status": "success",
         "presentation_id": presentation_id,
         "filename": file.filename,
-        "message": "파일 업로드 및 ID 발급이 완료되었습니다."
+        "slides": index["slides"],
+        "quality": index["quality"],      # 준비 상태 화면에서 '근거로 못 쓰는 슬라이드' 고지용
+        "message": "파일 업로드 및 자료 분석이 완료되었습니다."
     }
 
 @router.get("/list")
@@ -70,6 +87,10 @@ async def delete_presentation(presentation_id: str):
     
     if os.path.exists(file_path):
         os.remove(file_path)
+        # 청크도 같이 지운다. 안 그러면 자료는 없는데 검색은 되는 상태가 된다.
+        chunks = chunks_path(presentation_id)
+        if chunks.exists():
+            chunks.unlink()
         return {"status": "success", "message": f"{presentation_id} 파일이 삭제되었습니다."}
     else:
         raise HTTPException(status_code=404, detail="해당 파일을 찾을 수 없습니다.")

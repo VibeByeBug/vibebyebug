@@ -1,0 +1,95 @@
+"""업로드된 발표자료 -> 검색용 청크(chunks.jsonl) 생성.
+
+업로드 API 는 PDF 를 저장만 하고 끝난다. 그런데 ReadyQ 는 chunks.jsonl 을 받아서
+뜨므로, 그 사이를 이어주는 단계가 필요하다. 이 파일이 그 단계다.
+
+이예진 님 설계에서 가져온 두 가지 원칙을 그대로 지킨다.
+  1. 텍스트를 못 찾으면 조용히 0건으로 넘기지 않고 실패로 알린다 (NoTextError)
+  2. 검색이 못 보는 슬라이드가 있으면 발표자에게 고지한다 (quality_report)
+     -> "N번 슬라이드는 근거로 못 씁니다" 를 준비 상태 화면에 띄우기 위한 재료
+"""
+
+from __future__ import annotations
+
+import json
+from pathlib import Path
+
+# ai/ 를 import 경로에 등록하는 부수효과가 필요하다 (ai_engine.py 참고)
+import ai_engine  # noqa: F401
+from ingest import ingest, NoTextError
+from quality_report import analyze, MIN_LETTERS
+
+DATA_DIR = Path("data")
+
+# quality_report.main() 과 같은 기준을 쓴다
+FAIL_RATIO = 0.15
+WARN_RATIO = 0.05
+
+
+def chunks_path(presentation_id: str) -> Path:
+    """발표 ID 에 대응하는 청크 파일 경로."""
+    return DATA_DIR / f"{presentation_id}.jsonl"
+
+
+def _quality(rows: list[dict]) -> dict:
+    a = analyze(rows)
+    total = a["total"] or 1
+    dead_pages = [r["page"] for r in a["dead"]]
+    ratio = len(a["dead"]) / total
+
+    if ratio > FAIL_RATIO:
+        verdict = "실패"
+        message = ("자료의 상당 부분에서 텍스트를 찾지 못했습니다. "
+                   "이 자료로는 근거 검색을 신뢰하기 어렵습니다.")
+    elif ratio > WARN_RATIO:
+        verdict = "경고"
+        message = (f"일부 슬라이드({len(dead_pages)}장)는 근거로 사용할 수 없습니다. "
+                   "해당 슬라이드 질문이 나오면 직접 답하셔야 합니다.")
+    else:
+        verdict = "양호"
+        message = "모든 슬라이드가 근거로 사용 가능합니다."
+
+    return {
+        "verdict": verdict,
+        "message": message,
+        "median_letters": round(a["median_letters"]),
+        "unsearchable_pages": dead_pages,
+        "unsearchable_ratio": round(ratio, 3),
+        "min_letters_threshold": MIN_LETTERS,
+    }
+
+
+def build_index(file_path: Path | str, presentation_id: str) -> dict:
+    """발표자료를 청크로 만들어 저장하고, 추출 품질까지 판정해 돌려준다.
+
+    성공: {"ok": True, "slides": N, "chunks_path": ..., "quality": {...}}
+    실패: {"ok": False, "reason": ..., "message": ...}
+         reason = not_found | unsupported | no_text
+    """
+    path = Path(file_path)
+    if not path.exists():
+        return {"ok": False, "reason": "not_found",
+                "message": f"파일을 찾을 수 없습니다: {path.name}"}
+
+    try:
+        rows = ingest(path)
+    except NoTextError as e:
+        # 글자가 이미지로 깔린 자료. 텍스트 추출로는 검색이 불가능하다.
+        return {"ok": False, "reason": "no_text", "message": str(e),
+                "next": "이미지 인식 경로(render.py + caption.py)가 필요합니다."}
+    except ValueError as e:
+        return {"ok": False, "reason": "unsupported", "message": str(e)}
+
+    DATA_DIR.mkdir(parents=True, exist_ok=True)
+    out = chunks_path(presentation_id)
+    with out.open("w", encoding="utf-8") as f:
+        for r in rows:
+            f.write(json.dumps(r, ensure_ascii=False) + "\n")
+
+    return {
+        "ok": True,
+        "presentation_id": presentation_id,
+        "chunks_path": str(out),
+        "slides": len(rows),
+        "quality": _quality(rows),
+    }

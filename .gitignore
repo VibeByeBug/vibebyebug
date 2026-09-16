@@ -3,6 +3,10 @@
 *.ppt
 *.pdf
 ai/data/
+# 인덱싱 산출물(chunks.jsonl). 발표자료 원문이 통째로 들어있다
+data/
+# 업로드된 원본 파일
+uploaded_files/
 **/.cache/
 
 # 자격증명 및 환경변수
