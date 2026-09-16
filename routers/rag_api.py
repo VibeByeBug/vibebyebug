@@ -1,6 +1,7 @@
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 import asyncio
+import time
 
 # Q&A 로그 저장을 위해 앞서 만든 함수를 가져옵니다.
 from routers.log_api import save_qa_log
@@ -36,18 +37,17 @@ class TextQuestionRequest(BaseModel):
 # ---------------------------------------------------------
 @router.post("/fallback/ask")
 async def ask_question_by_text(req: TextQuestionRequest):
-    """
-    [비상용 API] 마이크나 웹소켓이 끊어졌을 때, 텍스트 입력으로 질문을 처리합니다.
-    """
+    # ⏱️ 계측 시작
+    start_time = time.time()
+    
     if not req.question or not req.question.strip():
         raise HTTPException(status_code=400, detail="질문 내용이 비어있습니다.")
         
     print(f"⌨️ 비상 텍스트 수신: {req.question}")
     
-    # 1. AI 처리 시간 시뮬레이션
+    # (AI 처리 시뮬레이션 및 로직...)
     await asyncio.sleep(1.0)
     
-    # 2. 결과 상태 분기 (Mock)
     if "테스트" in req.question:
         status = "우회"
         answer = "해당 질문은 발표 주제와 무관하거나 근거를 찾을 수 없습니다."
@@ -55,7 +55,6 @@ async def ask_question_by_text(req: TextQuestionRequest):
         status = "성공"
         answer = f"'{req.question}'에 대한 핵심 방어 논리입니다."
         
-    # 3. 로그 저장소에 기록 (import 해온 save_qa_log 사용)
     save_qa_log(
         presentation_id=req.presentation_id,
         question=req.question,
@@ -63,8 +62,14 @@ async def ask_question_by_text(req: TextQuestionRequest):
         status=status
     )
     
+    # ⏱️ 계측 종료 및 계산
+    end_time = time.time()
+    latency = round(end_time - start_time, 3)
+    print(f"⏱️ [지연시간 계측] Fallback API 처리: {latency}초 소요")
+    
     return {
         "status": "success",
+        "latency_sec": latency, # 프론트엔드에서 화면에 'X.XX초 소요'를 띄울 수 있게 넘겨줍니다.
         "qa_result": {
             "question": req.question,
             "answer": answer,
