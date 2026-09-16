@@ -1,0 +1,23 @@
+# Ready-Q 백엔드
+#   pip install -r requirements.txt
+#
+# AI 모듈 의존성까지 한 번에 깔린다. 파트별로 따로 설치하면
+# 버전이 갈려서 "내 컴퓨터에선 되는데" 가 생긴다.
+-r ai/requirements.txt
+
+# ── 웹 서버 ──────────────────────────────────────────────────
+fastapi==0.141.1
+uvicorn==0.53.0
+pydantic==2.13.5
+
+# uvicorn 이 WebSocket 을 처리하려면 별도 라이브러리가 있어야 한다.
+# 없으면 코드는 멀쩡한데 /ws 만 404 로 떨어져서 원인을 찾기 어렵다.
+#   WARNING: No supported WebSocket library detected.
+websockets==17.1
+
+# ── 파일 업로드 / 템플릿 ─────────────────────────────────────
+python-multipart==0.0.32    # UploadFile 처리. 없으면 업로드 API 가 500
+Jinja2==3.1.6               # templates/index.html 렌더
+
+# ── 설정 ────────────────────────────────────────────────────
+python-dotenv==1.2.3        # .env 읽기
