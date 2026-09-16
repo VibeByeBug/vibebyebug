@@ -32,10 +32,43 @@ STT 선정 필수 조건: **interim(부분) 결과 스트리밍 지원.** 없으
 검색이 못 보는 구간을 발표자가 모르는 것이 이 제품에서 가장 위험한 실패 양상이라,
 파이프라인 전체가 "못 읽었으면 반드시 말한다"를 지킵니다.
 
+### 자동 전환 (`build_chunks.py`)
+
+서버는 올라온 자료가 어느 쪽인지 미리 모른다. `build_chunks.build()` 가 둘을 알아서 고른다.
+
+1. 글자 추출을 먼저 한다. 글자가 다 있으면 여기서 끝나고 API 호출은 0회다.
+2. 글자가 20자 미만인 슬라이드만 이미지로 만들어 읽는다. 섞인 자료는 모자란 장만 읽는다.
+3. 키가 없거나 하루 한도가 떨어져도 멈추지 않는다. 글자로 뽑은 장은 살리고,
+   못 읽은 장 번호(`unreadable`)와 이유(`reason`)를 돌려준다.
+
+```python
+from build_chunks import build
+r = build(path, slides_dir=f"data/slides/{presentation_id}")
+r["rows"]        # ingest() 와 같은 형식. 그대로 jsonl 로 쓰면 된다
+r["method"]      # text | image | mixed
+r["unreadable"]  # 끝내 못 읽은 슬라이드 번호
+r["reason"]      # no_api_key | daily_quota | call_limit | render_failed | caption_error | None
+r["message"]     # 화면에 띄울 문구
+r["calls"]       # 이번에 쓴 API 호출 수
+```
+
+`slides_dir` 를 발표마다 고정하면 같은 자료를 다시 올려도 이미 읽은 장은 호출하지 않는다.
+하루 한도 때문에 일부만 읽혔다면 다음 날 다시 올리면 나머지만 읽는다.
+
+주의할 점 두 가지.
+
+- 슬라이드 한 장에 호출 1회다. Gemini 무료 등급은 하루 20회라 18장 자료 하나로 거의 다 쓴다.
+  `max_calls` 로 한 번에 쓸 상한을 걸 수 있다.
+- PPTX 를 이미지로 만들려면 PowerPoint 가 깔린 윈도우가 필요하다. PDF 는 어디서나 된다.
+
+확인한 경우: 글자만 있는 PDF(호출 0회), 글자 1장 + 이미지 2장 PDF(호출 2회, 재실행 시 0회),
+키 없음, 호출 상한 0, 하루 한도 초과. 마지막 셋은 모두 글자 1장을 살리고 2, 3번을 못 읽은 장으로 돌려줬다.
+
 ## 스크립트
 
 | 파일 | 역할 | 상태 |
 |---|---|---|
+| `build_chunks.py` | 글자 추출, 안 되는 장만 이미지로 읽기 | 동작 확인 |
 | `ingest.py` | PDF/PPTX → 슬라이드 단위 청크 | 동작 확인 |
 | `quality_report.py` | 추출 품질 게이트 | 동작 확인 |
 | `render.py` | 슬라이드 → PNG (PowerPoint COM / PyMuPDF) | 동작 확인 |
