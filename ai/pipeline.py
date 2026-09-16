@@ -22,6 +22,7 @@ import time
 from collections import Counter
 from dataclasses import asdict, dataclass, field
 from pathlib import Path
+from typing import Iterator
 
 from embedders import BM25, Hybrid, STEmbedder, _tokens
 from qtype import classify
@@ -119,6 +120,9 @@ PRESETS = {
 }
 DEFAULT_PRESET = "balanced"
 
+# 화면에 무엇까지 띄울지. 발표는 키워드로 충분할 수 있지만 회의나 업무 자리는 답변 문장이 필요하다.
+MODES = ("keywords", "answer")
+
 
 @dataclass
 class Source:
@@ -138,6 +142,7 @@ class Cue:
     weak_type: bool = False   # 연습에서 이 유형에 약했나 (화면 강조용)
     stage: str = "fast"
     latency_ms: float = 0.0
+    mode: str = "keywords"    # answer 면 화면은 뒤이어 올 cue.answer 자리를 비워둔다
 
     def to_message(self) -> dict:
         """백엔드 계약(cue.evidence)에 맞춘 형태."""
@@ -269,10 +274,12 @@ class ReadyQ:
     def __init__(self, chunks_path: Path | str, preset: str = DEFAULT_PRESET,
                  weak_path: Path | str | None = None,
                  log_path: Path | str | None = qa_log.DEFAULT_PATH,
-                 session: str = ""):
+                 session: str = "", mode: str = "keywords"):
         if preset not in PRESETS:
             raise ValueError(f"모르는 프리셋: {preset} (가능: {', '.join(PRESETS)})")
         self.preset = preset
+        self.set_mode(mode)
+        self._answerer = None
         # 연습 기록. 없으면 빈 것으로 동작한다 - 실전에서 멈추면 안 된다.
         self.weak = WeakProfile.load(weak_path)
         # 실전 기록. 사후 리포트의 재료다. None 이면 기록하지 않는다.
@@ -307,10 +314,12 @@ class ReadyQ:
         fast 프리셋은 2단계가 없으므로 할 일이 없다.
         balanced 는 문서 289장 기준 ~62초, accurate 는 ~721초 걸린다.
         """
+        t0 = time.time()
+        if self.mode == "answer":
+            self._get_answerer().warm()
         if self.slow is None:
             self._slow_ready = True
-            return 0.0
-        t0 = time.time()
+            return time.time() - t0
         self.slow.index(self._slow_docs)
         self._slow_ready = True
         return time.time() - t0
@@ -322,7 +331,7 @@ class ReadyQ:
     def _empty(self, question: str, status: str, t0: float, advice=None) -> Cue:
         """검색을 안 하고 돌려보낸다. 화면은 '근거 없음' 상태를 그리면 된다."""
         return Cue(question_type=classify(question) if status != "ignored" else "",
-                   status=status, advice=advice or [],
+                   status=status, advice=advice or [], mode=self.mode,
                    latency_ms=round((time.time() - t0) * 1000, 2))
 
     def _cue(self, question: str, hits, stage: str, k: int, t0: float) -> Cue:
@@ -347,6 +356,7 @@ class ReadyQ:
             weak_type=self.weak.weak_type(qtype),
             stage=stage,
             latency_ms=round((time.time() - t0) * 1000, 2),
+            mode=self.mode,
         )
 
     def cue(self, question: str, k: int = 3) -> Cue:
@@ -381,6 +391,42 @@ class ReadyQ:
         if self.log_path:
             qa_log.append(cue, question, self.log_path, self.session,
                           self.expected or None)
+
+    def set_mode(self, mode: str) -> None:
+        """keywords: 키워드와 근거만 (모델 호출 0회)
+        answer:   키워드와 근거 뒤에 추천 답변까지 (질문당 호출 1회)
+        """
+        if mode not in MODES:
+            raise ValueError(f"모르는 모드: {mode} (가능: {', '.join(MODES)})")
+        self.mode = mode
+
+    def answer(self, question: str, cue: Cue) -> Iterator[dict]:
+        """cue() 결과에 이어 추천 답변을 문장 단위로 내보낸다. answer 모드에서만 부른다.
+
+        cue() 를 먼저 화면에 보낸 뒤에 부른다. 모델 호출이 1~2초 걸려서
+        키워드까지 같이 기다리게 하면 안 된다.
+
+        메시지는 {"type": "cue.answer", "text", "done", "latency_ms"} 이고,
+        마지막 메시지(done=True)에 status 가 붙는다: ok | no_answer | blocked | error | skipped
+        """
+        if cue.status != "ok" or not cue.sources:
+            # 근거 없는 질문에 답변을 만들면 지어낸 말이 된다
+            yield {"type": "cue.answer", "text": "", "done": True,
+                   "latency_ms": 0.0, "status": "skipped"}
+            return
+        answerer = self._get_answerer()
+        by_page = {}
+        for s in cue.sources:
+            row = next((r for r in self.rows if r["page"] == s.slide and r["source"] == s.source), None)
+            if row is not None:
+                by_page.setdefault(s.slide, row["text"])
+        yield from answerer.stream(question, list(by_page.items()))
+
+    def _get_answerer(self):
+        if self._answerer is None:
+            from answer import Answerer
+            self._answerer = Answerer()
+        return self._answerer
 
     def set_expected(self, questions: list[dict]) -> None:
         """모의 디펜스에서 뽑아둔 예상 질문. 넣으면 적중률까지 기록한다."""
