@@ -18,7 +18,7 @@ app.include_router(rag_api.router)
 # [보안 설정] CORS 미들웨어 추가 (프론트엔드 접속 허용)
 # ---------------------------------------------------------
 app.add_middleware(
-    CORSMiddleware,
+    CORSMiddleware, 
     allow_origins=["*"],  # 지금은 개발 중이라 모든 도메인("*")의 접근을 허용합니다. (추후 배포 시 프론트엔드 주소로 한정)
     allow_credentials=True,
     allow_methods=["*"],  # GET, POST 등 모든 통신 방식 허용
