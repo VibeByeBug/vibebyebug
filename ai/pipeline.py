@@ -343,7 +343,9 @@ class ReadyQ:
             line = _best_line(self.prepared[i], qwords, qtype, self.idf)
             if not line:
                 continue
-            srcs.append(Source(slide=r["page"], snippet=line[:120], source=r["source"]))
+            # 글머리표는 화면에서 군더더기다 ("-바이브 코딩 경진 대회...")
+            shown = re.sub(r"^[-•▪◦●○■□※➢❖✓]\s*", "", line)
+            srcs.append(Source(slide=r["page"], snippet=shown[:120], source=r["source"]))
             for w in _keywords(self.line_words[i].get(line, []), qwords,
                                self.idf, weak=self.weak, page=r["page"]):
                 if w not in kws:

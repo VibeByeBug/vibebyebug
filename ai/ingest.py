@@ -96,6 +96,60 @@ def from_pptx(path: Path) -> list[dict]:
     return kept
 
 
+# ── 띄어쓰기 복원 ─────────────────────────────────────────────────────
+# PowerPoint 에서 PDF 로 저장한 한글 자료 중에 공백이 통째로 빠지는 것이 있다.
+#   "구독500 명으로운영BEP,"  "1회용응시링크와지원자별리포트,"
+# 글자 위치를 재봐도 단어 사이 간격이 0 이거나 겹쳐서 위치로는 되살릴 수 없었다.
+# 형태소 분석기(kiwipiepy, 키워드 추출에 이미 쓰는 것)로 띄어쓰기를 다시 넣는다.
+#   "구독 500명으로 운영 BEP,"  "1회용 응시 링크와 지원자별 리포트,"
+# 19장에 0.15초. 정상 자료에 돌리면 멀쩡한 공백을 건드리므로 공백이 모자란 쪽에만 쓴다.
+
+# "한글 공백 한글" 이 한글 글자 수에 비해 얼마나 있나.
+# 전체 공백 수로 재면 숫자, 영어, 쉼표 뒤 공백이 섞여서 공백 빠진 자료도 0.10 이 나왔다.
+#   공백 빠진 PDF 0.0  /  정상 자료(톰과젤리) 0.25
+MIN_SPACE_RATIO = 0.05
+_kiwi = None
+
+
+def _hangul(text: str) -> int:
+    return len(re.findall(r"[가-힣]", text))
+
+
+def needs_spacing(text: str) -> bool:
+    h = _hangul(text)
+    gaps = len(re.findall(r"[가-힣] (?=[가-힣])", text))
+    return h >= 30 and gaps / h < MIN_SPACE_RATIO
+
+
+def restore_spacing(text: str) -> str:
+    global _kiwi
+    if _kiwi is None:
+        from kiwipiepy import Kiwi
+        _kiwi = Kiwi()
+    spaced = "\n".join(_kiwi.space(l, reset_whitespace=True) if _hangul(l) else l
+                       for l in text.split("\n"))
+    # 분석기가 숫자와 단위를 떼어놓는다 ("10 곳", "95 %"). 근거 문장에서 제일 눈에 띄는 곳이라 되붙인다.
+    return _NUM_UNIT.sub(r"\1\2", spaced)
+
+
+_NUM_UNIT = re.compile(r"(\d)\s+(%|곳|명|인|개|건|원|억|만|년|월|일|배|회|장|차|위|종|시간|분|초|점|퍼센트)")
+
+
+# 슬라이드 글상자 폭 때문에 줄이 바뀐 자리를 되붙인다.
+# 안 붙이면 근거로 "누적 응시자 1,000명," 같은 반쪽 줄이 뜬다.
+_BULLET = re.compile(r"^\s*([-•▪◦●○■□※➢❖✓]|\d+[.)]|[①-⑳])")
+
+
+def join_wrapped(text: str) -> str:
+    out: list[str] = []
+    for line in text.split("\n"):
+        if out and out[-1].rstrip().endswith(",") and line.strip() and not _BULLET.match(line):
+            out[-1] = out[-1].rstrip() + " " + line.strip()
+        else:
+            out.append(line)
+    return "\n".join(out)
+
+
 def ingest(path: Path) -> list[dict]:
     suffix = path.suffix.lower()
     if suffix == ".pdf":
@@ -105,8 +159,13 @@ def ingest(path: Path) -> list[dict]:
     else:
         raise ValueError(f"지원하지 않는 형식: {suffix} (.pdf 또는 .pptx만)")
 
+    # 공백 판정은 자료 전체로 한다. 슬라이드마다 하면 짧은 장에서 흔들린다.
+    spacing = needs_spacing("\n".join(c["text"] for c in raw))
+
     out = []
     for c in raw:
+        text = restore_spacing(c["text"]) if spacing else c["text"]
+        c = {**c, "text": join_wrapped(text)}
         notes = c.get("notes", "")
         body = c["text"] if not notes else f"{c['text']}\n\n[노트] {notes}"
         out.append(
