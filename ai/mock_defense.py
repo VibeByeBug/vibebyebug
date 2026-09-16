@@ -11,6 +11,7 @@
 사용:
     python mock_defense.py gen  data/chunks_x.jsonl -o data/expected_x.jsonl
     python mock_defense.py drill data/chunks_x.jsonl data/expected_x.jsonl
+    python mock_defense.py answers data/chunks_x.jsonl data/expected_x.jsonl   # 모범 답변만 추가
 """
 
 from __future__ import annotations
@@ -75,6 +76,36 @@ FOLLOWUP_PROMPT = """발표 심사위원이 되어 꼬리질문을 만들어줘.
 {items}"""
 
 
+# 질문과 답변 생성에 쓸 모델. PROVIDERS 의 기본값은 이미지 캡션용이라 따로 둔다.
+# 톰과젤리 20문항 비교 (2026-09-16):
+#   gpt-4o       질문 번호를 "슬라이드2" 로 붙여 한계반론이 통째로 빠짐, 답변 9/15 이고 동어반복이 많음
+#   gpt-5.4-mini 답변 16/20, 57초
+#   gpt-5.5      답변 13/20, 2분 7초. "없음" 이 많다
+TEXT_MODELS = {"openai": "gpt-5.4-mini"}
+
+ANSWER_PROMPT = """발표자가 되어 예상 질문에 답할 모범 답변을 만들어줘.
+
+아래에 슬라이드 내용과 질문 목록이 있다. 질문마다 [번호] (슬라이드 N) 질문 형식이다.
+
+지켜야 할 것:
+1. 답변은 2~3문장. 발표자가 그대로 읽어도 되는 말투로 ("~입니다", "~했습니다").
+2. 그 질문에 붙은 슬라이드 내용만 근거로 써. 슬라이드에 없는 사실, 수치, 이름은 절대 지어내지 마.
+3. 숫자는 슬라이드에 적힌 그대로 옮겨. 반올림, 단위 변환, 재계산 금지.
+4. 첫 문장에서 바로 답해. "좋은 질문입니다" 같은 인사말 금지.
+5. 약점을 찌르는 질문이면, 슬라이드에 적힌 범위 안에서 한계를 인정하고 그래도 결론이 유효한 이유를 말해.
+6. 슬라이드만으로 답할 수 없으면 답변 자리에 "없음" 이라고만 적어.
+7. "슬라이드에서는", "슬라이드 기준으로" 같은 말은 쓰지 마. 발표자가 자기 분석을 말하듯이 써.
+
+출력 형식 (다른 말 붙이지 말고 이것만, 답변은 한 줄로):
+번호<TAB>답변
+
+--- 슬라이드 내용 ---
+{slides}
+
+--- 질문 목록 ---
+{items}"""
+
+
 @dataclass
 class Coverage:
     question: str
@@ -110,7 +141,9 @@ def _call(prompt: str, provider: str, model: str) -> str:
         return "".join(b.text for b in r.content if b.type == "text")
     from openai import OpenAI
     r = OpenAI().chat.completions.create(
-        model=model, max_tokens=4000, messages=[{"role": "user", "content": prompt}])
+        # gpt-5 계열은 max_tokens 를 거부한다. 추론 토큰도 여기서 빠지므로 넉넉히 준다.
+        model=model, max_completion_tokens=16000,
+        messages=[{"role": "user", "content": prompt}])
     return r.choices[0].message.content or ""
 
 
@@ -131,7 +164,8 @@ def _parse(out: str, valid: set[int]) -> list[tuple[int, str]]:
     rows = []
     for line in out.splitlines():
         line = line.strip()
-        m = re.match(r"^\D{0,3}(\d{1,3})\s*(?:\t|\||:|\.|\)|\s{2,})\s*(.+)$", line)
+        # 번호 앞에 "슬라이드" 를 붙이는 모델이 있다(gpt-4o). 여기서 놓치면 유형 하나가 통째로 빠진다.
+        m = re.match(r"^\D{0,6}(\d{1,3})\s*(?:\t|\||:|\.|\)|\s{2,})\s*(.+)$", line)
         if not m:
             continue
         page, q = int(m.group(1)), m.group(2).strip()
@@ -139,6 +173,59 @@ def _parse(out: str, valid: set[int]) -> list[tuple[int, str]]:
         if page in valid and len(q) >= 8:
             rows.append((page, q))
     return rows
+
+
+_NUM = re.compile(r"\d+(?:[.,]\d+)*")
+
+
+def answer_ok(answer: str, slide_text: str) -> bool:
+    """답변에 나온 숫자가 전부 슬라이드에 있는가.
+
+    모범 답변은 발표자가 실전에서 그대로 읽는다. 숫자 하나라도 지어낸 것이면
+    심사위원 앞에서 틀린 수치를 말하게 된다. 그런 답변은 없느니만 못하다.
+    """
+    slide = re.sub(r"[\s,]", "", slide_text)
+    return all(n.replace(",", "") in slide for n in _NUM.findall(answer))
+
+
+def add_answers(made: list[dict], rows: list[dict], provider: str, model: str) -> None:
+    """예상 질문마다 모범 답변을 붙인다. 호출 1회.
+
+    실전에서 만들지 않고 여기서 미리 만든다. 실전 질문이 연습한 질문과 맞으면
+    이걸 그대로 띄우므로 발표 중 호출은 0회로 유지된다.
+    """
+    by_page = {r["page"]: r for r in rows}
+    pages = sorted({m["gold_page"] for m in made if m["gold_page"] in by_page})
+    slides = "\n\n".join(f"[슬라이드 {p}]\n{by_page[p]['text']}" for p in pages)
+    items = "\n".join(f"[{i}] (슬라이드 {m['gold_page']}) {m['question']}"
+                      for i, m in enumerate(made, 1))
+
+    print()
+    print("[모범 답변 미리 생성] 호출 1회")
+    try:
+        raw = _call_retry(ANSWER_PROMPT.format(slides=slides, items=items), provider, model)
+    except Exception as e:
+        print(f"  실패 - 답변 없이 저장한다: {e}", file=sys.stderr)
+        raw = ""
+
+    got = {}
+    for line in raw.splitlines():
+        mt = re.match(r"^\D{0,6}(\d{1,3})\s*(?:\t|\||:|\.|\))\s*(.+)$", line.strip())
+        if mt:
+            got[int(mt.group(1))] = mt.group(2).strip()
+
+    dropped = 0
+    for i, m in enumerate(made, 1):
+        a = got.get(i, "").strip("\"' ")
+        if a == "없음":
+            a = ""
+        elif a and not answer_ok(a, by_page.get(m["gold_page"], {}).get("text", "")):
+            dropped += 1
+            a = ""
+        m["answer"] = a
+    ok = sum(1 for m in made if m.get("answer"))
+    print(f"  {ok}/{len(made)}개 준비"
+          + (f" (슬라이드에 없는 숫자가 나와서 버린 것 {dropped}개)" if dropped else ""))
 
 
 def generate(chunks: Path, out: Path, per_type: int, min_chars: int,
@@ -206,6 +293,8 @@ def generate(chunks: Path, out: Path, per_type: int, min_chars: int,
         m["followup"] = q
     ok = sum(1 for m in made if m.get("followup"))
     print(f"  {ok}/{len(made)}개 준비" + (f" (답 유출로 버린 것 {leaked}개)" if leaked else ""))
+
+    add_answers(made, rows, provider, model)
 
     out.parent.mkdir(parents=True, exist_ok=True)
     with out.open("w", encoding="utf-8") as f:
@@ -336,7 +425,11 @@ def drill(chunks: Path, questions: Path, shuffle: bool, limit: int) -> int:
         print(f"  커버리지 {c.ratio:.0%} {bar}")
         if c.missed:
             print(f"  놓친 것: {', '.join(c.missed)}")
-        print(f"  근거 (p{c.gold_slide}): {c.snippet[:90]}\n")
+        print(f"  근거 (p{c.gold_slide}): {c.snippet[:90]}")
+        # 답한 뒤에만 보여준다. 먼저 보여주면 읽고 따라 하는 연습이 된다.
+        if q.get("answer"):
+            print(f"  모범 답변: {q['answer']}")
+        print()
 
     if not results:
         return 0
@@ -368,6 +461,13 @@ def main() -> int:
     g.add_argument("--provider", choices=list(PROVIDERS), default=None)
     g.add_argument("--model", default=None)
 
+    w = sub.add_parser("answers", help="이미 만든 예상 질문에 모범 답변만 붙이기")
+    w.add_argument("chunks", type=Path)
+    w.add_argument("questions", type=Path)
+    w.add_argument("-o", "--output", type=Path, default=None, help="기본은 덮어쓰기")
+    w.add_argument("--provider", choices=list(PROVIDERS), default=None)
+    w.add_argument("--model", default=None)
+
     d = sub.add_parser("drill", help="모의 디펜스 진행")
     d.add_argument("chunks", type=Path)
     d.add_argument("questions", type=Path)
@@ -383,8 +483,18 @@ def main() -> int:
     if provider is None:
         print("API 키가 없습니다. ai/.env 에 넣으세요.", file=sys.stderr)
         return 2
-    return generate(a.chunks, a.output, a.per_type, a.min_chars,
-                    provider, a.model or PROVIDERS[provider][1])
+    model = a.model or TEXT_MODELS.get(provider) or PROVIDERS[provider][1]
+    if a.cmd == "answers":
+        rows = [json.loads(l) for l in a.chunks.open(encoding="utf-8")]
+        made = [json.loads(l) for l in a.questions.open(encoding="utf-8")]
+        add_answers(made, rows, provider, model)
+        out = a.output or a.questions
+        with out.open("w", encoding="utf-8") as f:
+            for m in made:
+                f.write(json.dumps(m, ensure_ascii=False) + "\n")
+        print(f"  -> {out}")
+        return 0
+    return generate(a.chunks, a.output, a.per_type, a.min_chars, provider, model)
 
 
 if __name__ == "__main__":
