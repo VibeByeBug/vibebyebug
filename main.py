@@ -2,15 +2,15 @@ import os
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect
 from fastapi.requests import Request
 from fastapi.templating import Jinja2Templates
-import google.generativeai as genai
 from dotenv import load_dotenv
 from fastapi.middleware.cors import CORSMiddleware
 
-from routers import rag_api 
+from routers import rag_api, upload_api   
 
 load_dotenv()
 
 app = FastAPI()
+app.include_router(upload_api.router)
 
 app.include_router(rag_api.router)
 
@@ -27,13 +27,6 @@ app.add_middleware(
 
 # HTML 템플릿 폴더 지정
 templates = Jinja2Templates(directory="templates")
-
-# Gemini 설정
-genai.configure(api_key=os.environ.get("GEMINI_API_KEY"))
-model = genai.GenerativeModel(
-    model_name="gemini-3.6-flash",
-    system_instruction="너는 발표자를 돕는 방어 프롬프터야. 들어온 질문의 핵심 요지만 1줄(20자 이내)로 짧고 객관적으로 요약해. 서론은 다 빼고 핵심 키워드만 출력해."
-)
 
 # ---------------------------------------------------------
 # [웹소켓 세션 매니저] 클라이언트 연결/해제를 객체지향적으로 관리
@@ -70,18 +63,22 @@ async def websocket_endpoint(websocket: WebSocket):
     try:
         while True:
             user_voice_text = await websocket.receive_text()
-            print(f"🎤 수신: {user_voice_text}")
+            print(f"🎤 수신(STT): {user_voice_text}")
             
-            # Gemini 요약 로직
-            try:
-                response = await model.generate_content_async(user_voice_text)
-                ai_summary = response.text.strip()
-            except Exception as e:
-                ai_summary = f"[API 오류] {str(e)}"
+            # 1. 빈 질문 및 잡음 방어 로직 (PM 요구사항)
+            if not user_voice_text or not user_voice_text.strip():
+                await manager.send_message("⚠️ [시스템] 인식된 음성이 없거나 너무 짧습니다.", websocket)
+                continue
             
-            # 매니저를 통해 결과 전송
-            await manager.send_message(f"💡 AI 요약: {ai_summary}", websocket)
+            # 2. AI 모듈(RAG) 연결 대기 상태
+            # 추후 예진 님이 작성하신 ai.pipeline.py 로직이 이 자리에 들어옵니다.
+            await manager.send_message(f"✅ 질문 수신 완료: {user_voice_text}", websocket)
             
     except WebSocketDisconnect:
         # 클라이언트가 브라우저를 끄거나 새로고침할 때 발생하는 예외 처리
+        manager.disconnect(websocket)
+        print("⚠️ 클라이언트와의 웹소켓 연결이 끊어졌습니다.")
+    except Exception as e:
+        # 3. 예기치 못한 런타임 에러 및 네트워크 장애 방어
+        print(f"❌ 웹소켓 통신 에러 발생: {str(e)}")
         manager.disconnect(websocket)
