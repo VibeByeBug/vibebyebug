@@ -79,6 +79,12 @@ def build_index(file_path: Path | str, presentation_id: str) -> dict:
                 "next": "이미지 인식 경로(render.py + caption.py)가 필요합니다."}
     except ValueError as e:
         return {"ok": False, "reason": "unsupported", "message": str(e)}
+    except Exception as e:
+        # 파서가 파일을 아예 열지 못하는 경우(손상된 PDF 등).
+        # 여기서 안 잡으면 업로드 API 가 500 으로 죽고, 쓸 수 없는 파일이
+        # 서버에 그대로 남는다.
+        return {"ok": False, "reason": "unreadable",
+                "message": f"파일을 열 수 없습니다. 손상되었거나 형식이 올바르지 않습니다. ({type(e).__name__})"}
 
     DATA_DIR.mkdir(parents=True, exist_ok=True)
     out = chunks_path(presentation_id)
