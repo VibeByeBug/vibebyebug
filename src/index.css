@@ -1,8 +1,5 @@
+@config "../tailwind.config.js";
 @import "tailwindcss";
-
-@theme {
-  --font-sans: "Noto Sans KR", sans-serif;
-}
 
 body {
   background-color: #ffffff;
