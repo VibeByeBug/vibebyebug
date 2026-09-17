@@ -84,6 +84,44 @@ async def approve(presentation_id: str, kind: str, req: ApproveRequest):
     return {"status": "success", "card": card}
 
 
+class AnswerRequest(BaseModel):
+    answer: str
+    confirmed: bool = False   # 경고를 보고도 "맞게 말했음" 을 눌렀는가
+
+
+@router.post("/{presentation_id}/{kind}/answer")
+async def save_from_answer(presentation_id: str, kind: str, req: AnswerRequest):
+    """연습에서 한 답을 칸으로 정리해 저장한다. 확정 버튼을 따로 누르지 않아도 된다.
+
+    저장 전에 슬라이드와 대조한다. 맞지 않는 곳이 있으면 저장하지 않고 경고를 돌려준다.
+    발표자가 확인하고 confirmed=true 로 다시 보내야 저장된다.
+    """
+    if kind not in core_answers.LABEL:
+        raise HTTPException(status_code=400, detail="모르는 질문 종류입니다.")
+    if not req.answer.strip():
+        raise HTTPException(status_code=400, detail="답이 비어 있습니다.")
+    path = chunks_path(presentation_id)
+    if not path.exists():
+        raise HTTPException(status_code=404, detail="발표 자료를 찾을 수 없습니다.")
+    rows = [json.loads(l) for l in path.open(encoding="utf-8")]
+
+    warnings = [] if req.confirmed else await asyncio.to_thread(core_answers.check_answer, rows, req.answer)
+    if warnings:
+        return {"status": "needs_review", "warnings": warnings}
+
+    steps = await asyncio.to_thread(core_answers.steps_from_answer, core_answers.LABEL[kind], req.answer)
+    store = _store(presentation_id)
+    try:
+        card = store.approve(kind, steps, edited=False, source="answer")
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    card["answer"] = req.answer
+    card["confirmed_despite_warning"] = req.confirmed
+    store._save()
+    _sync_engine(presentation_id, store)
+    return {"status": "saved", "card": card}
+
+
 @router.delete("/{presentation_id}/{kind}")
 async def discard(presentation_id: str, kind: str):
     store = _store(presentation_id)

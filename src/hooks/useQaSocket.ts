@@ -25,48 +25,60 @@ export function useQaSocket(): UseQaSocketResult {
   const socketRef = useRef<WebSocket | null>(null);
 
   useEffect(() => {
-    const socket = new WebSocket(WS_URL);
-    socketRef.current = socket;
+    // 서버 재시작이나 와이파이 끊김으로 연결이 닫히면 다시 잇는다.
+    // 안 그러면 화면은 멀쩡한데 질문을 보내도 "서버와 연결되지 않았습니다" 만 뜬다.
+    let stopped = false;
+    let retry: ReturnType<typeof setTimeout> | undefined;
 
-    socket.onopen = () => {
-      console.log(`[useQaSocket] connected: ${WS_URL}`);
-      setIsConnected(true);
-    };
+    function connect() {
+      const socket = new WebSocket(WS_URL);
+      socketRef.current = socket;
 
-    socket.onmessage = (event: MessageEvent<string>) => {
-      let msg;
-      try {
-        msg = JSON.parse(event.data);
-      } catch {
-        console.log('[useQaSocket] raw message (not JSON yet):', event.data);
-        setRawMessage(event.data);
-        return;
-      }
-      if (msg.type === 'cue.evidence') {
-        // 잡음(헛기침 등)으로 판정되면 화면을 바꾸지 않는다
-        if (msg.status === 'ignored') return;
-        setLastResult(toQaResult(msg));
-        setNotice(null);
-      } else if (msg.type === 'cue.answer') {
-        setLastAnswer(msg as QaAnswer);
-      } else if (msg.type === 'cue.flow') {
-        setLastFlow(msg as QaFlow);
-      } else if (msg.type === 'not_ready' || msg.type === 'error') {
-        setNotice(msg.message ?? '서버 오류가 발생했습니다.');
-      }
-    };
+      socket.onopen = () => {
+        console.log(`[useQaSocket] connected: ${WS_URL}`);
+        setIsConnected(true);
+      };
 
-    socket.onclose = () => {
-      console.log('[useQaSocket] disconnected');
-      setIsConnected(false);
-    };
+      socket.onmessage = (event: MessageEvent<string>) => {
+        let msg;
+        try {
+          msg = JSON.parse(event.data);
+        } catch {
+          console.log('[useQaSocket] raw message (not JSON yet):', event.data);
+          setRawMessage(event.data);
+          return;
+        }
+        if (msg.type === 'cue.evidence') {
+          // 잡음(헛기침 등)으로 판정되면 화면을 바꾸지 않는다
+          if (msg.status === 'ignored') return;
+          setLastResult(toQaResult(msg));
+          setNotice(null);
+        } else if (msg.type === 'cue.answer') {
+          setLastAnswer(msg as QaAnswer);
+        } else if (msg.type === 'cue.flow') {
+          setLastFlow(msg as QaFlow);
+        } else if (msg.type === 'not_ready' || msg.type === 'error') {
+          setNotice(msg.message ?? '서버 오류가 발생했습니다.');
+        }
+      };
 
-    socket.onerror = (event) => {
-      console.error('[useQaSocket] error:', event);
-    };
+      socket.onclose = () => {
+        console.log('[useQaSocket] disconnected');
+        setIsConnected(false);
+        if (!stopped) retry = setTimeout(connect, 1000);
+      };
 
+      socket.onerror = (event) => {
+        console.error('[useQaSocket] error:', event);
+      };
+
+    }
+
+    connect();
     return () => {
-      socket.close();
+      stopped = true;
+      clearTimeout(retry);
+      socketRef.current?.close();
     };
   }, []);
 

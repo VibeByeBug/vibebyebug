@@ -71,6 +71,48 @@ PROMPT = """아래는 발표 슬라이드 전체다. 청중이 자주 묻는 기
 MAX_STEP_CHARS = 30
 
 
+# 연습용 호출. 실전 답변용 연결(answer.Answerer)은 8초에 끊기게 되어 있어서, 10초 가까이 걸리는
+# 추천과 대조가 서버에서 조용히 실패했다(명령줄에서는 됐다). 연습은 느려도 되니 따로 연결한다.
+_client = None
+
+
+def _chat(prompt: str) -> str | None:
+    global _client
+    import os
+    from caption import load_env
+    load_env()
+    if not os.environ.get("OPENAI_API_KEY"):
+        return None
+    try:
+        if _client is None:
+            from openai import OpenAI
+            _client = OpenAI(timeout=60, max_retries=1)
+        from answer import MODEL
+        r = _client.chat.completions.create(
+            model=MODEL, reasoning_effort="low", messages=[{"role": "user", "content": prompt}])
+        return r.choices[0].message.content or ""
+    except Exception as e:
+        print(f"[core_answers] 모델 호출 실패: {type(e).__name__}: {e}")
+        return None
+
+# 연습 화면에서 먼저 보여줄 질문. 발표장에서 제일 자주 나오는 것부터. 나머지는 "더 보기".
+PRIMARY = ("significance", "why", "limit", "merit")
+
+ANSWER_PROMPT = """발표자가 연습에서 아래 질문에 직접 답했다. 이 답을 실전에서 한눈에 볼 흐름도 칸으로 정리해줘.
+
+지켜야 할 것:
+1. 발표자 답에 있는 내용만 쓴다. 새 내용, 새 숫자를 보태지 마.
+2. 발표자가 말한 순서를 지킨다.
+3. 칸은 1~3개. 한 칸은 22자 이내, 조사와 어미를 빼고 명사형으로.
+4. 숫자는 답에 적힌 그대로.
+
+출력 형식 (다른 말 붙이지 말고 한 줄에 한 칸):
+칸 내용
+
+질문: {label}
+발표자 답: {answer}"""
+
+
 def classify(question: str) -> str | None:
     """질문이 어느 기본 질문인가. 두 종류 이상에 걸리면 판정하지 않는다(엉뚱한 카드를 띄우지 않게)."""
     q = question or ""
@@ -92,25 +134,14 @@ def suggest(rows: list[dict], ids: list[str] | None = None) -> dict:
     status: ok | no_answer(자료로 못 만듦) | error
     숫자가 슬라이드에 없는 칸은 버린다. 칸이 하나도 안 남으면 no_answer.
     """
-    from answer import Answerer
-
     ids = ids or [c["id"] for c in CORE]
     by_page = {r["page"]: r["text"] for r in rows}
     slides = "\n\n".join(f"[{p}번 슬라이드]\n{t}" for p, t in sorted(by_page.items()))
     items = "\n".join(f"- {i}: {LABEL[i]} ({SHAPE[i]})" for i in ids)
 
     out = {i: {"label": LABEL[i], "steps": [], "status": "no_answer"} for i in ids}
-    ans = Answerer()
-    if not ans.ready():
-        for v in out.values():
-            v["status"] = "error"
-        return out
-    try:
-        raw = ans._get().chat.completions.create(
-            model=ans.model, reasoning_effort="low",
-            messages=[{"role": "user", "content": PROMPT.format(items=items, slides=slides)}],
-        ).choices[0].message.content or ""
-    except Exception:
+    raw = _chat(PROMPT.format(items=items, slides=slides))
+    if raw is None:
         for v in out.values():
             v["status"] = "error"
         return out
@@ -136,6 +167,67 @@ def suggest(rows: list[dict], ids: list[str] | None = None) -> dict:
     return out
 
 
+def steps_from_answer(label: str, answer: str) -> list[dict]:
+    """발표자가 연습에서 한 답을 칸으로 정리한다. 확정 버튼을 따로 누르지 않아도 되게.
+
+    발표자 본인의 말이라 실전에 띄워도 추론이 아니다. 모델은 줄이기만 하고,
+    답에 없는 숫자가 나온 칸은 버린다. 모델을 못 부르면 문장 단위로 잘라 쓴다.
+    """
+    answer = (answer or "").strip()
+    if not answer:
+        return []
+    lines: list[str] = []
+    raw = _chat(ANSWER_PROMPT.format(label=label, answer=answer))
+    if raw:
+        lines = [re.sub(r"^\s*(?:\d+[.)]|[-•*])\s*", "", l).strip() for l in raw.splitlines()]
+        lines = [l for l in lines if l and _numbers_ok(l, answer)]
+    if not lines:
+        lines = [x.strip() for x in re.split(r"(?<=[.!?])\s+|\n+", answer) if x.strip()]
+    return [{"text": l[:MAX_STEP_CHARS], "slide": None} for l in lines[:3]]
+
+
+CHECK_PROMPT = """발표자가 연습에서 한 답을 발표 슬라이드와 대조해줘.
+
+슬라이드 내용과 맞지 않는 말만 찾아. 예: 슬라이드는 95% 인데 답은 90%, 슬라이드는 목표인데 답은 달성했다고 함.
+슬라이드에 없는 내용을 말한 건 틀린 게 아니다(발표자가 따로 아는 사실일 수 있다). 그건 적지 마.
+맞지 않는 게 없으면 "없음" 한 줄만 써.
+
+출력 형식 (다른 말 붙이지 말고, 한 줄에 하나):
+슬라이드번호 | 답에서 틀린 부분 → 슬라이드에 적힌 내용
+
+발표자 답: {answer}
+
+--- 슬라이드 ---
+{slides}"""
+
+
+def check_answer(rows: list[dict], answer: str) -> list[dict]:
+    """연습 답이 슬라이드와 맞는가. 경고 목록 [{"slide", "message"}]. 비어 있으면 통과.
+
+    연습에서 한 말을 사실로 가정하지 않는다. 틀린 숫자가 저장되면 실전에서 그대로 말하게 된다.
+    다만 슬라이드에 없는 말은 막지 않는다. 발표자가 따로 아는 사실일 수 있다.
+    """
+    warnings: list[dict] = []
+    deck = re.sub(r"[\s,]", "", "\n".join(r["text"] for r in rows))
+    for n in re.findall(r"\d+(?:[.,]\d+)*", answer or ""):
+        if len(n) >= 2 and n.replace(",", "") not in deck:
+            warnings.append({"slide": None, "message": f"‘{n}’ 은 발표자료 어디에도 없는 숫자입니다"})
+
+    by_page = {r["page"]: r["text"] for r in rows}
+    slides = "\n\n".join(f"[{p}번 슬라이드]\n{t}" for p, t in sorted(by_page.items()))
+    raw = _chat(CHECK_PROMPT.format(answer=answer, slides=slides))
+    if raw is None:
+        # 대조를 못 했는데 경고 없이 넘기면 검증 안 된 답이 실전에 들어간다. 발표자 확인을 받게 한다.
+        warnings.append({"slide": None, "message": "발표자료와 대조하지 못했습니다(AI 호출 실패). 내용이 맞는지 직접 확인해주세요"})
+        return warnings
+    for line in raw.splitlines():
+        # "11 | ..." 도 "14번 슬라이드 | ..." 도 온다
+        m = re.match(r"^\D{0,6}?(\d{1,3})\s*(?:번)?\s*(?:슬라이드)?\s*[|\t:]\s*(.+)$", line.strip())
+        if m and int(m.group(1)) in by_page:
+            warnings.append({"slide": int(m.group(1)), "message": m.group(2).strip()})
+    return warnings
+
+
 # ── 확정한 답 저장 ─────────────────────────────────────────────────────────
 
 class CoreStore:
@@ -150,14 +242,16 @@ class CoreStore:
             except Exception:
                 self.cards = {}
 
-    def approve(self, cid: str, steps: list[dict], edited: bool) -> dict:
+    def approve(self, cid: str, steps: list[dict], edited: bool, source: str = "") -> dict:
         if cid not in LABEL:
             raise ValueError(f"모르는 질문 종류: {cid}")
         steps = [{"text": str(s.get("text", "")).strip()[:MAX_STEP_CHARS], "slide": s.get("slide")}
                  for s in steps if str(s.get("text", "")).strip()][:3]
         if not steps:
             raise ValueError("칸이 비어 있습니다")
-        card = {"id": cid, "label": LABEL[cid], "steps": steps, "edited": bool(edited),
+        # source: suggested(추천 그대로) | edited(추천을 고침) | answer(연습에서 발표자가 한 답)
+        source = source or ("edited" if edited else "suggested")
+        card = {"id": cid, "label": LABEL[cid], "steps": steps, "edited": bool(edited), "source": source,
                 "approved_at": datetime.now().isoformat(timespec="seconds")}
         self.cards[cid] = card
         self._save()

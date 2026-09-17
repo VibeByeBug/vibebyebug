@@ -114,7 +114,11 @@ export function Hud({ result, question, answer = null, flow = null, mode = 'keyw
         <div className="flex flex-col gap-[12px] w-full">
           <p className="font-bold text-[11px] text-[#409959] tracking-[1.54px] w-full">
             연습에서 확정한 답 · {core.label}
-            {core.edited && <span className="ml-[8px] text-[#6b7280]">발표자 수정</span>}
+            {core.source === 'answer' ? (
+              <span className="ml-[8px] text-[#6b7280]">연습에서 내가 한 답</span>
+            ) : (
+              core.edited && <span className="ml-[8px] text-[#6b7280]">발표자 수정</span>
+            )}
           </p>
           <FlowSteps steps={core.steps} />
         </div>

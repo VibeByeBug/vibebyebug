@@ -103,9 +103,15 @@ META_EXPAND = {
 }
 
 
+# 질문할 때 붙는 말. 내용어로 세면 "의의가 뭐라고 생각하세요?" 가 기본 질문으로 안 잡히고
+# "생각" 이 자료에 없어서 근거 없음으로 막혔다.
+QUESTION_TALK = {"생각", "말씀", "설명", "질문", "의견", "얘기", "이야기", "혹시", "개인",
+                 "부분", "정도", "어느", "무엇", "뭐", "거", "것", "점"}
+
+
 def _content_words(question: str, nouns_fn) -> list[str]:
     return [w for w in nouns_fn(question)
-            if w not in FILLER and w not in META_EXPAND and len(w) >= 2]
+            if w not in FILLER and w not in META_EXPAND and w not in QUESTION_TALK and len(w) >= 2]
 
 
 def known_ratio(question: str, nouns_fn, idf: dict) -> float:

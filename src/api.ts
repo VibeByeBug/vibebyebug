@@ -96,6 +96,31 @@ export async function approveCore(presentationId: string, id: string, steps: Flo
   return (await res.json()).card as CoreCard;
 }
 
+export interface AnswerWarning {
+  slide: number | null;
+  message: string;
+}
+
+export type SaveAnswerResult =
+  | { status: 'saved'; card: CoreCard }
+  | { status: 'needs_review'; warnings: AnswerWarning[] };
+
+// 연습에서 한 답을 저장한다. 슬라이드와 맞지 않는 곳이 있으면 저장하지 않고 경고를 돌려준다.
+export async function saveCoreAnswer(
+  presentationId: string,
+  id: string,
+  answer: string,
+  confirmed = false,
+): Promise<SaveAnswerResult> {
+  const res = await fetch(`${API_URL}/api/core/${presentationId}/${id}/answer`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ answer, confirmed }),
+  });
+  if (!res.ok) throw new Error('답을 저장하지 못했습니다');
+  return res.json();
+}
+
 export async function discardCore(presentationId: string, id: string) {
   await fetch(`${API_URL}/api/core/${presentationId}/${id}`, { method: 'DELETE' });
 }

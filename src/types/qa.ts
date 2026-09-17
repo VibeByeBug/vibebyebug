@@ -29,6 +29,9 @@ export interface CoreCard {
   label: string;
   steps: FlowStep[];
   edited: boolean; // 발표자가 고쳐서 확정했는가
+  source?: 'suggested' | 'edited' | 'answer'; // answer = 연습에서 발표자가 한 답
+  answer?: string; // 연습에서 한 답 원문
+  confirmed_despite_warning?: boolean; // 경고를 보고도 맞다고 확인하고 저장했는가
 }
 
 // 키워드만 볼지, 추천 답변까지 볼지 (설정과 실전 화면 상단에서 고른다)
