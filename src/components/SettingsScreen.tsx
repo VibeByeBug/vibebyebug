@@ -7,7 +7,7 @@ interface SettingsScreenProps {
   onModeChange: (mode: AnswerMode) => void;
 }
 
-const MODE_LABEL: Record<AnswerMode, string> = { keywords: '키워드', answer: '추천 답변' };
+const MODE_LABEL: Record<AnswerMode, string> = { keywords: '키워드', flow: '흐름도', answer: '추천 답변' };
 
 export function SettingsScreen({ mode, onModeChange }: SettingsScreenProps) {
   const [sourceCount, setSourceCount] = useState<3 | 5>(3);
@@ -22,11 +22,11 @@ export function SettingsScreen({ mode, onModeChange }: SettingsScreenProps) {
             <div className="flex flex-col gap-[4px] w-[280px]">
               <p className="font-bold text-[16px] text-[#1a1a1a] w-full">답변 보기</p>
               <p className="font-normal text-[13px] text-[#6b7280] w-full">
-                추천 답변은 키워드 뒤 1~2초에 뜨고, 질문마다 AI를 한 번 호출합니다
+                흐름도와 추천 답변은 키워드 뒤 1~3초에 뜨고, 질문마다 AI를 한 번 호출합니다
               </p>
             </div>
             <div className="flex gap-[8px] items-start">
-              {(['keywords', 'answer'] as const).map((m) => (
+              {(['keywords', 'flow', 'answer'] as const).map((m) => (
                 <button
                   key={m}
                   type="button"

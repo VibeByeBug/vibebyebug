@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { toQaResult } from '../api';
-import type { AnswerMode, QaAnswer, QaResult } from '../types/qa';
+import type { AnswerMode, QaAnswer, QaFlow, QaResult } from '../types/qa';
 
 const WS_URL = import.meta.env.VITE_WS_URL ?? 'ws://localhost:8000/ws';
 
@@ -8,6 +8,7 @@ interface UseQaSocketResult {
   isConnected: boolean;
   lastResult: QaResult | null;
   lastAnswer: QaAnswer | null;
+  lastFlow: QaFlow | null;
   notice: string | null; // 자료 준비 전 질문 등 서버 안내
   rawMessage: string | null;
   ask: (text: string, presentationId: string, mode: AnswerMode) => void;
@@ -17,6 +18,7 @@ export function useQaSocket(): UseQaSocketResult {
   const [isConnected, setIsConnected] = useState(false);
   const [lastResult, setLastResult] = useState<QaResult | null>(null);
   const [lastAnswer, setLastAnswer] = useState<QaAnswer | null>(null);
+  const [lastFlow, setLastFlow] = useState<QaFlow | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   const [rawMessage, setRawMessage] = useState<string | null>(null);
   const socketRef = useRef<WebSocket | null>(null);
@@ -46,6 +48,8 @@ export function useQaSocket(): UseQaSocketResult {
         setNotice(null);
       } else if (msg.type === 'cue.answer') {
         setLastAnswer(msg as QaAnswer);
+      } else if (msg.type === 'cue.flow') {
+        setLastFlow(msg as QaFlow);
       } else if (msg.type === 'not_ready' || msg.type === 'error') {
         setNotice(msg.message ?? '서버 오류가 발생했습니다.');
       }
@@ -73,9 +77,10 @@ export function useQaSocket(): UseQaSocketResult {
     }
     setLastResult(null);
     setLastAnswer(null);
+    setLastFlow(null);
     setNotice(null);
     socket.send(JSON.stringify({ type: 'stt.final', text, presentation_id: presentationId, mode }));
   }, []);
 
-  return { isConnected, lastResult, lastAnswer, notice, rawMessage, ask };
+  return { isConnected, lastResult, lastAnswer, lastFlow, notice, rawMessage, ask };
 }

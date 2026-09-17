@@ -16,7 +16,15 @@ export interface QaResult {
 }
 
 // 키워드만 볼지, 추천 답변까지 볼지 (설정과 실전 화면 상단에서 고른다)
-export type AnswerMode = 'keywords' | 'answer';
+export type AnswerMode = 'keywords' | 'answer' | 'flow';
+
+// 서버 cue.flow. 말할 순서를 짧은 칸으로. 칸이 완성될 때마다 steps 가 늘어난다.
+export interface QaFlow {
+  steps: { text: string; slide: number }[];
+  done: boolean;
+  latency_ms: number;
+  status?: 'ok' | 'no_answer' | 'blocked' | 'error' | 'skipped';
+}
 
 // 서버 cue.answer. 문장이 끝날 때마다 text 가 늘어나고, 마지막에 done 과 status 가 온다.
 export interface QaAnswer {

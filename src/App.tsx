@@ -21,6 +21,8 @@ import { DownloadIcon } from './components/icons';
 import type { ScreenName } from './types/flow';
 import type { AnswerMode } from './types/qa';
 
+const MODE_LABEL: Record<AnswerMode, string> = { keywords: '키워드', flow: '흐름도', answer: '추천 답변' };
+
 function App() {
   const [screen, setScreen] = useState<ScreenName>('login');
   const [presentationName, setPresentationName] = useState('캡스톤 디자인 최종 발표');
@@ -30,7 +32,7 @@ function App() {
   const [uploadError, setUploadError] = useState<{ fileName: string; message: string } | null>(null);
   const [mode, setMode] = useState<AnswerMode>('keywords');
   const [textFromError, setTextFromError] = useState(true); // 음성 인식 실패로 온 입력인지
-  const { lastResult, lastAnswer, notice, ask } = useQaSocket();
+  const { lastResult, lastAnswer, lastFlow, notice, ask } = useQaSocket();
 
   // 음성 인식 콜백은 인식을 시작한 순간의 값을 붙잡고 있어서, 최신 발표와 모드는 ref 로 읽는다
   const uploadRef = useRef(upload);
@@ -57,7 +59,7 @@ function App() {
 
   const modeToggle = (
     <div className="border border-[#e5e7eb] flex p-[3px] rounded-[6px]">
-      {(['keywords', 'answer'] as const).map((m) => (
+      {(['keywords', 'flow', 'answer'] as const).map((m) => (
         <button
           key={m}
           type="button"
@@ -66,7 +68,7 @@ function App() {
             mode === m ? 'bg-[#f26b1d] font-bold text-white' : 'font-medium text-[#6b7280]'
           }`}
         >
-          {m === 'keywords' ? '키워드' : '추천 답변'}
+          {MODE_LABEL[m]}
         </button>
       ))}
     </div>
@@ -240,6 +242,7 @@ function App() {
           <Hud
             result={lastResult}
             answer={lastAnswer}
+            flow={lastFlow}
             mode={mode}
             notice={notice}
             question={question.finalText}

@@ -138,8 +138,9 @@ async def websocket_endpoint(websocket: WebSocket):
             await websocket.send_json(payload)
 
             # ── 추천 답변 모드면 키워드를 보낸 뒤에 답변을 문장 단위로 이어서 보낸다
-            if (msg.get("mode") or session_mode) == "answer":
-                it = rq.answer(text, cue)
+            mode = msg.get("mode") or session_mode
+            if mode in ("answer", "flow"):
+                it = rq.answer(text, cue) if mode == "answer" else rq.flow(text, cue)
                 while True:
                     part = await asyncio.to_thread(next, it, None)
                     if part is None:

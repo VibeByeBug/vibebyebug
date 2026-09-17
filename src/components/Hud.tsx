@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import type { AnswerMode, QaAnswer, QaResult } from '../types/qa';
+import type { AnswerMode, QaAnswer, QaFlow, QaResult } from '../types/qa';
 import type { QuestionType } from '../types/mockPractice';
 import { ChevronDownIcon, MinusCircleIcon } from './icons';
 
@@ -11,12 +11,13 @@ interface HudProps {
   result: QaResult | null; // null 이면 서버 응답을 기다리는 중
   question: string;
   answer?: QaAnswer | null;
+  flow?: QaFlow | null;
   mode?: AnswerMode;
   notice?: string | null;
   onChangeType?: (type: QuestionType) => void;
 }
 
-export function Hud({ result, question, answer = null, mode = 'keywords', notice = null, onChangeType }: HudProps) {
+export function Hud({ result, question, answer = null, flow = null, mode = 'keywords', notice = null, onChangeType }: HudProps) {
   const [expanded, setExpanded] = useState(false);
 
   if (!result) {
@@ -35,6 +36,8 @@ export function Hud({ result, question, answer = null, mode = 'keywords', notice
 
   // 추천 답변 모드에서 서버가 만든 답변. 끝났는데 비어 있으면(자료로 답할 수 없음, 오류) 없는 것으로 본다.
   const showAnswer = mode === 'answer' && !(answer?.done && !answer.text);
+  // 흐름도가 실패하면(자료로 답할 수 없음, 오류) 칸 대신 키워드를 보여준다
+  const showFlow = mode === 'flow' && !(flow?.done && flow.steps.length === 0);
 
   const sources = result.sources.slice(0, MAX_SOURCES);
   const visibleSources = expanded ? sources : sources.slice(0, DEFAULT_VISIBLE_SOURCES);
@@ -98,6 +101,44 @@ export function Hud({ result, question, answer = null, mode = 'keywords', notice
         </div>
       </div>
 
+      {showFlow && (
+        <div className="flex flex-col gap-[12px] w-full">
+          <p className="font-bold text-[11px] text-[#6b7280] tracking-[1.54px] w-full">
+            말할 순서
+            {flow?.done && <span className="ml-[8px] font-medium text-[#999]">{Math.round(flow.latency_ms)}ms</span>}
+          </p>
+          {!flow?.steps.length ? (
+            <p className="font-medium text-[17px] text-[#999]">순서를 정리하고 있어요···</p>
+          ) : (
+            <div className="flex items-stretch gap-[10px] w-full">
+              {flow.steps.map((step, i) => (
+                <div key={i} className="flex flex-1 items-center gap-[10px] min-w-0">
+                  <div
+                    className={`flex flex-1 flex-col gap-[8px] justify-between self-stretch px-[20px] py-[18px] rounded-[6px] min-w-0 ${
+                      i === 0 ? 'bg-[#f26b1d]' : 'bg-[#fff3eb] border border-[#f26b1d]'
+                    }`}
+                  >
+                    <span className={`font-bold text-[12px] ${i === 0 ? 'text-white/80' : 'text-[#f26b1d]'}`}>{i + 1}</span>
+                    <p
+                      className={`font-black text-[24px] tracking-[-0.6px] leading-[32px] break-keep ${
+                        i === 0 ? 'text-white' : 'text-[#1a1a1a]'
+                      }`}
+                    >
+                      {step.text}
+                    </p>
+                    <span className={`font-bold text-[13px] ${i === 0 ? 'text-white/80' : 'text-[#6b7280]'}`}>p.{step.slide}</span>
+                  </div>
+                  {i < flow.steps.length - 1 && <span className="font-black text-[22px] text-[#f26b1d] shrink-0">→</span>}
+                </div>
+              ))}
+            </div>
+          )}
+          {flow?.status === 'blocked' && (
+            <p className="font-normal text-[13px] text-[#6b7280]">자료에 없는 숫자가 나와서 뒤 칸은 표시하지 않았습니다.</p>
+          )}
+        </div>
+      )}
+
       {showAnswer && (
         <div className="bg-[#fff3eb] border border-[#f26b1d] flex flex-col gap-[14px] px-[28px] py-[26px] rounded-[6px] w-full">
           <p className="font-bold text-[12px] text-[#f26b1d] tracking-[1.2px] w-full">
@@ -119,7 +160,7 @@ export function Hud({ result, question, answer = null, mode = 'keywords', notice
         </div>
       )}
 
-      {isLimitation && !showAnswer ? (
+      {isLimitation && !showAnswer && !showFlow ? (
         <div className="bg-[#fff3eb] border border-[#f26b1d] flex flex-col gap-[14px] px-[28px] py-[26px] rounded-[6px] w-full">
           <p className="font-bold text-[12px] text-[#f26b1d] tracking-[1.2px] w-full">추천 답변</p>
           <div className="flex flex-col gap-[12px] w-full">
@@ -131,7 +172,7 @@ export function Hud({ result, question, answer = null, mode = 'keywords', notice
           </div>
         </div>
       ) : (
-        result.keywords.length > 0 && (
+        !showFlow && result.keywords.length > 0 && (
           <>
             <div className="border-t border-[#e5e7eb] flex flex-col gap-[12px] pt-[20px] w-full">
               <p className="font-bold text-[11px] text-[#6b7280] tracking-[1.54px] w-full">키워드</p>

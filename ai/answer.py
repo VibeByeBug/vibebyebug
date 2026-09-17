@@ -197,3 +197,162 @@ class Answerer:
             if first_ms is None:
                 first_ms = round((time.time() - t0) * 1000, 1)
         yield msg(True, "ok" if shown else "no_answer")
+
+
+# ── 흐름도 모드 ──────────────────────────────────────────────────────────
+# 추천 답변은 그대로 읽게 되고, 키워드는 순서를 발표자가 짜야 해서 도움이 약하다는 의견이 나왔다.
+# 말할 순서만 짧은 칸 3개로 보여준다. 칸마다 근거 슬라이드를 붙이고 숫자를 그 슬라이드와 대조한다.
+
+FLOW_STEPS = 3
+FLOW_MAX_CHARS = 22
+
+FLOW_SHAPE = {
+    "사실확인": "1칸 질문에 대한 답(수치나 이름) → 2칸 그 수치의 출처나 조건 → 3칸 덧붙이면 좋은 사실",
+    "절차":     "1칸 첫 단계 → 2칸 다음 단계 → 3칸 마지막 단계나 결과",
+    "근거":     "1칸 주장이나 결론 → 2칸 뒷받침 수치 → 3칸 검증한 방법",
+    "한계반론": "1칸 한계를 인정하는 말 → 2칸 이 분석이 다루는 범위 → 3칸 그래도 결론이 유효한 이유",
+}
+
+FLOW_PROMPT = """발표자가 청중 질문에 답할 때 말할 순서를 흐름도 칸 {n}개로 만들어줘.
+발표자는 이걸 한 번 보고 자기 말로 풀어서 답한다. 문장이 아니라 짧은 메모다.
+
+흐름: {shape}
+
+지켜야 할 것:
+1. 한 칸은 {max_chars}자 이내. 조사와 어미를 빼고 명사형으로 끝내.
+2. 아래 자료 내용만 근거로 써. 자료에 없는 사실, 숫자, 이름은 절대 지어내지 마.
+3. 숫자는 자료에 적힌 그대로. 반올림, 단위 변환, 재계산 금지.
+4. 칸마다 근거가 된 슬라이드 번호를 붙여.
+5. 자료로 답할 수 없으면 "없음" 한 줄만 써.
+
+출력 형식 (다른 말 붙이지 말고 이것만, 한 줄에 한 칸, 숫자는 슬라이드 번호):
+12 | 구독 500명 기준
+12 | 월 매출 495만원
+
+질문: {question}
+
+--- 자료 ---
+{slides}"""
+
+_FLOW_LINE = re.compile(r"^\D{0,8}?(\d{1,3})\s*(?:\t|\||:|\)|번|\.)\s*(.+)$")
+
+
+def _stream_text(self, prompt: str, t0: float) -> Iterator[tuple[str, str]]:
+    """모델 출력을 줄 단위로 내보낸다. ("line", 줄) / ("end", 남은 글자) / ("error", 이유)"""
+    q: queue.Queue = queue.Queue()
+    cancel = threading.Event()
+
+    def work():
+        try:
+            resp = self._get().chat.completions.create(
+                model=self.model, stream=True, reasoning_effort=REASONING,
+                messages=[{"role": "user", "content": prompt}])
+            for chunk in resp:
+                if cancel.is_set():
+                    resp.close()
+                    return
+                delta = chunk.choices[0].delta.content if chunk.choices else None
+                if delta:
+                    q.put(("delta", delta))
+            q.put(("end", None))
+        except Exception as e:
+            q.put(("error", type(e).__name__))
+
+    threading.Thread(target=work, daemon=True).start()
+    buf = ""
+    try:
+        while True:
+            left = DEADLINE_S - (time.time() - t0)
+            try:
+                kind, val = q.get(timeout=left) if left > 0 else q.get_nowait()
+            except queue.Empty:
+                yield ("error", "timeout")
+                return
+            if kind == "error":
+                yield ("error", val)
+                return
+            if kind == "end":
+                yield ("end", buf)
+                return
+            buf += val
+            *lines, buf = buf.split("\n")
+            for line in lines:
+                if line.strip():
+                    yield ("line", line)
+    finally:
+        cancel.set()
+
+
+def flow(self, question: str, qtype: str, slides: list[tuple[int, str]]) -> Iterator[dict]:
+    """칸이 완성될 때마다 지금까지의 흐름도를 내보낸다.
+
+    {"type": "cue.flow", "steps": [{"text", "slide"}], "done", "latency_ms", "status"}
+    status: ok | no_answer | blocked | error  (blocked 는 자료에 없는 숫자가 나온 칸부터 버림)
+    """
+    t0 = time.time()
+    by_slide = dict(slides)
+    steps: list[dict] = []
+    first_ms = None
+
+    def msg(done: bool, status: str = "", note: str = "") -> dict:
+        m = {"type": "cue.flow", "steps": list(steps), "done": done,
+             "latency_ms": round((time.time() - t0) * 1000, 1)}
+        if done:
+            m.update(status=status, first_ms=first_ms)
+            if note:
+                m["note"] = note
+        return m
+
+    if not self.ready():
+        yield msg(True, "error", "OPENAI_API_KEY 가 없습니다")
+        return
+
+    prompt = FLOW_PROMPT.format(
+        n=FLOW_STEPS, max_chars=FLOW_MAX_CHARS, question=question,
+        shape=FLOW_SHAPE.get(qtype, FLOW_SHAPE["사실확인"]),
+        slides="\n\n".join(f"[{p}번 슬라이드]\n{t}" for p, t in slides))
+
+    def take(line: str):
+        """한 줄을 칸으로 만든다. 반환: 칸 dict / "skip" / "blocked" / "none" """
+        s = _clean(line)
+        if s.strip("\"' .") == "없음":
+            return "none"
+        m = _FLOW_LINE.match(s)
+        if not m:
+            return "skip"
+        slide, text = int(m.group(1)), m.group(2).strip().strip("\"'")
+        # 형식 지시어가 칸에 섞여 나오는 경우가 있었다 ("슬라이드	과정 채점", "<TAB>문제마다...")
+        text = re.sub(r"^(?:슬라이드|<?TAB>?|\||\s)+", "", text).strip()
+        if not text:
+            return "skip"
+        if slide not in by_slide:
+            # 주지 않은 슬라이드 번호는 지어낸 것이다
+            return "skip"
+        if not numbers_ok(text, by_slide[slide]):
+            return "blocked"
+        return {"text": text[:FLOW_MAX_CHARS + 8], "slide": slide}
+
+    for kind, val in _stream_text(self, prompt, t0):
+        if kind == "error":
+            yield msg(True, "ok" if steps else "error", val)
+            return
+        pending = [val] if kind == "line" else ([val] if val.strip() else [])
+        for line in pending:
+            got = take(line)
+            if got == "none" and not steps:
+                yield msg(True, "no_answer")
+                return
+            if got == "blocked":
+                yield msg(True, "blocked", line)
+                return
+            if isinstance(got, dict) and len(steps) < FLOW_STEPS:
+                steps.append(got)
+                if first_ms is None:
+                    first_ms = round((time.time() - t0) * 1000, 1)
+                yield msg(False)
+        if kind == "end":
+            break
+    yield msg(True, "ok" if steps else "no_answer")
+
+
+Answerer.flow = flow

@@ -155,7 +155,7 @@ WARM_QUESTIONS = (
 )
 
 # 화면에 무엇까지 띄울지. 발표는 키워드로 충분할 수 있지만 회의나 업무 자리는 답변 문장이 필요하다.
-MODES = ("keywords", "answer")
+MODES = ("keywords", "answer", "flow")
 
 
 @dataclass
@@ -429,7 +429,7 @@ class ReadyQ:
         balanced 는 문서 289장 기준 ~62초, accurate 는 ~721초 걸린다.
         """
         t0 = time.time()
-        if self.mode == "answer":
+        if self.mode in ("answer", "flow"):
             self._get_answerer().warm()
         if self.slow is None:
             self._slow_ready = True
@@ -566,6 +566,23 @@ class ReadyQ:
             if row is not None:
                 by_page.setdefault(s.slide, row["text"])
         yield from answerer.stream(question, list(by_page.items()))
+
+    def flow(self, question: str, cue: Cue) -> Iterator[dict]:
+        """cue() 결과에 이어 말할 순서를 흐름도 칸으로 내보낸다. flow 모드에서만 부른다.
+
+        메시지는 {"type": "cue.flow", "steps": [{"text", "slide"}], "done", "latency_ms"} 이고,
+        마지막 메시지에 status 가 붙는다: ok | no_answer | blocked | error | skipped
+        """
+        if cue.status != "ok" or not cue.sources:
+            yield {"type": "cue.flow", "steps": [], "done": True,
+                   "latency_ms": 0.0, "status": "skipped"}
+            return
+        by_page = {}
+        for s in cue.sources:
+            row = next((r for r in self.rows if r["page"] == s.slide and r["source"] == s.source), None)
+            if row is not None:
+                by_page.setdefault(s.slide, row["text"])
+        yield from self._get_answerer().flow(question, cue.question_type, list(by_page.items()))
 
     def _get_answerer(self):
         if self._answerer is None:
