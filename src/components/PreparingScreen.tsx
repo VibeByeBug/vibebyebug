@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { fetchStatus } from '../api';
 import type { PreparingStatus } from '../types/flow';
 import { WarningIcon } from './icons';
 
@@ -8,28 +9,41 @@ const STEPS: { key: PreparingStatus; label: string }[] = [
   { key: 'ready', label: '실시간 연결 준비' },
 ];
 
+// 서버 준비(임베딩 모델 로딩과 색인)에 걸리는 대략의 시간. 진행률과 남은 시간 표시에만 쓴다.
+// 로컬 측정 19장 자료 기준 약 90초.
+const EXPECTED_SEC = 90;
+
 interface PreparingScreenProps {
-  initialStatus?: PreparingStatus;
+  presentationId: string;
   onReady: () => void;
   onRetry: () => void;
 }
 
-export function PreparingScreen({ initialStatus = 'uploading', onReady, onRetry }: PreparingScreenProps) {
-  const [status, setStatus] = useState<PreparingStatus>(initialStatus);
+export function PreparingScreen({ presentationId, onReady, onRetry }: PreparingScreenProps) {
+  // 자료 인덱싱은 업로드 때 끝났으므로 모델 로딩부터 시작한다
+  const [status, setStatus] = useState<PreparingStatus>('analyzing');
   const [progress, setProgress] = useState(8);
 
   useEffect(() => {
-    if (initialStatus === 'failed' || initialStatus === 'ready') return;
-
-    const toAnalyzing = setTimeout(() => setStatus('analyzing'), 2000);
-    const toReady = setTimeout(() => setStatus('ready'), 4000);
-    const tick = setInterval(() => setProgress((p) => Math.min(96, p + 4)), 180);
+    let stop = false;
+    async function poll() {
+      while (!stop) {
+        try {
+          const st = await fetchStatus(presentationId);
+          if (st.state === '준비완료') return setStatus('ready');
+          if (st.state === '실패' || st.state === '없음') return setStatus('failed');
+          setProgress(Math.min(96, 8 + ((st.elapsed_sec ?? 0) / EXPECTED_SEC) * 88));
+        } catch {
+          return setStatus('failed');
+        }
+        await new Promise((r) => setTimeout(r, 1000));
+      }
+    }
+    poll();
     return () => {
-      clearTimeout(toAnalyzing);
-      clearTimeout(toReady);
-      clearInterval(tick);
+      stop = true;
     };
-  }, [initialStatus]);
+  }, [presentationId]);
 
   useEffect(() => {
     if (status === 'ready') {
@@ -40,7 +54,7 @@ export function PreparingScreen({ initialStatus = 'uploading', onReady, onRetry 
 
   const activeIndex = STEPS.findIndex((step) => step.key === status);
   const displayProgress = status === 'ready' ? 100 : progress;
-  const secondsLeft = Math.max(0, Math.round((100 - displayProgress) / 2));
+  const secondsLeft = Math.max(0, Math.round(((100 - displayProgress) / 88) * EXPECTED_SEC));
 
   return (
     <div className="flex flex-1 items-center justify-center py-[44px] w-full">

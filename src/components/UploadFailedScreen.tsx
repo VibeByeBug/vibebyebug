@@ -1,11 +1,13 @@
 import { DocumentIcon, RefreshIcon, WarningIcon } from './icons';
 
 interface UploadFailedScreenProps {
+  fileName?: string;
+  message?: string; // 서버가 알려준 실패 이유
   onBackToList: () => void;
   onRetry: () => void;
 }
 
-export function UploadFailedScreen({ onBackToList, onRetry }: UploadFailedScreenProps) {
+export function UploadFailedScreen({ fileName, message, onBackToList, onRetry }: UploadFailedScreenProps) {
   return (
     <div className="flex flex-1 items-center justify-center py-[44px] w-full">
       <div className="flex flex-col gap-[26px] w-[880px]">
@@ -23,8 +25,8 @@ export function UploadFailedScreen({ onBackToList, onRetry }: UploadFailedScreen
             <DocumentIcon />
           </span>
           <div className="flex flex-col flex-1 gap-[5px] min-w-0">
-            <p className="font-bold text-[17px] text-[#1a1a1a] w-full">capstone_final.pdf</p>
-            <p className="font-normal text-[14px] text-[#bf382e] w-full">18.4MB · 업로드 실패 (오류 코드: UPLOAD_500)</p>
+            <p className="font-bold text-[17px] text-[#1a1a1a] w-full">{fileName ?? '파일'}</p>
+            <p className="font-normal text-[14px] text-[#bf382e] w-full">업로드 실패</p>
           </div>
           <button
             type="button"
@@ -45,7 +47,7 @@ export function UploadFailedScreen({ onBackToList, onRetry }: UploadFailedScreen
               <span className="font-bold text-[20px] text-[#bf382e]">!</span>
             </span>
             <div className="flex flex-1 flex-col gap-[6px] min-w-0">
-              <p className="font-bold text-[16px] text-black w-full">서버에서 파일 처리에 실패했습니다</p>
+              <p className="font-bold text-[16px] text-black w-full">{message ?? '서버에서 파일 처리에 실패했습니다'}</p>
               <p className="font-normal text-[13px] text-[#666] w-full">
                 네트워크 상태를 확인하고 다시 시도해주세요. 계속 실패하면 파일을 PDF로 변환해서 업로드해보세요.
               </p>

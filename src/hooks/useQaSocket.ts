@@ -1,17 +1,23 @@
-import { useEffect, useRef, useState } from 'react';
-import type { QaResult } from '../types/qa';
+import { useCallback, useEffect, useRef, useState } from 'react';
+import { toQaResult } from '../api';
+import type { AnswerMode, QaAnswer, QaResult } from '../types/qa';
 
 const WS_URL = import.meta.env.VITE_WS_URL ?? 'ws://localhost:8000/ws';
 
 interface UseQaSocketResult {
   isConnected: boolean;
   lastResult: QaResult | null;
+  lastAnswer: QaAnswer | null;
+  notice: string | null; // 자료 준비 전 질문 등 서버 안내
   rawMessage: string | null;
+  ask: (text: string, presentationId: string, mode: AnswerMode) => void;
 }
 
 export function useQaSocket(): UseQaSocketResult {
   const [isConnected, setIsConnected] = useState(false);
   const [lastResult, setLastResult] = useState<QaResult | null>(null);
+  const [lastAnswer, setLastAnswer] = useState<QaAnswer | null>(null);
+  const [notice, setNotice] = useState<string | null>(null);
   const [rawMessage, setRawMessage] = useState<string | null>(null);
   const socketRef = useRef<WebSocket | null>(null);
 
@@ -25,12 +31,23 @@ export function useQaSocket(): UseQaSocketResult {
     };
 
     socket.onmessage = (event: MessageEvent<string>) => {
+      let msg;
       try {
-        const parsed = JSON.parse(event.data) as QaResult;
-        setLastResult(parsed);
+        msg = JSON.parse(event.data);
       } catch {
         console.log('[useQaSocket] raw message (not JSON yet):', event.data);
         setRawMessage(event.data);
+        return;
+      }
+      if (msg.type === 'cue.evidence') {
+        // 잡음(헛기침 등)으로 판정되면 화면을 바꾸지 않는다
+        if (msg.status === 'ignored') return;
+        setLastResult(toQaResult(msg));
+        setNotice(null);
+      } else if (msg.type === 'cue.answer') {
+        setLastAnswer(msg as QaAnswer);
+      } else if (msg.type === 'not_ready' || msg.type === 'error') {
+        setNotice(msg.message ?? '서버 오류가 발생했습니다.');
       }
     };
 
@@ -48,5 +65,17 @@ export function useQaSocket(): UseQaSocketResult {
     };
   }, []);
 
-  return { isConnected, lastResult, rawMessage };
+  const ask = useCallback((text: string, presentationId: string, mode: AnswerMode) => {
+    const socket = socketRef.current;
+    if (!socket || socket.readyState !== WebSocket.OPEN) {
+      setNotice('서버와 연결되지 않았습니다.');
+      return;
+    }
+    setLastResult(null);
+    setLastAnswer(null);
+    setNotice(null);
+    socket.send(JSON.stringify({ type: 'stt.final', text, presentation_id: presentationId, mode }));
+  }, []);
+
+  return { isConnected, lastResult, lastAnswer, notice, rawMessage, ask };
 }

@@ -1,4 +1,5 @@
-import { useState } from 'react';
+import { useRef, useState } from 'react';
+import type { UploadResult } from './api';
 import { Header } from './components/Header';
 import { Hud } from './components/Hud';
 import { Login } from './components/Login';
@@ -15,20 +16,32 @@ import { UploadFailedScreen } from './components/UploadFailedScreen';
 import { UploadScreen } from './components/UploadScreen';
 import { useQaSocket } from './hooks/useQaSocket';
 import { useSpeechRecognition } from './hooks/useSpeechRecognition';
-import { mockQaResult } from './mocks/qaMock';
 import { mockRecognizedQuestion } from './mocks/questionMock';
 import { DownloadIcon } from './components/icons';
 import type { ScreenName } from './types/flow';
+import type { AnswerMode } from './types/qa';
 
 function App() {
   const [screen, setScreen] = useState<ScreenName>('login');
   const [presentationName, setPresentationName] = useState('캡스톤 디자인 최종 발표');
   const [question, setQuestion] = useState(mockRecognizedQuestion);
-  const [uploadAttempted, setUploadAttempted] = useState(false);
   const [mockProgress, setMockProgress] = useState({ index: 0, total: 7 });
-  const { lastResult } = useQaSocket();
+  const [upload, setUpload] = useState<UploadResult | null>(null);
+  const [uploadError, setUploadError] = useState<{ fileName: string; message: string } | null>(null);
+  const [mode, setMode] = useState<AnswerMode>('keywords');
+  const [textFromError, setTextFromError] = useState(true); // 음성 인식 실패로 온 입력인지
+  const { lastResult, lastAnswer, notice, ask } = useQaSocket();
 
-  const result = lastResult ?? mockQaResult;
+  // 음성 인식 콜백은 인식을 시작한 순간의 값을 붙잡고 있어서, 최신 발표와 모드는 ref 로 읽는다
+  const uploadRef = useRef(upload);
+  const modeRef = useRef(mode);
+  uploadRef.current = upload;
+  modeRef.current = mode;
+
+  function sendQuestion(text: string) {
+    const pid = uploadRef.current?.presentation_id;
+    if (pid) ask(text, pid, modeRef.current);
+  }
 
   function handlePartialResult(text: string) {
     setQuestion((prev) => ({ ...prev, partialText: text, isConfirmed: false }));
@@ -37,14 +50,35 @@ function App() {
 
   function handleFinalResult(text: string) {
     setQuestion({ partialText: text, finalText: text, isConfirmed: true });
+    sendQuestion(text); // 화면 전환을 기다리지 않고 바로 보낸다
     setScreen('recognized');
     setTimeout(() => setScreen('hud'), 1200);
   }
 
+  const modeToggle = (
+    <div className="border border-[#e5e7eb] flex p-[3px] rounded-[6px]">
+      {(['keywords', 'answer'] as const).map((m) => (
+        <button
+          key={m}
+          type="button"
+          onClick={() => setMode(m)}
+          className={`h-[28px] px-[10px] rounded-[4px] text-[12px] whitespace-nowrap ${
+            mode === m ? 'bg-[#f26b1d] font-bold text-white' : 'font-medium text-[#6b7280]'
+          }`}
+        >
+          {m === 'keywords' ? '키워드' : '추천 답변'}
+        </button>
+      ))}
+    </div>
+  );
+
   const { start: startRecognition } = useSpeechRecognition({
     onPartialResult: handlePartialResult,
     onFinalResult: handleFinalResult,
-    onError: () => setScreen('textInput'),
+    onError: () => {
+      setTextFromError(true);
+      setScreen('textInput');
+    },
   });
 
   function handleConnectMic() {
@@ -53,8 +87,8 @@ function App() {
     startRecognition();
   }
 
-  function handleUploadFail() {
-    setUploadAttempted(true);
+  function handleUploadFail(fileName: string, message: string) {
+    setUploadError({ fileName, message });
     setScreen('uploadFailed');
   }
 
@@ -68,7 +102,7 @@ function App() {
           <StartScreen
             onStart={(title) => {
               setPresentationName(title);
-              setUploadAttempted(false);
+              setUpload(null);
               setScreen('upload');
             }}
             onOpenReport={() => setScreen('report')}
@@ -80,7 +114,7 @@ function App() {
         <>
           <Header onNavigate={setScreen} label={presentationName} rightText="2 / 3 준비" />
           <UploadScreen
-            forceFail={!uploadAttempted}
+            onUploaded={setUpload}
             onUploadFail={handleUploadFail}
             onSkip={() => setScreen('preparing')}
             onStartMock={() => setScreen('mockPractice')}
@@ -91,14 +125,23 @@ function App() {
       {screen === 'uploadFailed' && (
         <>
           <Header onNavigate={setScreen} label={presentationName} rightText="2 / 3 준비" />
-          <UploadFailedScreen onBackToList={() => setScreen('start')} onRetry={() => setScreen('upload')} />
+          <UploadFailedScreen
+            fileName={uploadError?.fileName}
+            message={uploadError?.message}
+            onBackToList={() => setScreen('start')}
+            onRetry={() => setScreen('upload')}
+          />
         </>
       )}
 
-      {screen === 'preparing' && (
+      {screen === 'preparing' && upload && (
         <>
           <Header onNavigate={setScreen} label={presentationName} showProfile />
-          <PreparingScreen onReady={() => setScreen('micConnect')} onRetry={() => setScreen('upload')} />
+          <PreparingScreen
+            presentationId={upload.presentation_id}
+            onReady={() => setScreen('micConnect')}
+            onRetry={() => setScreen('upload')}
+          />
         </>
       )}
 
@@ -118,7 +161,23 @@ function App() {
 
       {screen === 'micConnect' && (
         <>
-          <Header onNavigate={setScreen} compact rightText="대기 중" />
+          <Header
+            onNavigate={setScreen}
+            compact
+            rightText="대기 중"
+            rightButtons={
+              <button
+                type="button"
+                onClick={() => {
+                  setTextFromError(false);
+                  setScreen('textInput');
+                }}
+                className="border border-[#e5e7eb] h-[32px] px-[12px] rounded-[6px] font-bold text-[13px] text-[#6b7280] whitespace-nowrap"
+              >
+                글로 질문하기
+              </button>
+            }
+          />
           <MicConnectScreen onConnect={handleConnectMic} />
         </>
       )}
@@ -136,10 +195,18 @@ function App() {
 
       {screen === 'textInput' && (
         <>
-          <Header onNavigate={setScreen} compact rightText="음성 인식 대체" showProfile={false} />
+          <Header
+            onNavigate={setScreen}
+            compact
+            rightText="음성 인식 대체"
+            rightButtons={modeToggle}
+            showProfile={false}
+          />
           <TextInputFallback
+            sttError={textFromError}
             onSubmit={(text) => {
               setQuestion({ partialText: text, finalText: text, isConfirmed: true });
+              sendQuestion(text);
               setScreen('hud');
             }}
           />
@@ -152,10 +219,31 @@ function App() {
             onNavigate={setScreen}
             compact
             listening
-            rightText={`응답 ${result.responseMs}ms`}
+            rightText={lastResult ? `응답 ${lastResult.responseMs}ms` : '분석 중'}
+            rightButtons={
+              <>
+                {modeToggle}
+                <button
+                  type="button"
+                  onClick={() => {
+                    setTextFromError(false);
+                    setScreen('textInput');
+                  }}
+                  className="border border-[#e5e7eb] h-[32px] px-[12px] rounded-[6px] font-bold text-[13px] text-[#6b7280] whitespace-nowrap"
+                >
+                  글로 질문하기
+                </button>
+              </>
+            }
             showProfile={false}
           />
-          <Hud result={result} question={question.finalText || mockRecognizedQuestion.finalText} />
+          <Hud
+            result={lastResult}
+            answer={lastAnswer}
+            mode={mode}
+            notice={notice}
+            question={question.finalText}
+          />
         </>
       )}
 
@@ -200,7 +288,7 @@ function App() {
       {screen === 'settings' && (
         <>
           <Header onNavigate={setScreen} label="설정" activeMenu="settings" />
-          <SettingsScreen />
+          <SettingsScreen mode={mode} onModeChange={setMode} />
         </>
       )}
     </div>

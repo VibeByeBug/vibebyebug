@@ -28,8 +28,10 @@ export function TextInputFallback({ onSubmit, sttError = true }: TextInputFallba
             type="text"
             value={text}
             onChange={(e) => setText(e.target.value)}
-            onKeyDown={(e) => {
-              if (e.key === 'Enter') handleSubmit();
+            onKeyUp={(e) => {
+              // 한글 조합 중 누른 Enter 는 keydown 에서 글자 확정으로 먹힌다.
+              // keydown 으로 받으면 전송이 안 되거나 두 번 눌러야 해서, 조합이 끝난 뒤인 keyup 에서 보낸다.
+              if (e.key === 'Enter' && !e.nativeEvent.isComposing) handleSubmit();
             }}
             placeholder="질문을 입력해주세요"
             className="flex-1 border border-[#e5e7eb] rounded-[6px] px-[16px] py-[14px] text-[16px] text-[#1a1a1a] outline-none"

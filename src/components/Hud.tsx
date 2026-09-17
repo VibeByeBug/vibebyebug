@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import type { QaResult } from '../types/qa';
+import type { AnswerMode, QaAnswer, QaResult } from '../types/qa';
 import type { QuestionType } from '../types/mockPractice';
 import { ChevronDownIcon, MinusCircleIcon } from './icons';
 
@@ -8,13 +8,33 @@ const MAX_SOURCES = 5;
 const QUESTION_TYPES: QuestionType[] = ['사실확인', '절차', '근거', '한계/반론'];
 
 interface HudProps {
-  result: QaResult;
+  result: QaResult | null; // null 이면 서버 응답을 기다리는 중
   question: string;
+  answer?: QaAnswer | null;
+  mode?: AnswerMode;
+  notice?: string | null;
   onChangeType?: (type: QuestionType) => void;
 }
 
-export function Hud({ result, question, onChangeType }: HudProps) {
+export function Hud({ result, question, answer = null, mode = 'keywords', notice = null, onChangeType }: HudProps) {
   const [expanded, setExpanded] = useState(false);
+
+  if (!result) {
+    return (
+      <div className="flex flex-1 flex-col gap-[24px] items-start pb-[36px] pt-[32px] px-[44px] w-full">
+        <div className="flex flex-col gap-[14px] w-full">
+          <p className="font-bold text-[11px] text-[#6b7280] tracking-[1.54px] w-full">인식된 질문</p>
+          <p className="font-bold text-[44px] text-[#1a1a1a] tracking-[-1.76px] leading-[57px] w-full">{question}</p>
+        </div>
+        <p className={`font-medium text-[17px] ${notice ? 'text-[#bf382e]' : 'text-[#6b7280]'}`}>
+          {notice ?? '근거를 찾고 있어요···'}
+        </p>
+      </div>
+    );
+  }
+
+  // 추천 답변 모드에서 서버가 만든 답변. 끝났는데 비어 있으면(자료로 답할 수 없음, 오류) 없는 것으로 본다.
+  const showAnswer = mode === 'answer' && !(answer?.done && !answer.text);
 
   const sources = result.sources.slice(0, MAX_SOURCES);
   const visibleSources = expanded ? sources : sources.slice(0, DEFAULT_VISIBLE_SOURCES);
@@ -78,7 +98,28 @@ export function Hud({ result, question, onChangeType }: HudProps) {
         </div>
       </div>
 
-      {isLimitation ? (
+      {showAnswer && (
+        <div className="bg-[#fff3eb] border border-[#f26b1d] flex flex-col gap-[14px] px-[28px] py-[26px] rounded-[6px] w-full">
+          <p className="font-bold text-[12px] text-[#f26b1d] tracking-[1.2px] w-full">
+            추천 답변
+            {answer?.done && <span className="ml-[8px] font-medium text-[#999]">{Math.round(answer.latency_ms)}ms</span>}
+          </p>
+          <p
+            className={`font-bold text-[27px] tracking-[-0.675px] leading-[40px] w-full ${
+              answer?.text ? 'text-[#1a1a1a]' : 'text-[#999]'
+            }`}
+          >
+            {answer?.text ? `“${answer.text}”` : '답변을 만들고 있어요···'}
+          </p>
+          {answer?.status === 'blocked' && (
+            <p className="font-normal text-[13px] text-[#6b7280]">
+              자료에 없는 숫자가 나와서 뒷부분은 표시하지 않았습니다.
+            </p>
+          )}
+        </div>
+      )}
+
+      {isLimitation && !showAnswer ? (
         <div className="bg-[#fff3eb] border border-[#f26b1d] flex flex-col gap-[14px] px-[28px] py-[26px] rounded-[6px] w-full">
           <p className="font-bold text-[12px] text-[#f26b1d] tracking-[1.2px] w-full">추천 답변</p>
           <div className="flex flex-col gap-[12px] w-full">
