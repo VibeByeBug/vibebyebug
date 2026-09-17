@@ -12,10 +12,35 @@ uploaded_files/
 # 자격증명 및 환경변수
 .env
 *.key
-
 # 파이썬 가상환경 및 캐시
 __pycache__/
 *.pyc
 *.py[cod]
 .venv/
 venv/
+# Logs
+logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+lerna-debug.log*
+node_modules
+dist
+dist-ssr
+*.local
+.env.*
+!.env.example
+# Editor directories and files
+.vscode/*
+!.vscode/extensions.json
+.idea
+.DS_Store
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
+.claude/
+public/_test/
