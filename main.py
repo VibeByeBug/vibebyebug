@@ -9,7 +9,7 @@ from fastapi.templating import Jinja2Templates
 from dotenv import load_dotenv
 from fastapi.middleware.cors import CORSMiddleware
 
-from routers import rag_api, upload_api, log_api
+from routers import rag_api, upload_api, log_api, core_api
 import engine_store
 
 load_dotenv()
@@ -18,6 +18,7 @@ app = FastAPI()
 app.include_router(upload_api.router)
 app.include_router(rag_api.router)
 app.include_router(log_api.router)
+app.include_router(core_api.router)
 
 # ---------------------------------------------------------
 # [보안 설정] CORS 미들웨어 추가 (프론트엔드 접속 허용)
@@ -79,11 +80,24 @@ def _parse(raw: str) -> dict:
     return {"type": "stt.final", "text": raw}
 
 
+async def _send_extra(websocket: WebSocket, rq, text: str, cue, mode: str) -> None:
+    it = rq.answer(text, cue) if mode == "answer" else rq.flow(text, cue)
+    while True:
+        part = await asyncio.to_thread(next, it, None)
+        if part is None:
+            break
+        await websocket.send_json(part)
+        if part.get("done"):
+            print(f"💬 [{mode}] status={part.get('status')} "
+                  f"첫 칸 {part.get('first_ms')}ms / 끝 {part.get('latency_ms')}ms")
+
+
 @app.websocket("/ws")
 async def websocket_endpoint(websocket: WebSocket):
     await manager.connect(websocket)
     presentation_id = None      # 이 연결이 다루는 발표. session.start 로 정한다.
-    session_mode = "keywords"   # keywords | answer
+    session_mode = "keywords"   # keywords | answer | flow
+    last = None                 # (질문, cue, 엔진) — 답을 받은 뒤 모드를 바꾸면 이걸로 다시 만든다
     try:
         while True:
             msg = _parse(await websocket.receive_text())
@@ -95,6 +109,16 @@ async def websocket_endpoint(websocket: WebSocket):
                 session_mode = msg.get("mode") or session_mode
                 st = engine_store.get_status(presentation_id) if presentation_id else {}
                 await websocket.send_json({"type": "session.ready", **st})
+                continue
+
+            # ── 이미 받은 질문을 다른 모드로 다시 보고 싶을 때 (흐름도 → 추천 답변 등).
+            #    검색은 다시 하지 않고 직전 결과로 그 모드의 답만 만든다. 기록도 두 번 남기지 않는다.
+            if mtype == "cue.extra":
+                mode = msg.get("mode")
+                if last is None or mode not in ("answer", "flow"):
+                    continue
+                text, cue, rq = last
+                await _send_extra(websocket, rq, text, cue, mode)
                 continue
 
             # ── 말하는 중. 투기적 검색은 아직 붙이지 않았으므로 흘려보낸다.
@@ -136,19 +160,12 @@ async def websocket_endpoint(websocket: WebSocket):
                   f"AI {cue.latency_ms}ms / 웹소켓 왕복 {latency}초")
 
             await websocket.send_json(payload)
+            last = (text, cue, rq)
 
-            # ── 추천 답변 모드면 키워드를 보낸 뒤에 답변을 문장 단위로 이어서 보낸다
+            # ── 추천 답변, 흐름도 모드면 키워드를 보낸 뒤에 이어서 보낸다
             mode = msg.get("mode") or session_mode
             if mode in ("answer", "flow"):
-                it = rq.answer(text, cue) if mode == "answer" else rq.flow(text, cue)
-                while True:
-                    part = await asyncio.to_thread(next, it, None)
-                    if part is None:
-                        break
-                    await websocket.send_json(part)
-                    if part.get("done"):
-                        print(f"💬 [추천 답변] status={part.get('status')} "
-                              f"첫 문장 {part.get('first_ms')}ms / 끝 {part.get('latency_ms')}ms")
+                await _send_extra(websocket, rq, text, cue, mode)
 
     except WebSocketDisconnect:
         manager.disconnect(websocket)

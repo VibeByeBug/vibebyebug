@@ -52,6 +52,11 @@ def _warm_worker_inner(pid: str, chunks_path: str, preset: str) -> None:
         # 키워드만 쓰는 연결은 rq.answer() 를 안 부르므로 영향이 없다.
         rq = ReadyQ(chunks_path, preset=preset, session=pid, mode="answer")
         took = rq.warm()
+        # 연습에서 확정해둔 기본 질문 카드를 올린다 (서버가 재시작돼도 유지)
+        core_file = Path(chunks_path).parent / "core" / f"{pid}.json"
+        if core_file.exists():
+            import core_answers
+            rq.set_core(core_answers.CoreStore(core_file).cards)
         with _lock:
             _engines[pid] = rq
         _set(pid, state=READY, warm_sec=round(took, 1),

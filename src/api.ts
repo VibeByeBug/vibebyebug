@@ -1,5 +1,5 @@
 import type { QuestionType } from './types/mockPractice';
-import type { AnswerMode, QaResult } from './types/qa';
+import type { AnswerMode, CoreCard, FlowStep, QaResult } from './types/qa';
 
 export const API_URL = import.meta.env.VITE_API_URL ?? 'http://localhost:8000';
 
@@ -51,6 +51,8 @@ interface CueEvidence {
   deflect: string[];
   latency_ms: number;
   server_latency_ms?: number;
+  core?: CoreCard | null;
+  core_pending?: string;
 }
 
 export function toQaResult(m: CueEvidence): QaResult {
@@ -64,7 +66,38 @@ export function toQaResult(m: CueEvidence): QaResult {
     suggestions: noEvidence ? m.advice : m.deflect,
     responseMs: Math.round(m.server_latency_ms ?? m.latency_ms ?? 0),
     status: m.status,
+    core: m.core ?? null,
+    corePending: m.core_pending || '',
   };
+}
+
+// 기본 질문 답 (연습에서 추천, 발표자가 확정)
+export interface CoreItem {
+  id: string;
+  label: string;
+  suggested: FlowStep[];
+  status: 'ok' | 'no_answer' | 'error';
+  approved: CoreCard | null;
+}
+
+export async function fetchCoreSuggest(presentationId: string): Promise<CoreItem[]> {
+  const res = await fetch(`${API_URL}/api/core/${presentationId}/suggest`);
+  if (!res.ok) throw new Error(`추천을 불러오지 못했습니다 (${res.status})`);
+  return (await res.json()).items;
+}
+
+export async function approveCore(presentationId: string, id: string, steps: FlowStep[], edited: boolean) {
+  const res = await fetch(`${API_URL}/api/core/${presentationId}/${id}`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ steps, edited }),
+  });
+  if (!res.ok) throw new Error('확정하지 못했습니다');
+  return (await res.json()).card as CoreCard;
+}
+
+export async function discardCore(presentationId: string, id: string) {
+  await fetch(`${API_URL}/api/core/${presentationId}/${id}`, { method: 'DELETE' });
 }
 
 export type { AnswerMode };

@@ -28,6 +28,7 @@ from embedders import BM25, Hybrid, STEmbedder, _tokens
 from qtype import classify
 from weak_profile import WeakProfile
 import qa_log
+import core_answers
 
 # 유형별로 슬라이드에서 '무엇을 보여줄지'가 다르다.
 # 검색에 유형을 쓰는 건 실패했지만(README 참고), 무엇을 띄울지 고르는 데는 맞다.
@@ -98,6 +99,7 @@ META_EXPAND = {
     "장점": _MERIT, "강점": _MERIT, "차별점": _MERIT, "차별성": _MERIT, "차이": _MERIT, "경쟁력": _MERIT,
     "계획": _PLAN, "향후": _PLAN, "앞으로": _PLAN, "목표": _PLAN, "방향": _PLAN,
     "효과": ("효과", "기대", "절감", "개선"), "기대효과": ("효과", "기대", "절감", "개선"),
+    "의의": _MERIT + _WHY, "가치": _MERIT + _WHY, "중요성": _WHY, "의미": _MERIT + _WHY,
 }
 
 
@@ -177,6 +179,10 @@ class Cue:
     stage: str = "fast"
     latency_ms: float = 0.0
     mode: str = "keywords"    # answer 면 화면은 뒤이어 올 cue.answer 자리를 비워둔다
+    # 연습에서 발표자가 확정한 기본 질문 답. 있으면 화면은 이 카드를 먼저 띄운다.
+    core: dict | None = None
+    # 기본 질문인데 아직 확정한 답이 없을 때 그 질문 이름 (화면 안내용)
+    core_pending: str = ""
 
     def to_message(self) -> dict:
         """백엔드 계약(cue.evidence)에 맞춘 형태."""
@@ -394,6 +400,7 @@ class ReadyQ:
         self.preset = preset
         self.set_mode(mode)
         self._answerer = None
+        self.core_cards: dict[str, dict] = {}   # set_core() 로 넣는다
         # 연습 기록. 없으면 빈 것으로 동작한다 - 실전에서 멈추면 안 된다.
         self.weak = WeakProfile.load(weak_path)
         # 실전 기록. 사후 리포트의 재료다. None 이면 기록하지 않는다.
@@ -501,12 +508,21 @@ class ReadyQ:
             self._log(c, question)
             return c
 
+        # 연습에서 확정한 기본 질문 답이 있으면 그걸 띄운다. 여기서는 추론하지 않는다.
+        core_id = self._core_id(question)
+        if core_id and core_id in self.core_cards:
+            c = self._core_cue(question, self.core_cards[core_id], t0)
+            self._log(c, question)
+            return c
+        pending = core_answers.LABEL.get(core_id, "") if core_id else ""
+
         # 2단계 - 발표자료와 관련이 있는가.
         # 검색 엔진은 무조건 상위 k 개를 돌려주므로, 여기서 걸러야 '근거 없음'이 나온다.
         query, extra = question, set()
         if _content_words(question, self.nouns):
             if known_ratio(question, self.nouns, self.idf) < MIN_KNOWN_RATIO:
                 c = self._empty(question, "no_evidence", t0, NO_EVIDENCE_ADVICE)
+                c.core_pending = pending
                 self._log(c, question)
                 return c
         else:
@@ -521,6 +537,7 @@ class ReadyQ:
             extra = {t for t in terms if t.lower() in self.idf}
             if not extra:
                 c = self._empty(question, "no_evidence", t0, NO_EVIDENCE_ADVICE)
+                c.core_pending = pending
                 self._log(c, question)
                 return c
             query = f"{question} {' '.join(sorted(extra))}"
@@ -529,6 +546,7 @@ class ReadyQ:
             raise RuntimeError("warm() 을 먼저 부르세요 (임베딩 모델 로딩)")
         engine = self.slow if self.slow is not None else self.fast
         cue = self._cue(question, engine.search([query], k)[0], self.preset, k, t0, extra)
+        cue.core_pending = pending
         self._log(cue, question)
         return cue
 
@@ -554,7 +572,7 @@ class ReadyQ:
         메시지는 {"type": "cue.answer", "text", "done", "latency_ms"} 이고,
         마지막 메시지(done=True)에 status 가 붙는다: ok | no_answer | blocked | error | skipped
         """
-        if cue.status != "ok" or not cue.sources:
+        if cue.status != "ok" or not cue.sources or cue.core:
             # 근거 없는 질문에 답변을 만들면 지어낸 말이 된다
             yield {"type": "cue.answer", "text": "", "done": True,
                    "latency_ms": 0.0, "status": "skipped"}
@@ -573,7 +591,7 @@ class ReadyQ:
         메시지는 {"type": "cue.flow", "steps": [{"text", "slide"}], "done", "latency_ms"} 이고,
         마지막 메시지에 status 가 붙는다: ok | no_answer | blocked | error | skipped
         """
-        if cue.status != "ok" or not cue.sources:
+        if cue.status != "ok" or not cue.sources or cue.core:
             yield {"type": "cue.flow", "steps": [], "done": True,
                    "latency_ms": 0.0, "status": "skipped"}
             return
@@ -583,6 +601,37 @@ class ReadyQ:
             if row is not None:
                 by_page.setdefault(s.slide, row["text"])
         yield from self._get_answerer().flow(question, cue.question_type, list(by_page.items()))
+
+    def set_core(self, cards: dict) -> None:
+        """연습에서 확정한 기본 질문 카드 {질문 종류 id: 카드}. 확정이 바뀔 때마다 다시 넣는다."""
+        self.core_cards = dict(cards or {})
+
+    def _core_id(self, question: str) -> str | None:
+        """기본 질문인가. 질문에 자료 고유의 내용어가 섞여 있으면 기본 질문으로 보지 않는다.
+
+        "이 프로젝트의 한계는?" 은 기본 질문이고, "AI 탐지의 한계는?" 은 세부 질문이다.
+        세부 질문에 저장된 기본 카드를 띄우면 엉뚱한 답이 된다.
+        """
+        cid = core_answers.classify(question)
+        if not cid:
+            return None
+        core_words = [w for c in core_answers.CORE for w in c["words"]]
+        rest = [w for w in _content_words(question, self.nouns)
+                if not any(w in cw or cw in w for cw in core_words)]
+        return None if rest else cid
+
+    def _core_cue(self, question: str, card: dict, t0: float) -> Cue:
+        srcs = []
+        for step in card["steps"]:
+            row = next((r for r in self.rows if r["page"] == step.get("slide")), None)
+            if row is None or any(s.slide == row["page"] for s in srcs):
+                continue
+            i = self.rows.index(row)
+            words = {w.lower() for w in self.nouns(step["text"])}
+            line, _ = _score_lines(self.prepared[i], words, "사실확인", self.idf)
+            srcs.append(Source(slide=row["page"], snippet=(line or row["text"])[:120], source=row["source"]))
+        return Cue(question_type=classify(question), sources=srcs, status="ok", core=card,
+                   mode=self.mode, stage="core", latency_ms=round((time.time() - t0) * 1000, 2))
 
     def _get_answerer(self):
         if self._answerer is None:

@@ -12,6 +12,7 @@ interface UseQaSocketResult {
   notice: string | null; // 자료 준비 전 질문 등 서버 안내
   rawMessage: string | null;
   ask: (text: string, presentationId: string, mode: AnswerMode) => void;
+  requestMode: (mode: AnswerMode) => void; // 직전 질문을 다른 모드로 다시 받기
 }
 
 export function useQaSocket(): UseQaSocketResult {
@@ -82,5 +83,13 @@ export function useQaSocket(): UseQaSocketResult {
     socket.send(JSON.stringify({ type: 'stt.final', text, presentation_id: presentationId, mode }));
   }, []);
 
-  return { isConnected, lastResult, lastAnswer, lastFlow, notice, rawMessage, ask };
+  const requestMode = useCallback((mode: AnswerMode) => {
+    const socket = socketRef.current;
+    if (!socket || socket.readyState !== WebSocket.OPEN || mode === 'keywords') return;
+    if (mode === 'answer') setLastAnswer(null);
+    if (mode === 'flow') setLastFlow(null);
+    socket.send(JSON.stringify({ type: 'cue.extra', mode }));
+  }, []);
+
+  return { isConnected, lastResult, lastAnswer, lastFlow, notice, rawMessage, ask, requestMode };
 }

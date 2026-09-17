@@ -5,6 +5,7 @@ import { Hud } from './components/Hud';
 import { Login } from './components/Login';
 import { MicConnectScreen } from './components/MicConnectScreen';
 import { MockPracticeScreen } from './components/MockPracticeScreen';
+import { CorePracticeScreen } from './components/CorePracticeScreen';
 import { MyHistoryScreen } from './components/MyHistoryScreen';
 import { PreparingScreen } from './components/PreparingScreen';
 import { RecognizedQuestion } from './components/RecognizedQuestion';
@@ -32,7 +33,7 @@ function App() {
   const [uploadError, setUploadError] = useState<{ fileName: string; message: string } | null>(null);
   const [mode, setMode] = useState<AnswerMode>('keywords');
   const [textFromError, setTextFromError] = useState(true); // 음성 인식 실패로 온 입력인지
-  const { lastResult, lastAnswer, lastFlow, notice, ask } = useQaSocket();
+  const { lastResult, lastAnswer, lastFlow, notice, ask, requestMode } = useQaSocket();
 
   // 음성 인식 콜백은 인식을 시작한 순간의 값을 붙잡고 있어서, 최신 발표와 모드는 ref 로 읽는다
   const uploadRef = useRef(upload);
@@ -57,13 +58,21 @@ function App() {
     setTimeout(() => setScreen('hud'), 1200);
   }
 
+  // 답을 받은 뒤 모드를 바꾸면 새 모드의 답이 없으니 서버에 다시 요청한다.
+  // 이미 받아둔 답이 있으면 다시 부르지 않는다 (흐름도 ↔ 추천 답변을 오가도 호출은 한 번씩).
+  function changeMode(m: AnswerMode) {
+    setMode(m);
+    if (screen !== 'hud' || !lastResult || lastResult.core || lastResult.sources.length === 0) return;
+    if ((m === 'answer' && !lastAnswer) || (m === 'flow' && !lastFlow)) requestMode(m);
+  }
+
   const modeToggle = (
     <div className="border border-[#e5e7eb] flex p-[3px] rounded-[6px]">
       {(['keywords', 'flow', 'answer'] as const).map((m) => (
         <button
           key={m}
           type="button"
-          onClick={() => setMode(m)}
+          onClick={() => changeMode(m)}
           className={`h-[28px] px-[10px] rounded-[4px] text-[12px] whitespace-nowrap ${
             mode === m ? 'bg-[#f26b1d] font-bold text-white' : 'font-medium text-[#6b7280]'
           }`}
@@ -119,7 +128,7 @@ function App() {
             onUploaded={setUpload}
             onUploadFail={handleUploadFail}
             onSkip={() => setScreen('preparing')}
-            onStartMock={() => setScreen('mockPractice')}
+            onStartMock={() => setScreen('corePractice')}
           />
         </>
       )}
@@ -144,6 +153,13 @@ function App() {
             onReady={() => setScreen('micConnect')}
             onRetry={() => setScreen('upload')}
           />
+        </>
+      )}
+
+      {screen === 'corePractice' && upload && (
+        <>
+          <Header onNavigate={setScreen} label="기본 질문 연습" />
+          <CorePracticeScreen presentationId={upload.presentation_id} onFinish={() => setScreen('preparing')} />
         </>
       )}
 
@@ -291,7 +307,7 @@ function App() {
       {screen === 'settings' && (
         <>
           <Header onNavigate={setScreen} label="설정" activeMenu="settings" />
-          <SettingsScreen mode={mode} onModeChange={setMode} />
+          <SettingsScreen mode={mode} onModeChange={changeMode} />
         </>
       )}
     </div>

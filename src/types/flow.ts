@@ -5,6 +5,7 @@ export type ScreenName =
   | 'uploadFailed'
   | 'preparing'
   | 'mockPractice'
+  | 'corePractice'
   | 'micConnect'
   | 'recognized'
   | 'textInput'

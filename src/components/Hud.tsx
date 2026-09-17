@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import type { AnswerMode, QaAnswer, QaFlow, QaResult } from '../types/qa';
+import type { AnswerMode, FlowStep, QaAnswer, QaFlow, QaResult } from '../types/qa';
 import type { QuestionType } from '../types/mockPractice';
 import { ChevronDownIcon, MinusCircleIcon } from './icons';
 
@@ -35,16 +35,24 @@ export function Hud({ result, question, answer = null, flow = null, mode = 'keyw
   }
 
   // 추천 답변 모드에서 서버가 만든 답변. 끝났는데 비어 있으면(자료로 답할 수 없음, 오류) 없는 것으로 본다.
-  const showAnswer = mode === 'answer' && !(answer?.done && !answer.text);
+  const core = result.core ?? null;
+  // 연습에서 확정한 답이 있으면 그 카드만 띄운다. 흐름도, 추천 답변은 만들지 않는다.
+  const showAnswer = !core && mode === 'answer' && !(answer?.done && !answer.text);
   // 흐름도가 실패하면(자료로 답할 수 없음, 오류) 칸 대신 키워드를 보여준다
-  const showFlow = mode === 'flow' && !(flow?.done && flow.steps.length === 0);
+  const showFlow = !core && mode === 'flow' && !(flow?.done && flow.steps.length === 0);
+  const pendingNote = result.corePending ? (
+    <p className="font-medium text-[14px] text-[#6b7280]">
+      ‘{result.corePending}’은 연습에서 확정한 답이 없어요. 연습 화면에서 확정하면 다음부터 바로 뜹니다.
+    </p>
+  ) : null;
 
   const sources = result.sources.slice(0, MAX_SOURCES);
   const visibleSources = expanded ? sources : sources.slice(0, DEFAULT_VISIBLE_SOURCES);
   const canExpand = sources.length > DEFAULT_VISIBLE_SOURCES;
   const isLimitation = result.type === '한계/반론';
 
-  if (sources.length === 0) {
+  // 발표자가 직접 쓴 카드는 슬라이드가 없어서 근거가 0개다. 근거 없음 화면으로 보내면 안 된다.
+  if (sources.length === 0 && !core) {
     return (
       <div className="flex flex-1 flex-col gap-[24px] items-start pb-[36px] pt-[32px] px-[44px] w-full">
         <div className="flex flex-col gap-[14px] w-full">
@@ -59,6 +67,7 @@ export function Hud({ result, question, answer = null, flow = null, mode = 'keyw
             발표자료에서 관련 근거를 찾지 못했습니다
           </p>
         </div>
+        {pendingNote}
         <div className="flex flex-col gap-[12px] w-full">
           <p className="font-bold text-[11px] text-[#6b7280] tracking-[1.54px] w-full">추천 답변</p>
           <div className="flex flex-col gap-[10px] w-full">
@@ -101,6 +110,18 @@ export function Hud({ result, question, answer = null, flow = null, mode = 'keyw
         </div>
       </div>
 
+      {core && (
+        <div className="flex flex-col gap-[12px] w-full">
+          <p className="font-bold text-[11px] text-[#409959] tracking-[1.54px] w-full">
+            연습에서 확정한 답 · {core.label}
+            {core.edited && <span className="ml-[8px] text-[#6b7280]">발표자 수정</span>}
+          </p>
+          <FlowSteps steps={core.steps} />
+        </div>
+      )}
+
+      {!core && pendingNote}
+
       {showFlow && (
         <div className="flex flex-col gap-[12px] w-full">
           <p className="font-bold text-[11px] text-[#6b7280] tracking-[1.54px] w-full">
@@ -110,28 +131,7 @@ export function Hud({ result, question, answer = null, flow = null, mode = 'keyw
           {!flow?.steps.length ? (
             <p className="font-medium text-[17px] text-[#999]">순서를 정리하고 있어요···</p>
           ) : (
-            <div className="flex items-stretch gap-[10px] w-full">
-              {flow.steps.map((step, i) => (
-                <div key={i} className="flex flex-1 items-center gap-[10px] min-w-0">
-                  <div
-                    className={`flex flex-1 flex-col gap-[8px] justify-between self-stretch px-[20px] py-[18px] rounded-[6px] min-w-0 ${
-                      i === 0 ? 'bg-[#f26b1d]' : 'bg-[#fff3eb] border border-[#f26b1d]'
-                    }`}
-                  >
-                    <span className={`font-bold text-[12px] ${i === 0 ? 'text-white/80' : 'text-[#f26b1d]'}`}>{i + 1}</span>
-                    <p
-                      className={`font-black text-[24px] tracking-[-0.6px] leading-[32px] break-keep ${
-                        i === 0 ? 'text-white' : 'text-[#1a1a1a]'
-                      }`}
-                    >
-                      {step.text}
-                    </p>
-                    <span className={`font-bold text-[13px] ${i === 0 ? 'text-white/80' : 'text-[#6b7280]'}`}>p.{step.slide}</span>
-                  </div>
-                  {i < flow.steps.length - 1 && <span className="font-black text-[22px] text-[#f26b1d] shrink-0">→</span>}
-                </div>
-              ))}
-            </div>
+            <FlowSteps steps={flow.steps} />
           )}
           {flow?.status === 'blocked' && (
             <p className="font-normal text-[13px] text-[#6b7280]">자료에 없는 숫자가 나와서 뒤 칸은 표시하지 않았습니다.</p>
@@ -160,7 +160,7 @@ export function Hud({ result, question, answer = null, flow = null, mode = 'keyw
         </div>
       )}
 
-      {isLimitation && !showAnswer && !showFlow ? (
+      {isLimitation && !showAnswer && !showFlow && !core ? (
         <div className="bg-[#fff3eb] border border-[#f26b1d] flex flex-col gap-[14px] px-[28px] py-[26px] rounded-[6px] w-full">
           <p className="font-bold text-[12px] text-[#f26b1d] tracking-[1.2px] w-full">추천 답변</p>
           <div className="flex flex-col gap-[12px] w-full">
@@ -172,7 +172,7 @@ export function Hud({ result, question, answer = null, flow = null, mode = 'keyw
           </div>
         </div>
       ) : (
-        !showFlow && result.keywords.length > 0 && (
+        !showFlow && !core && result.keywords.length > 0 && (
           <>
             <div className="border-t border-[#e5e7eb] flex flex-col gap-[12px] pt-[20px] w-full">
               <p className="font-bold text-[11px] text-[#6b7280] tracking-[1.54px] w-full">키워드</p>
@@ -194,7 +194,7 @@ export function Hud({ result, question, answer = null, flow = null, mode = 'keyw
           isLimitation ? 'border-t border-[#e5e7eb] pt-[20px]' : ''
         }`}
       >
-        <p className="font-bold text-[11px] text-[#6b7280] tracking-[1.54px] w-full">뒷받침 근거</p>
+        {sources.length > 0 && <p className="font-bold text-[11px] text-[#6b7280] tracking-[1.54px] w-full">뒷받침 근거</p>}
         <div className="flex flex-col gap-[10px] w-full">
           {visibleSources.map((source, index) => (
             <div
@@ -212,7 +212,7 @@ export function Hud({ result, question, answer = null, flow = null, mode = 'keyw
           ))}
         </div>
 
-        <div className="flex gap-[14px] items-center w-full">
+        <div className={`flex gap-[14px] items-center w-full ${sources.length === 0 ? 'hidden' : ''}`}>
           <button
             type="button"
             onClick={() => setExpanded((prev) => !prev)}
@@ -231,6 +231,35 @@ export function Hud({ result, question, answer = null, flow = null, mode = 'keyw
           </p>
         </div>
       </div>
+    </div>
+  );
+}
+
+function FlowSteps({ steps }: { steps: FlowStep[] }) {
+  return (
+    <div className="flex items-stretch gap-[10px] w-full">
+      {steps.map((step, i) => (
+        <div key={i} className="flex flex-1 items-center gap-[10px] min-w-0">
+          <div
+            className={`flex flex-1 flex-col gap-[8px] justify-between self-stretch px-[20px] py-[18px] rounded-[6px] min-w-0 ${
+              i === 0 ? 'bg-[#f26b1d]' : 'bg-[#fff3eb] border border-[#f26b1d]'
+            }`}
+          >
+            <span className={`font-bold text-[12px] ${i === 0 ? 'text-white/80' : 'text-[#f26b1d]'}`}>{i + 1}</span>
+            <p
+              className={`font-black text-[24px] tracking-[-0.6px] leading-[32px] break-keep ${
+                i === 0 ? 'text-white' : 'text-[#1a1a1a]'
+              }`}
+            >
+              {step.text}
+            </p>
+            <span className={`font-bold text-[13px] ${i === 0 ? 'text-white/80' : 'text-[#6b7280]'}`}>
+              {step.slide ? `p.${step.slide}` : '발표자 작성'}
+            </span>
+          </div>
+          {i < steps.length - 1 && <span className="font-black text-[22px] text-[#f26b1d] shrink-0">→</span>}
+        </div>
+      ))}
     </div>
   );
 }
