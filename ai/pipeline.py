@@ -32,7 +32,8 @@ import qa_log
 # 유형별로 슬라이드에서 '무엇을 보여줄지'가 다르다.
 # 검색에 유형을 쓰는 건 실패했지만(README 참고), 무엇을 띄울지 고르는 데는 맞다.
 LINE_PREF = {
-    "사실확인": re.compile(r"\d"),
+    # 숫자만 있으면 안 된다. 특허번호나 날짜 조각이 아니라 단위나 자릿수가 붙은 수치여야 한다.
+    "사실확인": re.compile(r"\d[\d,.]*\s*(?:%|[가-힣]{1,2}|배)|\$\s?\d|\d,\d{3}|\d\.\d"),
     "절차":     re.compile(r"[①②③④⑤]|규칙|순서|단계|먼저|→"),
     "근거":     re.compile(r"p\s*=|ρ|배 |%|검증|대조|유의"),
     "한계반론": re.compile(r"한계|아니라|제외|다만|가상|근사|못 |반영되지"),
@@ -119,6 +120,14 @@ PRESETS = {
     "accurate": "BAAI/bge-m3",
 }
 DEFAULT_PRESET = "balanced"
+
+WARM_QUESTIONS = (
+    "데이터는 어디서 받으셨어요?",
+    "그 결과가 맞다는 근거는 무엇이고 한계는 없나요?",
+    "전체 과정을 어떤 순서로 진행했는지, 각 단계에서 어떤 기준을 썼는지 자세히 설명해주실 수 있을까요?",
+    "비용은 얼마인가요",
+    "이 방법이 기존 방식보다 나은 이유와 실제로 검증한 결과가 궁금합니다",
+)
 
 # 화면에 무엇까지 띄울지. 발표는 키워드로 충분할 수 있지만 회의나 업무 자리는 답변 문장이 필요하다.
 MODES = ("keywords", "answer")
@@ -209,26 +218,106 @@ def _useful_number(w: str) -> bool:
     return bool(re.search(r"[,\.]|%|\d{4,}", w)) or bool(re.match(r"^\d+\D", w))
 
 
+# 검색 순위 가산점. 톰과젤리 45문항과 PotentiAI 18문항으로 정했다.
+#   (1.5, 0.75) PotentiAI 10/18, 톰과젤리 29/45  /  (3, 1.5) 9/18, 30/45  /  순위만 따름 9/18, 27/45
+# 둘 다 크게 흔들지 않는 (3, 1.5). 문항 수가 적어서 더 잘게 맞추지 않았다.
+RANK_BONUS = (3.0, 1.5, 0.0, 0.0, 0.0)
+
 HEADING = re.compile(r"^[\[\(<※★①-⑤]|^STEP\s|^\s*[-•]\s*$")
 
 
+# 표나 카드 모양 슬라이드는 값이 제목 아래 줄에 따로 있다.
+#   "월 고정비" / "30만원",  "B2B 채용 검증" / "15,000원"
+# 질문 단어는 제목 줄에만 걸리고 값 줄에는 안 걸려서, 제목만 뜨거나 엉뚱한 줄이 떴다.
+# 짧은 제목 줄 바로 아래 짧은 숫자 줄이 오면 둘을 합친 후보를 하나 더 만든다.
+# 영문에 붙은 숫자(B2B, 2-Track 의 앞 글자 제외)는 값이 아니다
+_VALUE = re.compile(r"(?<![A-Za-z])\d(?![A-Za-z])")
+LABEL_MAX = 25
+VALUE_MAX = 20
+
+
 def split_lines(text: str) -> list[str]:
-    return [l.strip() for l in text.split(chr(10)) if len(l.strip()) > 6]
+    raw = [l.strip() for l in text.split(chr(10)) if l.strip()]
+    out = []
+    for i, l in enumerate(raw):
+        if len(l) > 6:
+            out.append(l)
+        if (i + 1 < len(raw) and len(l) <= LABEL_MAX and not _VALUE.search(l)
+                and len(raw[i + 1]) <= VALUE_MAX and _VALUE.search(raw[i + 1])):
+            out.append(f"{l} {raw[i + 1]}")
+    return out
+
+
+PARTIAL = 0.7        # "구독자" 와 "구독", "일치" 와 "일치율" 처럼 한쪽이 다른 쪽을 품을 때
+PER_MATCH = 0.4      # 같은 점수면 질문 단어를 더 많이 담은 줄
+RAW_WEIGHT = 1.2
+
+
+def _match(words: set, qwords: set, idf: dict) -> tuple[float, int]:
+    """줄이 질문 단어를 얼마나 담았나. (점수, 맞은 질문 단어 수)
+
+    형태소 분석 결과가 질문과 자료에서 다르게 끊기는 일이 잦다.
+    질문 "손익분기점" 은 손익/분기점, 자료는 "손익분기점" 한 덩어리로 나온다.
+    정확히 같아야만 세면 이런 줄이 0점이 된다.
+    """
+    score, n = 0.0, 0
+    for q in qwords:
+        if q in words:
+            score += idf.get(q, 0.0)
+            n += 1
+            continue
+        if len(q) < 2:
+            continue
+        part = [w for w in words if len(w) >= 2 and not _is_number(w) and (q in w or w in q)]
+        if part:
+            score += PARTIAL * max(idf.get(w, 0.0) for w in part)
+            n += 1
+    return score, n
+
+
+def _raw_keys(question: str, qwords: set, idf: dict) -> set:
+    """자료에 없는 질문 단어는 분석기가 잘못 자른 것일 수 있다. 원래 어절 글자로 찾는다.
+
+    "이예진 팀원은" 이 이예지 + ㄴ 으로 잘려서, 자료의 "이예진" 과 영영 안 맞았다.
+    """
+    keys = set()
+    for w in qwords:
+        if w in idf or len(w) < 2 or not re.match(r"[가-힣]", w):
+            continue
+        for eojeol in question.split():
+            if eojeol.startswith(w[:2]):
+                m = re.match(r"[가-힣]{3,}", eojeol)
+                if m:
+                    keys.add(m.group(0)[:len(w)])
+    return keys
 
 
 def _best_line(prepared: list[tuple[str, set]], qwords: set, qtype: str, idf: dict) -> str:
-    """슬라이드에서 화면에 띄울 한 줄을 고른다.
+    return _score_lines(prepared, qwords, qtype, idf)[0]
+
+
+def _score_lines(prepared: list[tuple[str, set]], qwords: set, qtype: str,
+                 idf: dict, raw: set = frozenset()) -> tuple[str, float]:
+    """슬라이드에서 화면에 띄울 한 줄을 고른다. (줄, 점수)
 
     prepared 는 (줄, 그 줄의 명사집합) 목록이다. 명사 분석은 색인 때 끝내둔다 -
     질의마다 다시 하면 슬라이드당 수십 ms 가 붙는다.
     """
     if not prepared:
-        return ""
+        return "", float("-inf")
     pref = LINE_PREF.get(qtype)
     best, best_score = prepared[0][0], float("-inf")
     for i, (line, words) in enumerate(prepared):
-        score = sum(idf.get(w, 0.0) for w in words & qwords)
-        if pref and pref.search(line):
+        score, n = _match(words, qwords, idf)
+        for key in raw:
+            if key in line:
+                # 자료 사전에 없던 말이 줄에 그대로 있으면 가장 드문 단어로 친다 (이름, 고유명사)
+                score += RAW_WEIGHT * max(idf.values(), default=1.0)
+                n += 1
+        score += PER_MATCH * n
+        # 유형 가산점은 질문과 닿은 줄에만 준다. 안 그러면 숫자만 있는 엉뚱한 줄이
+        # ("특허가출원 참여(10-2026-0110645)") 질문 단어를 더 담은 줄을 이겼다.
+        if pref and n and pref.search(line):
             score += 2.0
         # 제목·소제목은 근거가 아니다. 숫자가 있는 본문 줄이 화면에 쓸모 있다.
         if HEADING.match(line):
@@ -242,7 +331,7 @@ def _best_line(prepared: list[tuple[str, set]], qwords: set, qtype: str, idf: di
         score -= 0.004 * max(0, len(line) - 90)
         if score > best_score:
             best, best_score = line, score
-    return best
+    return best, best_score
 
 
 def _keywords(words: list[str], qwords: set, idf: dict, n: int = 5,
@@ -322,6 +411,12 @@ class ReadyQ:
             return time.time() - t0
         self.slow.index(self._slow_docs)
         self._slow_ready = True
+        # 준비 직후 첫 질문 몇 개가 200~280ms 로 느렸다(이후 50~70ms).
+        # 질문 길이가 달라질 때마다 모델 내부 연산이 처음 한 번 준비되는 비용이라
+        # 길이가 다른 가짜 질문을 미리 흘려서 발표 전에 치르게 한다. 기록은 남기지 않는다.
+        for q in WARM_QUESTIONS:
+            self.slow.search([q], 3)
+            self._cue(q, self.fast.search([q], 3)[0], "warm", 3, time.time())
         return time.time() - t0
 
     @property
@@ -338,12 +433,20 @@ class ReadyQ:
         qtype = classify(question)
         qwords = {w.lower() for w in self.nouns(question)}
         srcs, kws = [], []
-        for i, _ in hits[:k]:
+        picked = []
+        raw = _raw_keys(question, qwords, self.idf)
+        for rank, (i, _) in enumerate(hits[:k]):
+            line, score = _score_lines(self.prepared[i], qwords, qtype, self.idf, raw)
+            if line:
+                picked.append((score + RANK_BONUS[rank], rank, i, line))
+        # 검색 1위 슬라이드의 줄이 질문과 잘 안 맞고 2, 3위 슬라이드에 딱 맞는 줄이 있으면
+        # 그걸 먼저 보여준다. 검색 순위는 가산점으로만 반영한다.
+        picked.sort(key=lambda x: (-x[0], x[1]))
+        for _, _, i, line in picked:
             r = self.rows[i]
-            line = _best_line(self.prepared[i], qwords, qtype, self.idf)
-            if not line:
-                continue
-            srcs.append(Source(slide=r["page"], snippet=line[:120], source=r["source"]))
+            # 글머리표는 화면에서 군더더기다 ("-바이브 코딩 경진 대회...")
+            shown = re.sub(r"^[-•▪◦●○■□※➢❖✓]\s*", "", line)
+            srcs.append(Source(slide=r["page"], snippet=shown[:120], source=r["source"]))
             for w in _keywords(self.line_words[i].get(line, []), qwords,
                                self.idf, weak=self.weak, page=r["page"]):
                 if w not in kws:
