@@ -1,68 +1,81 @@
 import { useState } from 'react';
+import { ChevronDownIcon, MicSmallIcon, WatchIcon } from './icons';
 
 export function SettingsScreen() {
   const [sourceCount, setSourceCount] = useState<3 | 5>(3);
-  const [mic, setMic] = useState('MacBook Pro 마이크');
   const [watchConnected, setWatchConnected] = useState(true);
 
   return (
-    <div className="mx-auto w-full max-w-2xl px-4 py-4">
-      <h1 className="text-2xl font-bold text-gray-900">설정</h1>
+    <div className="flex flex-col pb-[44px] pt-[34px] px-[44px] w-full">
+      <div className="flex flex-col gap-[12px] items-start w-full">
+        <p className="font-bold text-[17px] text-[#1a1a1a] w-full">설정</p>
+        <div className="flex flex-col items-start w-full">
+          <div className="border-t border-[#e5e7eb] flex gap-[20px] items-center px-[4px] py-[16px] w-full">
+            <div className="flex flex-col gap-[4px] w-[280px]">
+              <p className="font-bold text-[16px] text-[#1a1a1a] w-full">근거 표시 개수</p>
+              <p className="font-normal text-[13px] text-[#6b7280] w-full">실전 화면에 한 번에 보여줄 카드 수</p>
+            </div>
+            <div className="flex gap-[8px] items-start">
+              {([3, 5] as const).map((n) => (
+                <button
+                  key={n}
+                  type="button"
+                  onClick={() => setSourceCount(n)}
+                  className={`flex h-[40px] items-center px-[20px] rounded-[6px] ${
+                    sourceCount === n ? 'bg-[#f26b1d]' : 'border border-[#e5e7eb]'
+                  }`}
+                >
+                  <span className={`text-[15px] whitespace-nowrap ${sourceCount === n ? 'font-bold text-white' : 'font-medium text-[#6b7280]'}`}>
+                    {n}개
+                  </span>
+                </button>
+              ))}
+            </div>
+          </div>
 
-      <div className="mt-6 rounded-2xl border border-gray-200 bg-white p-6 shadow-lg">
-        <p className="text-sm font-bold text-gray-900">근거 표시 개수</p>
-        <p className="mt-1 text-xs text-gray-500">실시간 Q&amp;A 화면에서 보여줄 근거 슬라이드 수예요</p>
-        <div className="mt-4 flex gap-3">
-          {([3, 5] as const).map((n) => (
-            <button
-              key={n}
-              type="button"
-              onClick={() => setSourceCount(n)}
-              className={`rounded-xl border px-6 py-2.5 text-sm font-semibold ${
-                sourceCount === n
-                  ? 'border-orange-500 bg-orange-500 text-white'
-                  : 'border-gray-300 bg-white text-gray-700 hover:bg-gray-50'
-              }`}
-            >
-              {n}개
-            </button>
-          ))}
-        </div>
-      </div>
+          <div className="border-t border-[#e5e7eb] flex gap-[20px] items-center px-[4px] py-[16px] w-full">
+            <div className="flex flex-col gap-[4px] w-[280px]">
+              <p className="font-bold text-[16px] text-[#1a1a1a] w-full">마이크</p>
+              <p className="font-normal text-[13px] text-[#6b7280] w-full">질문을 받을 입력 장치</p>
+            </div>
+            <div className="border border-[#e5e7eb] flex h-[44px] items-center justify-between px-[14px] rounded-[6px] w-[340px]">
+              <div className="flex gap-[10px] items-center">
+                <span className="size-[17px] text-[#6b7280]">
+                  <MicSmallIcon />
+                </span>
+                <p className="font-medium text-[15px] text-[#1a1a1a] whitespace-nowrap">MacBook Pro 마이크 (내장)</p>
+              </div>
+              <span className="size-[14px] text-[#6b7280]">
+                <ChevronDownIcon />
+              </span>
+            </div>
+          </div>
 
-      <div className="mt-6 rounded-2xl border border-gray-200 bg-white p-6 shadow-lg">
-        <p className="text-sm font-bold text-gray-900">마이크</p>
-        <select
-          value={mic}
-          onChange={(e) => setMic(e.target.value)}
-          className="mt-4 w-full rounded-xl border border-gray-300 px-4 py-3 text-sm text-gray-900 outline-none focus:border-orange-500 focus:ring-2 focus:ring-orange-100"
-        >
-          <option>MacBook Pro 마이크</option>
-          <option>AirPods Pro</option>
-          <option>외장 USB 마이크</option>
-        </select>
-      </div>
-
-      <div className="mt-6 rounded-2xl border border-gray-200 bg-white p-6 shadow-lg">
-        <p className="text-sm font-bold text-gray-900">갤럭시 워치</p>
-        <div className="mt-4 flex items-center justify-between">
-          <span
-            className={`flex items-center gap-1.5 text-sm font-semibold ${
-              watchConnected ? 'text-green-600' : 'text-gray-400'
-            }`}
-          >
-            <span className={`h-1.5 w-1.5 rounded-full ${watchConnected ? 'bg-green-500' : 'bg-gray-300'}`} />
-            {watchConnected ? '연결됨' : '연결 안 됨'}
-          </span>
-          {watchConnected && (
-            <button
-              type="button"
-              onClick={() => setWatchConnected(false)}
-              className="rounded-xl border border-gray-300 bg-white px-4 py-2 text-xs font-semibold text-gray-700 hover:bg-gray-50"
-            >
-              연결 해제
-            </button>
-          )}
+          <div className="border-y border-[#e5e7eb] flex gap-[20px] items-center px-[4px] py-[16px] w-full">
+            <div className="flex flex-col gap-[4px] w-[280px]">
+              <p className="font-bold text-[16px] text-[#1a1a1a] w-full">갤럭시 워치</p>
+              <p className="font-normal text-[13px] text-[#6b7280] w-full">손목에서 질문 유형과 슬라이드 번호 확인</p>
+            </div>
+            {watchConnected ? (
+              <>
+                <div className="flex flex-1 gap-[10px] items-center">
+                  <span className="size-[18px] text-[#1a1a1a]">
+                    <WatchIcon />
+                  </span>
+                  <p className="font-bold text-[15px] text-[#1a1a1a] whitespace-nowrap">연결됨, Galaxy Watch6</p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setWatchConnected(false)}
+                  className="border border-[#e5e7eb] flex h-[40px] items-center px-[16px] rounded-[6px]"
+                >
+                  <span className="font-bold text-[14px] text-[#6b7280] whitespace-nowrap">연결 해제</span>
+                </button>
+              </>
+            ) : (
+              <p className="flex-1 font-medium text-[15px] text-[#6b7280]">연결 안 됨</p>
+            )}
+          </div>
         </div>
       </div>
     </div>

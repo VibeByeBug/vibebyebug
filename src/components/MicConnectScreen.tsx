@@ -1,24 +1,31 @@
+import { MicLargeIcon } from './icons';
+
 interface MicConnectScreenProps {
   onConnect: () => void;
 }
 
 export function MicConnectScreen({ onConnect }: MicConnectScreenProps) {
   return (
-    <div className="mx-auto flex w-full max-w-md flex-col items-center gap-6 rounded-2xl bg-white p-8 text-center shadow-lg">
-      <div className="flex h-28 w-28 items-center justify-center rounded-full bg-gray-100 text-5xl">🎙</div>
-      <span className="flex items-center gap-1.5 rounded-full bg-green-50 px-3 py-1 text-xs font-semibold text-green-600">
-        <span className="h-1.5 w-1.5 rounded-full bg-green-500" /> 마이크 권한: 허용됨
-      </span>
-      <div>
-        <h1 className="text-xl font-bold text-gray-900">마이크를 연결해주세요</h1>
-        <p className="mt-2 text-sm text-gray-500">연결하면 실시간으로 질문을 듣고 답변을 준비해요</p>
+    <div className="flex flex-1 flex-col gap-[28px] items-center justify-center pb-[36px] pt-[32px] px-[44px] w-full">
+      <div className="bg-[#f2f2f2] flex items-center justify-center rounded-full shrink-0 size-[160px]">
+        <span className="size-[64px] text-[#4d4d4d]">
+          <MicLargeIcon />
+        </span>
       </div>
+      <div className="bg-[#f2f2f2] flex gap-[6px] items-center px-[14px] py-[7px] rounded-full">
+        <span className="bg-[#22c55e] rounded-full size-[8px]" />
+        <p className="font-bold text-[13px] text-black whitespace-nowrap">마이크 권한: 허용됨</p>
+      </div>
+      <p className="font-bold text-[30px] text-black whitespace-nowrap">마이크를 연결해주세요</p>
+      <p className="font-normal text-[16px] text-[#808080] whitespace-nowrap">
+        연결하면 실시간으로 질문을 듣고 답변을 준비해요
+      </p>
       <button
         type="button"
         onClick={onConnect}
-        className="rounded-full bg-orange-500 px-10 py-3.5 text-sm font-bold text-white hover:bg-orange-600"
+        className="bg-[#f26b1d] flex h-[56px] items-center justify-center rounded-[28px] w-[200px]"
       >
-        연결하기
+        <span className="font-bold text-[18px] text-white">연결하기</span>
       </button>
     </div>
   );

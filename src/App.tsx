@@ -1,10 +1,8 @@
 import { useState } from 'react';
-import { ErrorScreen } from './components/ErrorScreen';
 import { Header } from './components/Header';
 import { Hud } from './components/Hud';
 import { Login } from './components/Login';
 import { MicConnectScreen } from './components/MicConnectScreen';
-import { MicControl } from './components/MicControl';
 import { MockPracticeScreen } from './components/MockPracticeScreen';
 import { MyHistoryScreen } from './components/MyHistoryScreen';
 import { PreparingScreen } from './components/PreparingScreen';
@@ -16,34 +14,21 @@ import { TextInputFallback } from './components/TextInputFallback';
 import { UploadFailedScreen } from './components/UploadFailedScreen';
 import { UploadScreen } from './components/UploadScreen';
 import { useQaSocket } from './hooks/useQaSocket';
-import { mockQaResult, mockQaResultNoSources } from './mocks/qaMock';
+import { useSpeechRecognition } from './hooks/useSpeechRecognition';
+import { mockQaResult } from './mocks/qaMock';
 import { mockRecognizedQuestion } from './mocks/questionMock';
+import { DownloadIcon } from './components/icons';
 import type { ScreenName } from './types/flow';
-
-const SCREENS: { key: ScreenName; label: string }[] = [
-  { key: 'login', label: '1.로그인' },
-  { key: 'start', label: '2.시작' },
-  { key: 'upload', label: '3.업로드' },
-  { key: 'uploadFailed', label: '4.업로드 실패' },
-  { key: 'preparing', label: '5.AI 준비 중' },
-  { key: 'mockPractice', label: '6.모의 연습' },
-  { key: 'micConnect', label: '7.마이크 연결' },
-  { key: 'mic', label: '8.마이크 대기/제어' },
-  { key: 'recognized', label: '9.질문 인식 중' },
-  { key: 'textInput', label: '텍스트 입력 대체' },
-  { key: 'hud', label: '10.실전 Q&A' },
-  { key: 'error', label: '오류 안내' },
-  { key: 'report', label: '15.사후 리포트' },
-  { key: 'myHistory', label: '16.내 기록' },
-  { key: 'settings', label: '17.설정' },
-];
 
 function App() {
   const [screen, setScreen] = useState<ScreenName>('login');
-  const [presentationName, setPresentationName] = useState('2026 상반기 서비스 기획 발표');
+  const [presentationName, setPresentationName] = useState('캡스톤 디자인 최종 발표');
   const [question, setQuestion] = useState(mockRecognizedQuestion);
-  const [hudShowEmpty, setHudShowEmpty] = useState(false);
-  const { isConnected, lastResult } = useQaSocket();
+  const [uploadAttempted, setUploadAttempted] = useState(false);
+  const [mockProgress, setMockProgress] = useState({ index: 0, total: 7 });
+  const { lastResult } = useQaSocket();
+
+  const result = lastResult ?? mockQaResult;
 
   function handlePartialResult(text: string) {
     setQuestion((prev) => ({ ...prev, partialText: text, isConfirmed: false }));
@@ -56,146 +41,168 @@ function App() {
     setTimeout(() => setScreen('hud'), 1200);
   }
 
-  const headerProps = (() => {
-    switch (screen) {
-      case 'start':
-        return { showProfile: true };
-      case 'upload':
-        return { presentationName, statusText: '2 / 3 준비' };
-      case 'uploadFailed':
-        return { presentationName, statusText: '2 / 3 준비' };
-      case 'preparing':
-        return { presentationName, showProfile: false };
-      case 'mockPractice':
-        return { presentationName, statusText: '모의 연습' };
-      case 'micConnect':
-        return { presentationName, statusText: '곧 시작돼요' };
-      case 'mic':
-      case 'recognized':
-      case 'textInput':
-      case 'error':
-        return { presentationName };
-      case 'hud':
-        return { presentationName, statusText: '실시간 Q&A' };
-      case 'report':
-        return { presentationName };
-      case 'myHistory':
-        return { activeMenu: 'history' as const };
-      case 'settings':
-        return { activeMenu: 'settings' as const };
-      default:
-        return {};
-    }
-  })();
+  const { start: startRecognition } = useSpeechRecognition({
+    onPartialResult: handlePartialResult,
+    onFinalResult: handleFinalResult,
+    onError: () => setScreen('textInput'),
+  });
+
+  function handleConnectMic() {
+    setQuestion({ partialText: '', finalText: '', isConfirmed: false });
+    setScreen('recognized');
+    startRecognition();
+  }
+
+  function handleUploadFail() {
+    setUploadAttempted(true);
+    setScreen('uploadFailed');
+  }
 
   return (
-    <div className="min-h-screen bg-gray-100">
-      {screen !== 'login' && <Header onNavigate={setScreen} {...headerProps} />}
+    <div className="flex flex-col min-h-screen w-full bg-white">
+      {screen === 'login' && <Login onLogin={() => setScreen('start')} />}
 
-      <div className={screen === 'login' ? '' : 'px-4 py-10'}>
-        <div className="mx-auto mb-6 flex w-full max-w-4xl flex-wrap gap-2 px-4">
-          {SCREENS.map((item) => (
-            <button
-              key={item.key}
-              type="button"
-              onClick={() => setScreen(item.key)}
-              className={`rounded-full px-3 py-1 text-xs font-medium transition-colors ${
-                screen === item.key ? 'bg-orange-500 text-white' : 'bg-white text-gray-500 hover:bg-orange-50'
-              }`}
-            >
-              {item.label}
-            </button>
-          ))}
-        </div>
-
-        {screen === 'login' && <Login onLogin={() => setScreen('start')} />}
-
-        {screen === 'start' && (
+      {screen === 'start' && (
+        <>
+          <Header onNavigate={setScreen} />
           <StartScreen
             onStart={(title) => {
               setPresentationName(title);
+              setUploadAttempted(false);
               setScreen('upload');
             }}
             onOpenReport={() => setScreen('report')}
           />
-        )}
+        </>
+      )}
 
-        {screen === 'upload' && (
-          <UploadScreen onSkip={() => setScreen('preparing')} onStartMock={() => setScreen('mockPractice')} />
-        )}
-
-        {screen === 'uploadFailed' && (
-          <UploadFailedScreen onBackToList={() => setScreen('start')} onRetry={() => setScreen('upload')} />
-        )}
-
-        {screen === 'preparing' && (
-          <PreparingScreen onReady={() => setScreen('micConnect')} onRetry={() => setScreen('upload')} />
-        )}
-
-        {screen === 'mockPractice' && <MockPracticeScreen onFinish={() => setScreen('micConnect')} />}
-
-        {screen === 'micConnect' && <MicConnectScreen onConnect={() => setScreen('mic')} />}
-
-        {screen === 'mic' && (
-          <MicControl
-            onPartialResult={handlePartialResult}
-            onFinalResult={handleFinalResult}
-            onSttError={() => setScreen('textInput')}
+      {screen === 'upload' && (
+        <>
+          <Header onNavigate={setScreen} label={presentationName} rightText="2 / 3 준비" />
+          <UploadScreen
+            forceFail={!uploadAttempted}
+            onUploadFail={handleUploadFail}
+            onSkip={() => setScreen('preparing')}
+            onStartMock={() => setScreen('mockPractice')}
           />
-        )}
+        </>
+      )}
 
-        {screen === 'recognized' && (
+      {screen === 'uploadFailed' && (
+        <>
+          <Header onNavigate={setScreen} label={presentationName} rightText="2 / 3 준비" />
+          <UploadFailedScreen onBackToList={() => setScreen('start')} onRetry={() => setScreen('upload')} />
+        </>
+      )}
+
+      {screen === 'preparing' && (
+        <>
+          <Header onNavigate={setScreen} label={presentationName} showProfile />
+          <PreparingScreen onReady={() => setScreen('micConnect')} onRetry={() => setScreen('upload')} />
+        </>
+      )}
+
+      {screen === 'mockPractice' && (
+        <>
+          <Header
+            onNavigate={setScreen}
+            label="모의 연습"
+            rightText={`${mockProgress.index + 1} / ${mockProgress.total} 문항`}
+          />
+          <MockPracticeScreen
+            onFinish={() => setScreen('micConnect')}
+            onIndexChange={(index, total) => setMockProgress({ index, total })}
+          />
+        </>
+      )}
+
+      {screen === 'micConnect' && (
+        <>
+          <Header onNavigate={setScreen} compact rightText="대기 중" />
+          <MicConnectScreen onConnect={handleConnectMic} />
+        </>
+      )}
+
+      {screen === 'recognized' && (
+        <>
+          <Header onNavigate={setScreen} compact listening rightText="분석 준비 중" showProfile={false} />
           <RecognizedQuestion
             partialText={question.partialText}
             finalText={question.finalText}
             isConfirmed={question.isConfirmed}
           />
-        )}
+        </>
+      )}
 
-        {screen === 'textInput' && (
+      {screen === 'textInput' && (
+        <>
+          <Header onNavigate={setScreen} compact rightText="음성 인식 대체" showProfile={false} />
           <TextInputFallback
             onSubmit={(text) => {
               setQuestion({ partialText: text, finalText: text, isConfirmed: true });
               setScreen('hud');
             }}
           />
-        )}
+        </>
+      )}
 
-        {screen === 'hud' && (
-          <div className="mx-auto flex w-full max-w-2xl flex-col gap-4">
-            <div className="flex items-center justify-between text-sm text-gray-500">
-              <span>WebSocket: {isConnected ? '연결됨' : '연결 대기 중'}</span>
-              <button
-                type="button"
-                onClick={() => setHudShowEmpty((v) => !v)}
-                className="text-xs font-medium text-gray-400 underline hover:text-gray-600"
-              >
-                {hudShowEmpty ? '근거 있음 보기' : '근거 없음 상태 보기'}
-              </button>
-            </div>
-            <Hud result={lastResult ?? (hudShowEmpty ? mockQaResultNoSources : mockQaResult)} />
-            <button
-              type="button"
-              onClick={() => setScreen('report')}
-              className="self-start rounded-lg border border-gray-300 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50"
-            >
-              발표 종료하고 리포트 보기
-            </button>
-          </div>
-        )}
+      {screen === 'hud' && (
+        <>
+          <Header
+            onNavigate={setScreen}
+            compact
+            listening
+            rightText={`응답 ${result.responseMs}ms`}
+            showProfile={false}
+          />
+          <Hud result={result} question={question.finalText || mockRecognizedQuestion.finalText} />
+        </>
+      )}
 
-        {screen === 'error' && (
-          <ErrorScreen onEditQuestion={() => setScreen('textInput')} onRetry={() => setScreen('mic')} />
-        )}
+      {screen === 'report' && (
+        <>
+          <Header
+            onNavigate={setScreen}
+            label="사후 리포트"
+            showProfile={false}
+            rightButtons={
+              <div className="flex gap-[10px]">
+                <button
+                  type="button"
+                  className="border border-[#e5e7eb] flex gap-[7px] h-[40px] items-center px-[14px] rounded-[6px]"
+                >
+                  <span className="size-[16px] text-[#1a1a1a]">
+                    <DownloadIcon />
+                  </span>
+                  <span className="font-bold text-[14px] text-[#1a1a1a] whitespace-nowrap">PDF 저장</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setScreen('start')}
+                  className="bg-[#f26b1d] flex h-[40px] items-center px-[16px] rounded-[6px]"
+                >
+                  <span className="font-bold text-[14px] text-white whitespace-nowrap">다음 발표 준비</span>
+                </button>
+              </div>
+            }
+          />
+          <Report presentationName={presentationName} />
+        </>
+      )}
 
-        {screen === 'report' && (
-          <Report presentationName={presentationName} onNextPresentation={() => setScreen('start')} />
-        )}
+      {screen === 'myHistory' && (
+        <>
+          <Header onNavigate={setScreen} label="내 기록" activeMenu="history" />
+          <MyHistoryScreen onOpenReport={() => setScreen('report')} />
+        </>
+      )}
 
-        {screen === 'myHistory' && <MyHistoryScreen onOpenReport={() => setScreen('report')} />}
-
-        {screen === 'settings' && <SettingsScreen />}
-      </div>
+      {screen === 'settings' && (
+        <>
+          <Header onNavigate={setScreen} label="설정" activeMenu="settings" />
+          <SettingsScreen />
+        </>
+      )}
     </div>
   );
 }

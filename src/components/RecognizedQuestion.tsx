@@ -5,24 +5,20 @@ interface RecognizedQuestionProps {
 }
 
 export function RecognizedQuestion({ partialText, finalText, isConfirmed }: RecognizedQuestionProps) {
-  return (
-    <div className="mx-auto flex w-full max-w-2xl flex-col gap-4 rounded-2xl bg-white p-6 shadow-lg">
-      <span
-        className={`self-start rounded-full px-3 py-1 text-sm font-medium ${
-          isConfirmed ? 'bg-orange-100 text-orange-800' : 'bg-gray-100 text-gray-600'
-        }`}
-      >
-        {isConfirmed ? '질문 확정' : '인식 중...'}
-      </span>
+  const text = isConfirmed ? finalText : partialText;
 
-      <div
-        className={`rounded-xl px-5 py-4 text-lg ${
-          isConfirmed
-            ? 'border-2 border-orange-500 font-semibold text-gray-900'
-            : 'border border-gray-200 text-gray-400'
-        }`}
-      >
-        {isConfirmed ? finalText : partialText || '질문을 듣고 있어요...'}
+  return (
+    <div className="flex flex-1 flex-col items-center justify-center pb-[36px] pt-[32px] px-[44px] w-full">
+      <div className="flex flex-col gap-[16px] w-full">
+        <p className="font-bold text-[11px] text-[#6b7280] tracking-[1.54px] w-full">질문 인식 중···</p>
+        <p
+          className={`font-bold text-[44px] tracking-[-1.76px] leading-[57px] w-full ${
+            isConfirmed ? 'text-[#1a1a1a]' : 'text-[#999]'
+          }`}
+        >
+          {text || '질문을 기다리고 있어요···'}
+        </p>
+        <p className="font-normal text-[13px] text-[#999] whitespace-nowrap">질문 유형은 인식이 끝나면 분류돼요</p>
       </div>
     </div>
   );

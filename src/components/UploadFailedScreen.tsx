@@ -1,3 +1,5 @@
+import { DocumentIcon, RefreshIcon, WarningIcon } from './icons';
+
 interface UploadFailedScreenProps {
   onBackToList: () => void;
   onRetry: () => void;
@@ -5,56 +7,80 @@ interface UploadFailedScreenProps {
 
 export function UploadFailedScreen({ onBackToList, onRetry }: UploadFailedScreenProps) {
   return (
-    <div className="mx-auto w-full max-w-2xl px-4 py-4 text-center">
-      <h1 className="text-2xl font-bold text-gray-900">발표자료를 올려주세요</h1>
-      <p className="mt-2 text-sm text-gray-500">PPT 또는 PDF, 최대 200MB</p>
-
-      <div className="mt-8 flex items-center gap-4 rounded-2xl border border-red-200 bg-white p-5 text-left shadow-lg">
-        <div className="flex h-12 w-12 flex-shrink-0 items-center justify-center rounded-xl bg-red-50 text-xl font-bold text-red-500">
-          📄
-        </div>
-        <div className="flex-1">
-          <p className="text-sm font-semibold text-gray-900">2026_상반기_서비스_기획_발표.pptx</p>
-          <p className="mt-1 text-xs font-semibold text-red-500">업로드 실패 (오류 코드: UPLOAD_500)</p>
-        </div>
-        <button type="button" className="text-sm font-semibold text-orange-500 hover:underline">
-          파일 바꾸기
-        </button>
-      </div>
-
-      <div className="mt-6 flex items-start gap-4 rounded-2xl border border-gray-200 bg-white p-5 text-left shadow-lg">
-        <div className="flex h-14 w-14 flex-shrink-0 items-center justify-center rounded-full bg-red-50 text-2xl">
-          ⚠️
-        </div>
-        <div>
-          <p className="text-sm font-bold text-gray-900">실패 원인</p>
-          <p className="mt-1 text-sm leading-relaxed text-gray-600">
-            서버가 일시적으로 응답하지 않아 업로드가 중단되었습니다. 파일 용량이 크거나 네트워크 상태가
-            불안정할 때 발생할 수 있어요.
+    <div className="flex flex-1 items-center justify-center py-[44px] w-full">
+      <div className="flex flex-col gap-[26px] w-[880px]">
+        <div className="flex flex-col gap-[7px] w-full">
+          <p className="font-bold text-[26px] text-[#1a1a1a] tracking-[-0.78px] leading-[34px] w-full">
+            자료 업로드에 실패했어요
+          </p>
+          <p className="font-normal text-[15px] text-[#6b7280] w-full">
+            PDF 파싱 중 오류가 발생했습니다. 파일을 확인하고 다시 시도해주세요.
           </p>
         </div>
-      </div>
 
-      <div className="mt-6 rounded-xl border border-orange-200 bg-orange-50 px-5 py-4 text-left text-sm text-orange-800">
-        <strong className="font-bold">이런 경우 도움이 될 수 있어요</strong>
-        <p className="mt-1">Wi-Fi 연결을 확인하거나, 파일을 200MB 이하로 압축한 뒤 다시 시도해보세요.</p>
-      </div>
+        <div className="border border-[#e5e7eb] flex gap-[18px] items-center p-[26px] rounded-[6px] w-full">
+          <span className="size-[40px] text-[#bf382e] shrink-0">
+            <DocumentIcon />
+          </span>
+          <div className="flex flex-col flex-1 gap-[5px] min-w-0">
+            <p className="font-bold text-[17px] text-[#1a1a1a] w-full">capstone_final.pdf</p>
+            <p className="font-normal text-[14px] text-[#bf382e] w-full">18.4MB · 업로드 실패 (오류 코드: UPLOAD_500)</p>
+          </div>
+          <button
+            type="button"
+            onClick={onRetry}
+            className="border border-[#e5e7eb] flex gap-[7px] h-[40px] items-center px-[16px] rounded-[6px] shrink-0"
+          >
+            <span className="size-[16px] text-[#1a1a1a]">
+              <RefreshIcon />
+            </span>
+            <span className="font-bold text-[14px] text-[#1a1a1a] whitespace-nowrap">다른 파일 선택</span>
+          </button>
+        </div>
 
-      <div className="mt-8 flex justify-center gap-3">
-        <button
-          type="button"
-          onClick={onBackToList}
-          className="rounded-xl border border-gray-300 bg-white px-6 py-3 text-sm font-semibold text-gray-700 hover:bg-gray-50"
-        >
-          발표 목록으로
-        </button>
-        <button
-          type="button"
-          onClick={onRetry}
-          className="rounded-xl bg-orange-500 px-6 py-3 text-sm font-bold text-white hover:bg-orange-600"
-        >
-          다시 시도
-        </button>
+        <div className="border border-[#e5e7eb] flex flex-col gap-[14px] px-[26px] py-[24px] rounded-[6px] w-full">
+          <p className="font-bold text-[15px] text-[#1a1a1a] w-full">실패 원인</p>
+          <div className="flex gap-[16px] items-center w-full">
+            <span className="bg-[#fae5e0] flex items-center justify-center rounded-full shrink-0 size-[41px]">
+              <span className="font-bold text-[20px] text-[#bf382e]">!</span>
+            </span>
+            <div className="flex flex-1 flex-col gap-[6px] min-w-0">
+              <p className="font-bold text-[16px] text-black w-full">서버에서 파일 처리에 실패했습니다</p>
+              <p className="font-normal text-[13px] text-[#666] w-full">
+                네트워크 상태를 확인하고 다시 시도해주세요. 계속 실패하면 파일을 PDF로 변환해서 업로드해보세요.
+              </p>
+            </div>
+          </div>
+        </div>
+
+        <div className="bg-[#fff3eb] border border-[#f26b1d] flex gap-[12px] items-start px-[20px] py-[18px] rounded-[6px] w-full">
+          <span className="size-[22px] text-[#f26b1d] shrink-0">
+            <WarningIcon />
+          </span>
+          <div className="flex flex-col gap-[5px]">
+            <p className="font-bold text-[15px] text-[#1a1a1a] leading-[22px]">이런 경우 도움이 될 수 있어요</p>
+            <p className="font-normal text-[14px] text-[#6b7280] leading-[22px] w-[481px]">
+              파일을 새로 저장한 뒤 다시 업로드하거나, PDF로 변환해서 올려보세요.
+            </p>
+          </div>
+        </div>
+
+        <div className="flex gap-[10px] items-start justify-end w-full">
+          <button
+            type="button"
+            onClick={onBackToList}
+            className="border border-[#e5e7eb] flex h-[50px] items-center px-[20px] rounded-[6px]"
+          >
+            <span className="font-bold text-[16px] text-[#6b7280] whitespace-nowrap">발표 목록으로</span>
+          </button>
+          <button
+            type="button"
+            onClick={onRetry}
+            className="bg-[#f26b1d] flex h-[50px] items-center px-[26px] rounded-[6px]"
+          >
+            <span className="font-bold text-[16px] text-white whitespace-nowrap">다시 시도</span>
+          </button>
+        </div>
       </div>
     </div>
   );

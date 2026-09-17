@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { mockRecentPresentations } from '../mocks/recentMock';
+import { ArrowRightIcon } from './icons';
 
 interface StartScreenProps {
   onStart: (title: string) => void;
@@ -10,47 +11,48 @@ export function StartScreen({ onStart, onOpenReport }: StartScreenProps) {
   const [title, setTitle] = useState('');
 
   return (
-    <div className="mx-auto flex w-full max-w-xl flex-col gap-12 px-4 py-4">
-      <div className="flex flex-col items-center gap-6 rounded-2xl bg-white p-8 text-center shadow-lg">
-        <div>
-          <h1 className="text-2xl font-bold text-gray-900">새 발표 준비</h1>
-          <p className="mt-2 text-sm text-gray-500">발표 이름을 적어주세요.</p>
+    <div className="flex flex-1 items-center justify-center w-full">
+      <div className="flex flex-col gap-[28px] w-[480px]">
+        <div className="flex flex-col gap-[9px] text-center w-full">
+          <p className="font-bold text-[34px] text-[#1a1a1a] tracking-[-1.19px] leading-[42px] w-full">
+            새 발표 준비
+          </p>
+          <p className="font-normal text-[15px] text-[#6b7280] leading-[24px] w-full">발표 이름을 적어주세요.</p>
         </div>
 
-        <div className="flex w-full flex-col gap-3 sm:flex-row">
+        <div className="flex flex-col gap-[10px] w-full">
+          <p className="font-bold text-[13px] text-[#6b7280] w-full">발표 이름</p>
           <input
             type="text"
             value={title}
             onChange={(e) => setTitle(e.target.value)}
-            placeholder="예: 2026 하반기 성과 발표"
-            className="flex-1 rounded-xl border border-gray-300 px-4 py-3.5 text-sm text-gray-900 outline-none focus:border-orange-500 focus:ring-2 focus:ring-orange-100"
+            placeholder="예: 캡스톤 디자인 최종 발표"
+            className="border border-[#1a1a1a] h-[52px] px-[16px] rounded-[6px] text-[17px] font-medium text-[#1a1a1a] outline-none w-full"
           />
           <button
             type="button"
             onClick={() => onStart(title.trim() || '제목 없는 발표')}
-            className="whitespace-nowrap rounded-xl bg-orange-500 px-6 py-3.5 text-sm font-bold text-white hover:bg-orange-600"
+            className="bg-[#f26b1d] flex gap-[8px] h-[52px] items-center justify-center rounded-[6px] w-full"
           >
-            시작하기 →
+            <span className="font-bold text-[17px] text-white">시작하기</span>
+            <span className="size-[18px] text-white">
+              <ArrowRightIcon />
+            </span>
           </button>
         </div>
-      </div>
 
-      <div>
-        <h2 className="text-lg font-bold text-gray-900">최근 발표</h2>
-        <div className="mt-4 divide-y divide-gray-100 rounded-2xl border border-gray-200 bg-white shadow-lg">
+        <div className="border-t border-[#e5e7eb] flex flex-col gap-[12px] pt-[18px] w-full">
+          <p className="font-bold text-[13px] text-[#6b7280] w-full">최근 발표</p>
           {mockRecentPresentations.map((p) => (
             <button
               key={p.id}
               type="button"
               onClick={onOpenReport}
-              className="flex w-full items-center gap-4 px-5 py-4 text-left hover:bg-gray-50"
+              className="flex gap-[12px] items-center w-full text-left"
             >
-              <span className="h-14 w-20 flex-shrink-0 rounded-lg border border-gray-200 bg-gray-100" />
-              <span className="flex-1">
-                <span className="block text-sm font-semibold text-gray-900">{p.name}</span>
-                <span className="mt-1 block text-xs text-gray-400">{p.date}</span>
-              </span>
-              <span className="text-gray-300">›</span>
+              <span className="bg-[#f3f4f6] border border-[#e5e7eb] h-[32px] rounded-[6px] shrink-0 w-[56px]" />
+              <span className="flex-1 font-medium text-[15px] text-[#1a1a1a] underline">{p.name}</span>
+              <span className="font-normal text-[13px] text-[#6b7280] whitespace-nowrap">{p.date}</span>
             </button>
           ))}
         </div>

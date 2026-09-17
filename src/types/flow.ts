@@ -6,11 +6,9 @@ export type ScreenName =
   | 'preparing'
   | 'mockPractice'
   | 'micConnect'
-  | 'mic'
   | 'recognized'
   | 'textInput'
   | 'hud'
-  | 'error'
   | 'report'
   | 'myHistory'
   | 'settings';

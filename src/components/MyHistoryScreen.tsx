@@ -8,112 +8,114 @@ const weakestType = accuracyByType.reduce((min, cur) => (cur.value < min.value ?
 
 export function MyHistoryScreen({ onOpenReport }: MyHistoryScreenProps) {
   return (
-    <div className="mx-auto w-full max-w-4xl px-4 py-4">
-      <h1 className="text-2xl font-bold text-gray-900">내 기록</h1>
-
-      <div className="mt-6 flex flex-wrap items-center gap-5 rounded-2xl border border-gray-200 bg-white p-6 shadow-lg">
-        <span className="flex h-16 w-16 items-center justify-center rounded-full bg-orange-50 text-2xl font-bold text-orange-500">
-          사
-        </span>
-        <div>
-          <p className="text-lg font-bold text-gray-900">사용자</p>
-          <p className="text-sm text-gray-500">seott@mju.ac.kr</p>
-        </div>
-        <div className="ml-auto flex gap-8 text-center">
-          <div>
-            <p className="text-2xl font-black text-orange-500">36</p>
-            <p className="text-xs text-gray-500">총 연습 횟수</p>
+    <div className="flex flex-col gap-[30px] items-start pb-[44px] pt-[34px] px-[44px] w-full">
+      <div className="border-b border-[#e5e7eb] flex gap-[36px] items-center pb-[22px] w-full">
+        <div className="flex gap-[14px] items-center">
+          <span className="bg-[#f3f4f6] border border-[#e5e7eb] flex items-center justify-center rounded-full shrink-0 size-[48px]">
+            <span className="font-bold text-[17px] text-[#6b7280]">사</span>
+          </span>
+          <div className="flex flex-col gap-[5px]">
+            <p className="font-bold text-[24px] text-[#1a1a1a] tracking-[-0.72px] whitespace-nowrap">사용자</p>
+            <p className="font-normal text-[13px] text-[#6b7280] whitespace-nowrap">user@gmail.com</p>
           </div>
-          <div>
-            <p className="text-2xl font-black text-orange-500">3</p>
-            <p className="text-xs text-gray-500">실전 발표 횟수</p>
+        </div>
+        <div className="border-l border-[#e5e7eb] flex gap-[36px] pl-[28px]">
+          <div className="flex flex-col gap-[6px]">
+            <p className="font-medium text-[13px] text-[#6b7280] whitespace-nowrap">총 연습</p>
+            <p className="font-black text-[30px] text-[#1a1a1a] whitespace-nowrap">12회</p>
+          </div>
+          <div className="flex flex-col gap-[6px]">
+            <p className="font-medium text-[13px] text-[#6b7280] whitespace-nowrap">실전 발표</p>
+            <p className="font-black text-[30px] text-[#1a1a1a] whitespace-nowrap">3회</p>
           </div>
         </div>
       </div>
 
-      <div className="mt-6 rounded-2xl border border-gray-200 bg-white p-6 shadow-lg">
-        <p className="text-sm font-bold text-gray-900">질문 유형별 답변 정확도</p>
-        <div className="mt-4 space-y-4">
-          {accuracyByType.map((d) => (
-            <div key={d.type}>
-              <div className="flex items-center gap-2 text-xs text-gray-600">
-                <span>{d.type}</span>
-                {d.type === weakestType.type && (
-                  <span className="rounded-full bg-red-50 px-2 py-0.5 text-[10px] font-bold text-red-500">
-                    가장 약한 유형
+      <div className="flex flex-col gap-[16px] items-start w-full">
+        <div className="flex gap-[10px] items-baseline whitespace-nowrap">
+          <p className="font-bold text-[17px] text-[#1a1a1a]">질문 유형별 답변 정확도</p>
+          <p className="font-normal text-[13px] text-[#6b7280]">연습 12회 누적</p>
+        </div>
+        <div className="flex flex-col gap-[13px] items-start w-full max-w-[840px]">
+          {accuracyByType.map((d) => {
+            const isWeak = d.type === weakestType.type;
+            return (
+              <div key={d.type} className="flex gap-[16px] items-center w-full">
+                <p className={`text-[15px] w-[84px] ${isWeak ? 'font-bold text-[#f26b1d]' : 'font-medium text-[#6b7280]'}`}>
+                  {d.type}
+                </p>
+                <div className={`flex flex-1 h-[12px] overflow-hidden rounded-[6px] ${isWeak ? 'bg-[#fff3eb]' : 'bg-[#f3f4f6]'}`}>
+                  <div
+                    className={`h-[12px] rounded-[6px] ${isWeak ? 'bg-[#f26b1d]' : 'bg-[#1a1a1a]'}`}
+                    style={{ width: `${d.value}%` }}
+                  />
+                </div>
+                <p className={`text-[17px] text-right w-[56px] ${isWeak ? 'font-black text-[#f26b1d]' : 'font-bold text-[#1a1a1a]'}`}>
+                  {d.value}%
+                </p>
+                {isWeak && (
+                  <span className="border border-[#f26b1d] px-[10px] py-[5px] rounded-[6px] shrink-0">
+                    <span className="font-bold text-[12px] text-[#f26b1d] whitespace-nowrap">가장 약한 유형</span>
                   </span>
                 )}
-                <span className="ml-auto font-semibold">{d.value}%</span>
               </div>
-              <div className="mt-1 h-2 w-full overflow-hidden rounded-full bg-gray-100">
-                <div className="h-2 rounded-full bg-orange-500" style={{ width: `${d.value}%` }} />
-              </div>
+            );
+          })}
+        </div>
+      </div>
+
+      <div className="flex flex-col gap-[12px] items-start w-full">
+        <p className="font-bold text-[17px] text-[#1a1a1a] w-full">자주 놓치는 근거</p>
+        <div className="flex flex-col items-start w-full">
+          <div className="border-b border-[#e5e7eb] flex gap-[20px] items-center pb-[10px] px-[4px] w-full text-[13px] font-bold text-[#6b7280]">
+            <p className="w-[280px] text-center">발표 이름</p>
+            <p className="w-[80px] text-center">슬라이드</p>
+            <p className="flex-1 text-center">놓친 내용</p>
+            <p className="w-[120px] text-center">놓친 횟수</p>
+          </div>
+          {frequentlyMissed.map((m, i) => (
+            <div key={`${m.page}-${i}`} className="border-b border-[#e5e7eb] flex gap-[20px] items-center px-[4px] py-[14px] w-full">
+              <p className="font-medium text-[16px] text-[#1a1a1a] text-center w-[280px]">{m.presentation}</p>
+              <p className="font-bold text-[16px] text-[#1a1a1a] text-center w-[80px]">p.{m.page}</p>
+              <p className="flex-1 font-medium text-[16px] text-[#1a1a1a] text-center">{m.content}</p>
+              <p className="font-bold text-[16px] text-[#1a1a1a] text-center w-[120px]">
+                {m.totalCount}번 중 {m.missedCount}번
+              </p>
             </div>
           ))}
         </div>
       </div>
 
-      <div className="mt-6 overflow-x-auto rounded-2xl border border-gray-200 bg-white p-6 shadow-lg">
-        <p className="text-sm font-bold text-gray-900">자주 놓치는 근거</p>
-        <table className="mt-4 w-full text-left text-sm">
-          <thead>
-            <tr className="border-b border-gray-100 text-xs text-gray-400">
-              <th className="pb-2 font-medium">발표 이름</th>
-              <th className="pb-2 font-medium">슬라이드</th>
-              <th className="pb-2 font-medium">내용</th>
-              <th className="pb-2 font-medium">횟수</th>
-            </tr>
-          </thead>
-          <tbody>
-            {frequentlyMissed.map((m) => (
-              <tr key={`${m.presentation}-${m.page}`} className="border-b border-gray-50">
-                <td className="py-3 text-gray-700">{m.presentation}</td>
-                <td className="py-3 text-gray-700">p.{m.page}</td>
-                <td className="py-3 text-gray-700">{m.content}</td>
-                <td className="py-3 font-semibold text-orange-500">{m.count}회</td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
-
-      <div className="mt-6 overflow-x-auto rounded-2xl border border-gray-200 bg-white p-6 shadow-lg">
-        <p className="text-sm font-bold text-gray-900">발표 기록</p>
-        <table className="mt-4 w-full text-left text-sm">
-          <thead>
-            <tr className="border-b border-gray-100 text-xs text-gray-400">
-              <th className="pb-2 font-medium">발표</th>
-              <th className="pb-2 font-medium">날짜</th>
-              <th className="pb-2 font-medium">연습</th>
-              <th className="pb-2 font-medium">실전 질문</th>
-              <th className="pb-2 font-medium">적중률</th>
-              <th className="pb-2 font-medium" />
-            </tr>
-          </thead>
-          <tbody>
-            {historyRecords.map((h) => (
-              <tr key={h.id} className="border-b border-gray-50">
-                <td className="flex items-center gap-3 py-3">
-                  <span className="h-10 w-14 rounded-md border border-gray-200 bg-gray-100" />
-                  <span className="font-medium text-gray-800">{h.name}</span>
-                </td>
-                <td className="py-3 text-gray-500">{h.date}</td>
-                <td className="py-3 text-gray-700">{h.practiceCount}회</td>
-                <td className="py-3 text-gray-700">{h.liveQuestions}개</td>
-                <td className="py-3 font-semibold text-orange-500">{h.hitRate}%</td>
-                <td className="py-3">
-                  <button
-                    type="button"
-                    onClick={onOpenReport}
-                    className="text-xs font-semibold text-orange-500 hover:underline"
-                  >
-                    리포트 보기
-                  </button>
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
+      <div className="flex flex-col gap-[12px] items-start w-full">
+        <p className="font-bold text-[17px] text-[#1a1a1a] w-full">발표 기록</p>
+        <div className="flex flex-col items-start w-full">
+          <div className="border-b border-[#e5e7eb] flex gap-[18px] items-center pb-[10px] px-[4px] w-full text-[13px] font-bold text-[#6b7280]">
+            <span className="w-[72px]" />
+            <p className="flex-1">발표 이름</p>
+            <p className="w-[100px] text-center">날짜</p>
+            <p className="w-[80px] text-center">연습</p>
+            <p className="w-[100px] text-center">실전 질문</p>
+            <p className="w-[90px] text-center">적중률</p>
+            <p className="w-[100px] text-center">리포트</p>
+          </div>
+          {historyRecords.map((h) => (
+            <div key={h.id} className="border-b border-[#e5e7eb] flex gap-[18px] items-center px-[4px] py-[12px] w-full">
+              <span className="bg-white border border-[#e6e6e6] rounded-[6px] shrink-0 h-[41px] w-[72px]" />
+              <p className="flex-1 font-bold text-[16px] text-[#1a1a1a]">{h.name}</p>
+              <p className="font-medium text-[15px] text-[#6b7280] text-center w-[100px]">{h.date}</p>
+              <p className="font-medium text-[16px] text-[#1a1a1a] text-center w-[80px]">{h.practiceCount}회</p>
+              <p className="font-medium text-[16px] text-[#1a1a1a] text-center w-[100px]">{h.liveQuestions}개</p>
+              <p className="font-black text-[18px] text-[#1a1a1a] text-center w-[90px]">{h.hitRate}%</p>
+              <button
+                type="button"
+                onClick={onOpenReport}
+                className="font-bold text-[15px] text-[#1a1a1a] text-right underline w-[100px]"
+              >
+                리포트 보기
+              </button>
+            </div>
+          ))}
+        </div>
       </div>
     </div>
   );

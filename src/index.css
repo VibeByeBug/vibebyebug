@@ -1,19 +1,11 @@
 @import "tailwindcss";
 
 @theme {
-  /* Rebrand Tailwind's orange scale to the Ready-Q brand color (#F26B1D)
-     so every existing `orange-*` utility across the app stays on-brand. */
-  --color-orange-50: #fdf1e8;
-  --color-orange-100: #fbe1cc;
-  --color-orange-200: #f8cba6;
-  --color-orange-500: #f26b1d;
-  --color-orange-600: #d95e15;
-  --color-orange-700: #b34c11;
-  --color-orange-800: #8a3b0d;
   --font-sans: "Noto Sans KR", sans-serif;
 }
 
 body {
-  background-color: #f7f7f7;
+  background-color: #ffffff;
   font-family: "Noto Sans KR", sans-serif;
+  color: #1a1a1a;
 }

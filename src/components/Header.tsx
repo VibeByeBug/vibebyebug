@@ -1,83 +1,105 @@
 import { useState, type ReactNode } from 'react';
 import type { ScreenName } from '../types/flow';
+import { ChevronDownIcon, ClockIcon, LogoutIcon, MicSmallIcon, SettingsIcon } from './icons';
 
 interface HeaderProps {
-  presentationName?: string;
-  statusText?: string;
+  compact?: boolean;
+  label?: string;
+  listening?: boolean;
+  rightText?: string;
+  rightButtons?: ReactNode;
   showProfile?: boolean;
   activeMenu?: 'history' | 'settings';
   onNavigate: (screen: ScreenName) => void;
-  rightSlot?: ReactNode;
 }
 
 export function Header({
-  presentationName,
-  statusText,
+  compact = false,
+  label,
+  listening = false,
+  rightText,
+  rightButtons,
   showProfile = true,
   activeMenu,
   onNavigate,
-  rightSlot,
 }: HeaderProps) {
   const [menuOpen, setMenuOpen] = useState(false);
 
   return (
-    <header className="sticky top-0 z-10 border-b border-gray-200 bg-white">
-      <div className="mx-auto flex h-16 max-w-[1440px] items-center justify-between px-6">
-        <div className="flex items-center gap-4">
-          <button
-            type="button"
-            onClick={() => onNavigate('start')}
-            className="text-xl font-black tracking-tight text-gray-900"
-          >
-            Ready-<span className="text-orange-500">Q</span>
-          </button>
-          {presentationName && (
-            <>
-              <span className="h-5 w-px bg-gray-300" />
-              <span className="text-sm font-medium text-gray-700">{presentationName}</span>
-            </>
-          )}
-        </div>
+    <header
+      className={`border-b border-[#e5e7eb] flex items-center justify-between px-[28px] w-full shrink-0 ${
+        compact ? 'h-[56px]' : 'h-[60px]'
+      }`}
+    >
+      <div className="flex gap-[14px] items-center">
+        <button
+          type="button"
+          onClick={() => onNavigate('start')}
+          className={`font-['Noto_Sans_KR'] font-black tracking-[-0.54px] text-[#1a1a1a] whitespace-nowrap ${
+            compact ? 'text-[18px]' : 'text-[19px]'
+          }`}
+        >
+          Ready-<span className="text-[#f26b1d]">Q</span>
+        </button>
+        {(label || listening) && (
+          <>
+            <div className="bg-[#e5e7eb] h-[16px] w-px" />
+            {listening ? (
+              <div className="flex gap-[7px] items-center">
+                <span className="size-[16px] text-[#1a1a1a]">
+                  <MicSmallIcon />
+                </span>
+                <p className="font-bold text-[13px] text-[#1a1a1a] whitespace-nowrap">듣는 중</p>
+              </div>
+            ) : (
+              <p className="font-medium text-[14px] text-[#6b7280] whitespace-nowrap">{label}</p>
+            )}
+          </>
+        )}
+      </div>
 
-        <div className="flex items-center gap-4">
-          {rightSlot}
-          {statusText && <span className="text-sm font-medium text-gray-500">{statusText}</span>}
-          {showProfile && (
+      <div className="flex gap-[14px] items-center">
+        {rightButtons}
+        {rightText && <p className="font-bold text-[13px] text-[#6b7280] whitespace-nowrap">{rightText}</p>}
+        {showProfile && (
+          <>
+            {rightText && <div className="bg-[#e5e7eb] h-[18px] w-px" />}
             <div className="relative">
               <button
                 type="button"
                 onClick={() => setMenuOpen((v) => !v)}
-                className="flex items-center gap-2 rounded-full border border-gray-200 px-3 py-1.5 hover:bg-gray-50"
+                className="border border-[#e5e7eb] flex gap-[9px] h-[38px] items-center pl-[6px] pr-[10px] rounded-[6px]"
               >
-                <span className="flex h-7 w-7 items-center justify-center rounded-full bg-orange-50 text-sm font-bold text-orange-500">
-                  사
+                <span className="bg-[#f3f4f6] border border-[#e5e7eb] flex items-center justify-center rounded-full size-[26px]">
+                  <span className="font-bold text-[11px] text-[#6b7280]">사</span>
                 </span>
-                <span className="text-sm font-medium text-gray-800">사용자</span>
-                <svg
-                  className={`h-4 w-4 text-gray-500 transition-transform ${menuOpen ? 'rotate-180' : ''}`}
-                  viewBox="0 0 20 20"
-                  fill="currentColor"
-                >
-                  <path
-                    fillRule="evenodd"
-                    d="M5.23 7.21a.75.75 0 011.06.02L10 11.168l3.71-3.938a.75.75 0 111.08 1.04l-4.25 4.5a.75.75 0 01-1.08 0l-4.25-4.5a.75.75 0 01.02-1.06z"
-                    clipRule="evenodd"
-                  />
-                </svg>
+                <span className="font-bold text-[14px] text-[#1a1a1a] whitespace-nowrap">사용자</span>
+                <span className={`size-[14px] text-[#6b7280] transition-transform ${menuOpen ? 'rotate-180' : ''}`}>
+                  <ChevronDownIcon />
+                </span>
               </button>
               {menuOpen && (
-                <div className="absolute right-0 z-20 mt-2 w-40 overflow-hidden rounded-xl border border-gray-200 bg-white shadow-lg">
+                <div className="absolute right-0 z-20 bg-white border border-[#e5e7eb] flex flex-col p-[5px] rounded-[6px] top-[46px] w-[180px]">
                   <button
                     type="button"
                     onClick={() => {
                       setMenuOpen(false);
                       onNavigate('myHistory');
                     }}
-                    className={`block w-full px-4 py-2.5 text-left text-sm hover:bg-gray-50 ${
-                      activeMenu === 'history' ? 'font-bold text-orange-500' : 'text-gray-700'
+                    className={`flex gap-[10px] h-[40px] items-center px-[11px] rounded-[6px] ${
+                      activeMenu === 'history' ? 'bg-[#fff3eb]' : ''
                     }`}
                   >
-                    내 기록
+                    <span className={`size-[17px] ${activeMenu === 'history' ? 'text-[#f26b1d]' : 'text-[#1a1a1a]'}`}>
+                      <ClockIcon />
+                    </span>
+                    <span
+                      className={`text-[14px] whitespace-nowrap ${
+                        activeMenu === 'history' ? 'font-bold text-[#f26b1d]' : 'font-medium text-[#1a1a1a]'
+                      }`}
+                    >
+                      내 기록
+                    </span>
                   </button>
                   <button
                     type="button"
@@ -85,27 +107,40 @@ export function Header({
                       setMenuOpen(false);
                       onNavigate('settings');
                     }}
-                    className={`block w-full px-4 py-2.5 text-left text-sm hover:bg-gray-50 ${
-                      activeMenu === 'settings' ? 'font-bold text-orange-500' : 'text-gray-700'
+                    className={`flex gap-[10px] h-[40px] items-center px-[11px] rounded-[6px] ${
+                      activeMenu === 'settings' ? 'bg-[#fff3eb]' : ''
                     }`}
                   >
-                    설정
+                    <span className={`size-[17px] ${activeMenu === 'settings' ? 'text-[#f26b1d]' : 'text-[#1a1a1a]'}`}>
+                      <SettingsIcon />
+                    </span>
+                    <span
+                      className={`text-[14px] whitespace-nowrap ${
+                        activeMenu === 'settings' ? 'font-bold text-[#f26b1d]' : 'font-medium text-[#1a1a1a]'
+                      }`}
+                    >
+                      설정
+                    </span>
                   </button>
+                  <div className="bg-[#e5e7eb] h-px w-full" />
                   <button
                     type="button"
                     onClick={() => {
                       setMenuOpen(false);
                       onNavigate('login');
                     }}
-                    className="block w-full border-t border-gray-100 px-4 py-2.5 text-left text-sm text-gray-500 hover:bg-gray-50"
+                    className="flex gap-[10px] h-[40px] items-center px-[11px] rounded-[6px]"
                   >
-                    로그아웃
+                    <span className="size-[17px] text-[#6b7280]">
+                      <LogoutIcon />
+                    </span>
+                    <span className="font-medium text-[14px] text-[#6b7280] whitespace-nowrap">로그아웃</span>
                   </button>
                 </div>
               )}
             </div>
-          )}
-        </div>
+          </>
+        )}
       </div>
     </header>
   );
