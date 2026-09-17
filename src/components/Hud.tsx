@@ -39,26 +39,36 @@ export function Hud({ result }: HudProps) {
       </div>
 
       {/* 3층: 근거 자료 */}
-      <div className="flex flex-col gap-2">
-        {visibleSources.map((source, index) => (
-          <div
-            key={`${source.slide}-${index}`}
-            className="rounded-lg bg-gray-50 px-4 py-3 text-gray-800"
-            style={{ fontSize: '16px' }}
-          >
-            슬라이드 {source.slide}p — "{source.quote}"
-          </div>
-        ))}
+      {sources.length === 0 ? (
+        <div className="rounded-xl border border-dashed border-gray-300 bg-gray-50 px-4 py-6 text-center">
+          <p className="text-2xl">🔍</p>
+          <p className="mt-2 text-sm font-bold text-gray-700">발표 자료에서 근거를 찾지 못했어요</p>
+          <p className="mt-1 text-sm text-gray-500">
+            침착하게 아는 범위에서 답하거나, "추가로 확인해서 답변드리겠습니다"라고 안내해보세요.
+          </p>
+        </div>
+      ) : (
+        <div className="flex flex-col gap-2">
+          {visibleSources.map((source, index) => (
+            <div
+              key={`${source.slide}-${index}`}
+              className="rounded-lg bg-gray-50 px-4 py-3 text-gray-800"
+              style={{ fontSize: '16px' }}
+            >
+              슬라이드 {source.slide}p — "{source.quote}"
+            </div>
+          ))}
 
-        <button
-          type="button"
-          onClick={() => setExpanded((prev) => !prev)}
-          disabled={!canExpand}
-          className="mt-1 self-start rounded-md px-3 py-1.5 text-sm font-medium text-orange-700 disabled:cursor-not-allowed disabled:text-gray-400 enabled:hover:bg-orange-50"
-        >
-          {expanded ? '접기' : '더보기'}
-        </button>
-      </div>
+          <button
+            type="button"
+            onClick={() => setExpanded((prev) => !prev)}
+            disabled={!canExpand}
+            className="mt-1 self-start rounded-md px-3 py-1.5 text-sm font-medium text-orange-700 disabled:cursor-not-allowed disabled:text-gray-400 enabled:hover:bg-orange-50"
+          >
+            {expanded ? '접기' : '더보기'}
+          </button>
+        </div>
+      )}
     </div>
   );
 }

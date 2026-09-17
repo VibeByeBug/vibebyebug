@@ -9,3 +9,9 @@ export const mockQaResult: QaResult = {
     { slide: 9, quote: '고객 만족도 4.6/5.0 달성' },
   ],
 };
+
+export const mockQaResultNoSources: QaResult = {
+  snippet: '제안하신 방식이 실패할 경우 대안에 대한 질문입니다.',
+  keywords: ['대안', '리스크'],
+  sources: [],
+};

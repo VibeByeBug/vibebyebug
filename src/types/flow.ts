@@ -1,13 +1,19 @@
 export type ScreenName =
+  | 'login'
   | 'start'
   | 'upload'
+  | 'uploadFailed'
   | 'preparing'
+  | 'mockPractice'
+  | 'micConnect'
   | 'mic'
   | 'recognized'
   | 'textInput'
   | 'hud'
   | 'error'
-  | 'postSession';
+  | 'report'
+  | 'myHistory'
+  | 'settings';
 
 export type PreparingStatus = 'uploading' | 'analyzing' | 'ready' | 'failed';
 
