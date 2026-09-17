@@ -16,7 +16,7 @@ from pathlib import Path
 
 # ai/ 를 import 경로에 등록하는 부수효과가 필요하다 (ai_engine.py 참고)
 import ai_engine  # noqa: F401
-from ingest import ingest, NoTextError
+from build_chunks import build
 from quality_report import analyze, MIN_LETTERS
 
 DATA_DIR = Path("data")
@@ -72,11 +72,12 @@ def build_index(file_path: Path | str, presentation_id: str) -> dict:
                 "message": f"파일을 찾을 수 없습니다: {path.name}"}
 
     try:
-        rows = ingest(path)
-    except NoTextError as e:
-        # 글자가 이미지로 깔린 자료. 텍스트 추출로는 검색이 불가능하다.
-        return {"ok": False, "reason": "no_text", "message": str(e),
-                "next": "이미지 인식 경로(render.py + caption.py)가 필요합니다."}
+        # 글자 추출이 안 되는 슬라이드는 이미지로 읽는다 (ai/build_chunks.py)
+        built = build(path, slides_dir=DATA_DIR / "slides" / presentation_id)
+        rows = built["rows"]
+        if not rows:
+            return {"ok": False, "reason": built["reason"] or "no_text",
+                    "message": built["message"] or "슬라이드를 한 장도 읽지 못했습니다."}
     except ValueError as e:
         return {"ok": False, "reason": "unsupported", "message": str(e)}
     except Exception as e:
@@ -98,4 +99,9 @@ def build_index(file_path: Path | str, presentation_id: str) -> dict:
         "chunks_path": str(out),
         "slides": len(rows),
         "quality": _quality(rows),
+        "method": built["method"],
+        "captioned": built["captioned"],
+        "unreadable": built["unreadable"],
+        "unreadable_message": built["message"],
+        "api_calls": built["calls"],
     }

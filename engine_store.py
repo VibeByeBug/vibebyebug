@@ -35,10 +35,22 @@ def _set(pid: str, **kw) -> None:
         _status.setdefault(pid, {}).update(kw)
 
 
+# 준비(임베딩 색인)가 동시에 여러 개 돌면 CPU 를 나눠 써서 진행 중인 발표의 질문 응답이
+# 50ms 에서 1초 넘게 느려졌다. 한 번에 하나만 돌린다.
+_warm_gate = threading.Semaphore(1)
+
+
 def _warm_worker(pid: str, chunks_path: str, preset: str) -> None:
+    with _warm_gate:
+        _warm_worker_inner(pid, chunks_path, preset)
+
+
+def _warm_worker_inner(pid: str, chunks_path: str, preset: str) -> None:
     t0 = time.time()
     try:
-        rq = ReadyQ(chunks_path, preset=preset, session=pid)
+        # answer 모드로 만들어야 warm() 에서 답변 API 연결까지 미리 연다.
+        # 키워드만 쓰는 연결은 rq.answer() 를 안 부르므로 영향이 없다.
+        rq = ReadyQ(chunks_path, preset=preset, session=pid, mode="answer")
         took = rq.warm()
         with _lock:
             _engines[pid] = rq

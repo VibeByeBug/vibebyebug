@@ -62,6 +62,11 @@ async def upload_pdf(file: UploadFile = File(...)):
         "slides": index["slides"],
         "state": engine_store.PENDING,
         "quality": index["quality"],      # 준비 상태 화면에서 '근거로 못 쓰는 슬라이드' 고지용
+        "method": index["method"],
+        "captioned": index["captioned"],
+        "unreadable": index["unreadable"],
+        "unreadable_message": index["unreadable_message"],
+        "api_calls": index["api_calls"],
         "message": "파일 업로드 및 자료 분석이 완료되었습니다."
     }
 

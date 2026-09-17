@@ -83,6 +83,7 @@ def _parse(raw: str) -> dict:
 async def websocket_endpoint(websocket: WebSocket):
     await manager.connect(websocket)
     presentation_id = None      # 이 연결이 다루는 발표. session.start 로 정한다.
+    session_mode = "keywords"   # keywords | answer
     try:
         while True:
             msg = _parse(await websocket.receive_text())
@@ -91,6 +92,7 @@ async def websocket_endpoint(websocket: WebSocket):
             # ── 어느 발표에 대한 질문인지 정한다
             if mtype == "session.start":
                 presentation_id = msg.get("presentation_id")
+                session_mode = msg.get("mode") or session_mode
                 st = engine_store.get_status(presentation_id) if presentation_id else {}
                 await websocket.send_json({"type": "session.ready", **st})
                 continue
@@ -134,6 +136,18 @@ async def websocket_endpoint(websocket: WebSocket):
                   f"AI {cue.latency_ms}ms / 웹소켓 왕복 {latency}초")
 
             await websocket.send_json(payload)
+
+            # ── 추천 답변 모드면 키워드를 보낸 뒤에 답변을 문장 단위로 이어서 보낸다
+            if (msg.get("mode") or session_mode) == "answer":
+                it = rq.answer(text, cue)
+                while True:
+                    part = await asyncio.to_thread(next, it, None)
+                    if part is None:
+                        break
+                    await websocket.send_json(part)
+                    if part.get("done"):
+                        print(f"💬 [추천 답변] status={part.get('status')} "
+                              f"첫 문장 {part.get('first_ms')}ms / 끝 {part.get('latency_ms')}ms")
 
     except WebSocketDisconnect:
         manager.disconnect(websocket)
