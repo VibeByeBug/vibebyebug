@@ -81,9 +81,34 @@ def is_noise(text: str, nouns_fn) -> bool:
     return all(w in FILLER for w in words)
 
 
+# 어느 발표에나 나오는 질문 말. 자료에 이 단어가 없다고 근거 없음으로 막으면 안 된다.
+# 실제로 "이 프로젝트를 왜 만드셨죠", "이 프로젝트의 한계" 가 전부 근거 없음으로 막혔다
+# (19장 자료에 프로젝트, 이유, 한계, 장점이 한 번도 안 나왔다).
+# 자료 쪽에서 같은 내용을 가리키는 표현으로 바꿔 찾는다. 빈 튜플은 바꿀 말이 없는 순수 지시어다.
+_WHY = ("문제", "배경", "목적", "필요", "현황", "우려", "해결")
+_LIMIT = ("한계", "다만", "향후", "과제", "리스크", "제외", "가상", "근사")
+_MERIT = ("차별", "기존", "대비", "비교", "강점", "효과", "절감")
+_PLAN = ("목표", "계획", "로드맵", "단계", "출시", "확장")
+_WHAT = ("개요", "소개", "플랫폼", "해결", "목표", "핵심")
+META_EXPAND = {
+    "프로젝트": (), "서비스": (), "발표": (), "연구": (), "시스템": (), "아이디어": (), "작품": (),
+    "주제": (), "내용": (),
+    "이유": _WHY, "계기": _WHY, "배경": _WHY, "동기": _WHY, "목적": _WHY, "필요성": _WHY,
+    "한계": _LIMIT, "단점": _LIMIT, "약점": _LIMIT, "리스크": _LIMIT, "문제점": _LIMIT, "보완": _LIMIT,
+    "장점": _MERIT, "강점": _MERIT, "차별점": _MERIT, "차별성": _MERIT, "차이": _MERIT, "경쟁력": _MERIT,
+    "계획": _PLAN, "향후": _PLAN, "앞으로": _PLAN, "목표": _PLAN, "방향": _PLAN,
+    "효과": ("효과", "기대", "절감", "개선"), "기대효과": ("효과", "기대", "절감", "개선"),
+}
+
+
+def _content_words(question: str, nouns_fn) -> list[str]:
+    return [w for w in nouns_fn(question)
+            if w not in FILLER and w not in META_EXPAND and len(w) >= 2]
+
+
 def known_ratio(question: str, nouns_fn, idf: dict) -> float:
-    """질문에 쓰인 낱말 중 발표자료에 실제로 있는 비율."""
-    words = [w for w in nouns_fn(question) if w not in FILLER and len(w) >= 2]
+    """질문에 쓰인 낱말 중 발표자료에 실제로 있는 비율. 어느 발표에나 나오는 말은 뺀다."""
+    words = _content_words(question, nouns_fn)
     if not words:
         return 0.0
     known = sum(1 for w in words if w.lower() in idf)
@@ -429,9 +454,9 @@ class ReadyQ:
                    status=status, advice=advice or [], mode=self.mode,
                    latency_ms=round((time.time() - t0) * 1000, 2))
 
-    def _cue(self, question: str, hits, stage: str, k: int, t0: float) -> Cue:
+    def _cue(self, question: str, hits, stage: str, k: int, t0: float, extra=frozenset()) -> Cue:
         qtype = classify(question)
-        qwords = {w.lower() for w in self.nouns(question)}
+        qwords = {w.lower() for w in self.nouns(question)} | {t.lower() for t in extra}
         srcs, kws = [], []
         picked = []
         raw = _raw_keys(question, qwords, self.idf)
@@ -478,15 +503,32 @@ class ReadyQ:
 
         # 2단계 - 발표자료와 관련이 있는가.
         # 검색 엔진은 무조건 상위 k 개를 돌려주므로, 여기서 걸러야 '근거 없음'이 나온다.
-        if known_ratio(question, self.nouns, self.idf) < MIN_KNOWN_RATIO:
-            c = self._empty(question, "no_evidence", t0, NO_EVIDENCE_ADVICE)
-            self._log(c, question)
-            return c
+        query, extra = question, set()
+        if _content_words(question, self.nouns):
+            if known_ratio(question, self.nouns, self.idf) < MIN_KNOWN_RATIO:
+                c = self._empty(question, "no_evidence", t0, NO_EVIDENCE_ADVICE)
+                self._log(c, question)
+                return c
+        else:
+            # "이 프로젝트의 한계는?" 처럼 어느 발표에나 나오는 말로만 된 질문.
+            # 자료 쪽 표현으로 바꿔 찾는다. 바꾼 말도 자료에 없으면 근거 없음이다.
+            terms = [t for w in self.nouns(question) for t in META_EXPAND.get(w, ())]
+            # "왜", "뭔가요" 는 명사가 아니라 위에서 안 잡힌다
+            if re.search(r"왜|어째서", question):
+                terms += _WHY
+            if re.search(r"뭔가|뭐예|뭐에요|무엇|뭐하는|어떤 거", question):
+                terms += _WHAT
+            extra = {t for t in terms if t.lower() in self.idf}
+            if not extra:
+                c = self._empty(question, "no_evidence", t0, NO_EVIDENCE_ADVICE)
+                self._log(c, question)
+                return c
+            query = f"{question} {' '.join(sorted(extra))}"
 
         if self.slow is not None and not self._slow_ready:
             raise RuntimeError("warm() 을 먼저 부르세요 (임베딩 모델 로딩)")
         engine = self.slow if self.slow is not None else self.fast
-        cue = self._cue(question, engine.search([question], k)[0], self.preset, k, t0)
+        cue = self._cue(question, engine.search([query], k)[0], self.preset, k, t0, extra)
         self._log(cue, question)
         return cue
 
