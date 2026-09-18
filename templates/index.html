@@ -1,0 +1,109 @@
+<!DOCTYPE html>
+<html>
+    <head>
+        <title>Ready-Q 실시간 음성인식 테스트</title>
+        <style>
+            body { font-family: sans-serif; padding: 20px; }
+            #mic-btn { padding: 10px 20px; font-size: 16px; background-color: #ff4757; color: white; border: none; border-radius: 5px; cursor: pointer; }
+            #mic-btn.recording { background-color: #2ed573; }
+            .box { margin-top: 20px; padding: 10px; border: 1px solid #ccc; background: #f9f9f9; min-height: 50px; }
+        </style>
+    </head>
+    <body>
+        <h1>Ready-Q 실시간 음성인식(STT) 테스트</h1>
+        <button id="mic-btn" onclick="toggleRecording()">마이크 켜기</button>
+        
+        <h3>🗣️ 내가 한 말 (인식된 질문):</h3>
+        <div id="recognized-text" class="box"></div>
+        
+        <h3>🛡️ 서버 응답 (방어 논리):</h3>
+        <ul id='messages' class="box" style="list-style-type: none; padding-left: 10px;"></ul>
+
+        <script>
+            var ws = new WebSocket("ws://localhost:8000/ws");
+            
+            // 어느 발표에 대한 질문인지. 업로드 응답의 presentation_id 를 넣는다.
+            // (URL 에 ?pid=... 로 넘겨서 테스트할 수 있게 해둠)
+            var presentationId = new URLSearchParams(location.search).get("pid");
+
+            ws.onopen = function() {
+                if (presentationId) {
+                    ws.send(JSON.stringify({ type: "session.start", presentation_id: presentationId }));
+                }
+            };
+
+            function line(html) {
+                var li = document.createElement('li');
+                li.innerHTML = html;
+                document.getElementById('messages').appendChild(li);
+            }
+
+            ws.onmessage = function(event) {
+                var m = JSON.parse(event.data);
+
+                if (m.type === "session.ready") {
+                    line("🔗 자료 연결: <b>" + m.state + "</b>");
+                    return;
+                }
+                if (m.type === "not_ready") {
+                    line("⏳ " + m.message);
+                    return;
+                }
+                if (m.type === "error") {
+                    line("❌ " + m.message);
+                    return;
+                }
+
+                // cue.evidence
+                if (m.status === "ignored") {
+                    line("🔇 잡음으로 판단해 검색하지 않았습니다.");
+                    return;
+                }
+                if (m.status === "no_evidence") {
+                    line("🛡️ <b>근거 자료를 찾지 못했어요</b><br>"
+                         + m.advice.map(function (a) { return "· " + a; }).join("<br>"));
+                    return;
+                }
+
+                var html = "<b>[" + m.question_type + "]</b> "
+                         + m.keywords.join(" · ")
+                         + "<br>" + m.sources.map(function (s) {
+                               return "&nbsp;&nbsp;슬라이드 " + s.slide + "p — " + s.snippet;
+                           }).join("<br>");
+                if (m.deflect && m.deflect.length) {
+                    html += "<br>💬 " + m.deflect[0];
+                }
+                html += "<br><small>AI " + m.latency_ms + "ms / 서버 " + m.server_latency_ms + "ms</small>";
+                line(html);
+            };
+
+            var recognition = new (window.SpeechRecognition || window.webkitSpeechRecognition)();
+            recognition.lang = 'ko-KR';
+            recognition.interimResults = false;
+            recognition.continuous = true;
+
+            var isRecording = false;
+            var micBtn = document.getElementById("mic-btn");
+            var recognizedBox = document.getElementById("recognized-text");
+
+            recognition.onresult = function(event) {
+                var transcript = event.results[event.results.length - 1][0].transcript;
+                recognizedBox.innerHTML += transcript + "<br>";
+                ws.send(JSON.stringify({ type: "stt.final", text: transcript }));
+            };
+
+            function toggleRecording() {
+                if (isRecording) {
+                    recognition.stop();
+                    micBtn.innerText = "마이크 켜기";
+                    micBtn.classList.remove("recording");
+                } else {
+                    recognition.start();
+                    micBtn.innerText = "듣는 중... (마이크 끄기)";
+                    micBtn.classList.add("recording");
+                }
+                isRecording = !isRecording;
+            }
+        </script>
+    </body>
+</html>

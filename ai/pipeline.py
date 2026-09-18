@@ -28,11 +28,13 @@ from embedders import BM25, Hybrid, STEmbedder, _tokens
 from qtype import classify
 from weak_profile import WeakProfile
 import qa_log
+import core_answers
 
 # 유형별로 슬라이드에서 '무엇을 보여줄지'가 다르다.
 # 검색에 유형을 쓰는 건 실패했지만(README 참고), 무엇을 띄울지 고르는 데는 맞다.
 LINE_PREF = {
-    "사실확인": re.compile(r"\d"),
+    # 숫자만 있으면 안 된다. 특허번호나 날짜 조각이 아니라 단위나 자릿수가 붙은 수치여야 한다.
+    "사실확인": re.compile(r"\d[\d,.]*\s*(?:%|[가-힣]{1,2}|배)|\$\s?\d|\d,\d{3}|\d\.\d"),
     "절차":     re.compile(r"[①②③④⑤]|규칙|순서|단계|먼저|→"),
     "근거":     re.compile(r"p\s*=|ρ|배 |%|검증|대조|유의"),
     "한계반론": re.compile(r"한계|아니라|제외|다만|가상|근사|못 |반영되지"),
@@ -80,9 +82,41 @@ def is_noise(text: str, nouns_fn) -> bool:
     return all(w in FILLER for w in words)
 
 
+# 어느 발표에나 나오는 질문 말. 자료에 이 단어가 없다고 근거 없음으로 막으면 안 된다.
+# 실제로 "이 프로젝트를 왜 만드셨죠", "이 프로젝트의 한계" 가 전부 근거 없음으로 막혔다
+# (19장 자료에 프로젝트, 이유, 한계, 장점이 한 번도 안 나왔다).
+# 자료 쪽에서 같은 내용을 가리키는 표현으로 바꿔 찾는다. 빈 튜플은 바꿀 말이 없는 순수 지시어다.
+_WHY = ("문제", "배경", "목적", "필요", "현황", "우려", "해결")
+_LIMIT = ("한계", "다만", "향후", "과제", "리스크", "제외", "가상", "근사")
+_MERIT = ("차별", "기존", "대비", "비교", "강점", "효과", "절감")
+_PLAN = ("목표", "계획", "로드맵", "단계", "출시", "확장")
+_WHAT = ("개요", "소개", "플랫폼", "해결", "목표", "핵심")
+META_EXPAND = {
+    "프로젝트": (), "서비스": (), "발표": (), "연구": (), "시스템": (), "아이디어": (), "작품": (),
+    "주제": (), "내용": (),
+    "이유": _WHY, "계기": _WHY, "배경": _WHY, "동기": _WHY, "목적": _WHY, "필요성": _WHY,
+    "한계": _LIMIT, "단점": _LIMIT, "약점": _LIMIT, "리스크": _LIMIT, "문제점": _LIMIT, "보완": _LIMIT,
+    "장점": _MERIT, "강점": _MERIT, "차별점": _MERIT, "차별성": _MERIT, "차이": _MERIT, "경쟁력": _MERIT,
+    "계획": _PLAN, "향후": _PLAN, "앞으로": _PLAN, "목표": _PLAN, "방향": _PLAN,
+    "효과": ("효과", "기대", "절감", "개선"), "기대효과": ("효과", "기대", "절감", "개선"),
+    "의의": _MERIT + _WHY, "가치": _MERIT + _WHY, "중요성": _WHY, "의미": _MERIT + _WHY,
+}
+
+
+# 질문할 때 붙는 말. 내용어로 세면 "의의가 뭐라고 생각하세요?" 가 기본 질문으로 안 잡히고
+# "생각" 이 자료에 없어서 근거 없음으로 막혔다.
+QUESTION_TALK = {"생각", "말씀", "설명", "질문", "의견", "얘기", "이야기", "혹시", "개인",
+                 "부분", "정도", "어느", "무엇", "뭐", "거", "것", "점"}
+
+
+def _content_words(question: str, nouns_fn) -> list[str]:
+    return [w for w in nouns_fn(question)
+            if w not in FILLER and w not in META_EXPAND and w not in QUESTION_TALK and len(w) >= 2]
+
+
 def known_ratio(question: str, nouns_fn, idf: dict) -> float:
-    """질문에 쓰인 낱말 중 발표자료에 실제로 있는 비율."""
-    words = [w for w in nouns_fn(question) if w not in FILLER and len(w) >= 2]
+    """질문에 쓰인 낱말 중 발표자료에 실제로 있는 비율. 어느 발표에나 나오는 말은 뺀다."""
+    words = _content_words(question, nouns_fn)
     if not words:
         return 0.0
     known = sum(1 for w in words if w.lower() in idf)
@@ -120,8 +154,16 @@ PRESETS = {
 }
 DEFAULT_PRESET = "balanced"
 
+WARM_QUESTIONS = (
+    "데이터는 어디서 받으셨어요?",
+    "그 결과가 맞다는 근거는 무엇이고 한계는 없나요?",
+    "전체 과정을 어떤 순서로 진행했는지, 각 단계에서 어떤 기준을 썼는지 자세히 설명해주실 수 있을까요?",
+    "비용은 얼마인가요",
+    "이 방법이 기존 방식보다 나은 이유와 실제로 검증한 결과가 궁금합니다",
+)
+
 # 화면에 무엇까지 띄울지. 발표는 키워드로 충분할 수 있지만 회의나 업무 자리는 답변 문장이 필요하다.
-MODES = ("keywords", "answer")
+MODES = ("keywords", "answer", "flow")
 
 
 @dataclass
@@ -143,6 +185,10 @@ class Cue:
     stage: str = "fast"
     latency_ms: float = 0.0
     mode: str = "keywords"    # answer 면 화면은 뒤이어 올 cue.answer 자리를 비워둔다
+    # 연습에서 발표자가 확정한 기본 질문 답. 있으면 화면은 이 카드를 먼저 띄운다.
+    core: dict | None = None
+    # 기본 질문인데 아직 확정한 답이 없을 때 그 질문 이름 (화면 안내용)
+    core_pending: str = ""
 
     def to_message(self) -> dict:
         """백엔드 계약(cue.evidence)에 맞춘 형태."""
@@ -209,26 +255,106 @@ def _useful_number(w: str) -> bool:
     return bool(re.search(r"[,\.]|%|\d{4,}", w)) or bool(re.match(r"^\d+\D", w))
 
 
+# 검색 순위 가산점. 톰과젤리 45문항과 PotentiAI 18문항으로 정했다.
+#   (1.5, 0.75) PotentiAI 10/18, 톰과젤리 29/45  /  (3, 1.5) 9/18, 30/45  /  순위만 따름 9/18, 27/45
+# 둘 다 크게 흔들지 않는 (3, 1.5). 문항 수가 적어서 더 잘게 맞추지 않았다.
+RANK_BONUS = (3.0, 1.5, 0.0, 0.0, 0.0)
+
 HEADING = re.compile(r"^[\[\(<※★①-⑤]|^STEP\s|^\s*[-•]\s*$")
 
 
+# 표나 카드 모양 슬라이드는 값이 제목 아래 줄에 따로 있다.
+#   "월 고정비" / "30만원",  "B2B 채용 검증" / "15,000원"
+# 질문 단어는 제목 줄에만 걸리고 값 줄에는 안 걸려서, 제목만 뜨거나 엉뚱한 줄이 떴다.
+# 짧은 제목 줄 바로 아래 짧은 숫자 줄이 오면 둘을 합친 후보를 하나 더 만든다.
+# 영문에 붙은 숫자(B2B, 2-Track 의 앞 글자 제외)는 값이 아니다
+_VALUE = re.compile(r"(?<![A-Za-z])\d(?![A-Za-z])")
+LABEL_MAX = 25
+VALUE_MAX = 20
+
+
 def split_lines(text: str) -> list[str]:
-    return [l.strip() for l in text.split(chr(10)) if len(l.strip()) > 6]
+    raw = [l.strip() for l in text.split(chr(10)) if l.strip()]
+    out = []
+    for i, l in enumerate(raw):
+        if len(l) > 6:
+            out.append(l)
+        if (i + 1 < len(raw) and len(l) <= LABEL_MAX and not _VALUE.search(l)
+                and len(raw[i + 1]) <= VALUE_MAX and _VALUE.search(raw[i + 1])):
+            out.append(f"{l} {raw[i + 1]}")
+    return out
+
+
+PARTIAL = 0.7        # "구독자" 와 "구독", "일치" 와 "일치율" 처럼 한쪽이 다른 쪽을 품을 때
+PER_MATCH = 0.4      # 같은 점수면 질문 단어를 더 많이 담은 줄
+RAW_WEIGHT = 1.2
+
+
+def _match(words: set, qwords: set, idf: dict) -> tuple[float, int]:
+    """줄이 질문 단어를 얼마나 담았나. (점수, 맞은 질문 단어 수)
+
+    형태소 분석 결과가 질문과 자료에서 다르게 끊기는 일이 잦다.
+    질문 "손익분기점" 은 손익/분기점, 자료는 "손익분기점" 한 덩어리로 나온다.
+    정확히 같아야만 세면 이런 줄이 0점이 된다.
+    """
+    score, n = 0.0, 0
+    for q in qwords:
+        if q in words:
+            score += idf.get(q, 0.0)
+            n += 1
+            continue
+        if len(q) < 2:
+            continue
+        part = [w for w in words if len(w) >= 2 and not _is_number(w) and (q in w or w in q)]
+        if part:
+            score += PARTIAL * max(idf.get(w, 0.0) for w in part)
+            n += 1
+    return score, n
+
+
+def _raw_keys(question: str, qwords: set, idf: dict) -> set:
+    """자료에 없는 질문 단어는 분석기가 잘못 자른 것일 수 있다. 원래 어절 글자로 찾는다.
+
+    "이예진 팀원은" 이 이예지 + ㄴ 으로 잘려서, 자료의 "이예진" 과 영영 안 맞았다.
+    """
+    keys = set()
+    for w in qwords:
+        if w in idf or len(w) < 2 or not re.match(r"[가-힣]", w):
+            continue
+        for eojeol in question.split():
+            if eojeol.startswith(w[:2]):
+                m = re.match(r"[가-힣]{3,}", eojeol)
+                if m:
+                    keys.add(m.group(0)[:len(w)])
+    return keys
 
 
 def _best_line(prepared: list[tuple[str, set]], qwords: set, qtype: str, idf: dict) -> str:
-    """슬라이드에서 화면에 띄울 한 줄을 고른다.
+    return _score_lines(prepared, qwords, qtype, idf)[0]
+
+
+def _score_lines(prepared: list[tuple[str, set]], qwords: set, qtype: str,
+                 idf: dict, raw: set = frozenset()) -> tuple[str, float]:
+    """슬라이드에서 화면에 띄울 한 줄을 고른다. (줄, 점수)
 
     prepared 는 (줄, 그 줄의 명사집합) 목록이다. 명사 분석은 색인 때 끝내둔다 -
     질의마다 다시 하면 슬라이드당 수십 ms 가 붙는다.
     """
     if not prepared:
-        return ""
+        return "", float("-inf")
     pref = LINE_PREF.get(qtype)
     best, best_score = prepared[0][0], float("-inf")
     for i, (line, words) in enumerate(prepared):
-        score = sum(idf.get(w, 0.0) for w in words & qwords)
-        if pref and pref.search(line):
+        score, n = _match(words, qwords, idf)
+        for key in raw:
+            if key in line:
+                # 자료 사전에 없던 말이 줄에 그대로 있으면 가장 드문 단어로 친다 (이름, 고유명사)
+                score += RAW_WEIGHT * max(idf.values(), default=1.0)
+                n += 1
+        score += PER_MATCH * n
+        # 유형 가산점은 질문과 닿은 줄에만 준다. 안 그러면 숫자만 있는 엉뚱한 줄이
+        # ("특허가출원 참여(10-2026-0110645)") 질문 단어를 더 담은 줄을 이겼다.
+        if pref and n and pref.search(line):
             score += 2.0
         # 제목·소제목은 근거가 아니다. 숫자가 있는 본문 줄이 화면에 쓸모 있다.
         if HEADING.match(line):
@@ -242,7 +368,7 @@ def _best_line(prepared: list[tuple[str, set]], qwords: set, qtype: str, idf: di
         score -= 0.004 * max(0, len(line) - 90)
         if score > best_score:
             best, best_score = line, score
-    return best
+    return best, best_score
 
 
 def _keywords(words: list[str], qwords: set, idf: dict, n: int = 5,
@@ -280,6 +406,7 @@ class ReadyQ:
         self.preset = preset
         self.set_mode(mode)
         self._answerer = None
+        self.core_cards: dict[str, dict] = {}   # set_core() 로 넣는다
         # 연습 기록. 없으면 빈 것으로 동작한다 - 실전에서 멈추면 안 된다.
         self.weak = WeakProfile.load(weak_path)
         # 실전 기록. 사후 리포트의 재료다. None 이면 기록하지 않는다.
@@ -315,13 +442,19 @@ class ReadyQ:
         balanced 는 문서 289장 기준 ~62초, accurate 는 ~721초 걸린다.
         """
         t0 = time.time()
-        if self.mode == "answer":
+        if self.mode in ("answer", "flow"):
             self._get_answerer().warm()
         if self.slow is None:
             self._slow_ready = True
             return time.time() - t0
         self.slow.index(self._slow_docs)
         self._slow_ready = True
+        # 준비 직후 첫 질문 몇 개가 200~280ms 로 느렸다(이후 50~70ms).
+        # 질문 길이가 달라질 때마다 모델 내부 연산이 처음 한 번 준비되는 비용이라
+        # 길이가 다른 가짜 질문을 미리 흘려서 발표 전에 치르게 한다. 기록은 남기지 않는다.
+        for q in WARM_QUESTIONS:
+            self.slow.search([q], 3)
+            self._cue(q, self.fast.search([q], 3)[0], "warm", 3, time.time())
         return time.time() - t0
 
     @property
@@ -334,16 +467,24 @@ class ReadyQ:
                    status=status, advice=advice or [], mode=self.mode,
                    latency_ms=round((time.time() - t0) * 1000, 2))
 
-    def _cue(self, question: str, hits, stage: str, k: int, t0: float) -> Cue:
+    def _cue(self, question: str, hits, stage: str, k: int, t0: float, extra=frozenset()) -> Cue:
         qtype = classify(question)
-        qwords = {w.lower() for w in self.nouns(question)}
+        qwords = {w.lower() for w in self.nouns(question)} | {t.lower() for t in extra}
         srcs, kws = [], []
-        for i, _ in hits[:k]:
+        picked = []
+        raw = _raw_keys(question, qwords, self.idf)
+        for rank, (i, _) in enumerate(hits[:k]):
+            line, score = _score_lines(self.prepared[i], qwords, qtype, self.idf, raw)
+            if line:
+                picked.append((score + RANK_BONUS[rank], rank, i, line))
+        # 검색 1위 슬라이드의 줄이 질문과 잘 안 맞고 2, 3위 슬라이드에 딱 맞는 줄이 있으면
+        # 그걸 먼저 보여준다. 검색 순위는 가산점으로만 반영한다.
+        picked.sort(key=lambda x: (-x[0], x[1]))
+        for _, _, i, line in picked:
             r = self.rows[i]
-            line = _best_line(self.prepared[i], qwords, qtype, self.idf)
-            if not line:
-                continue
-            srcs.append(Source(slide=r["page"], snippet=line[:120], source=r["source"]))
+            # 글머리표는 화면에서 군더더기다 ("-바이브 코딩 경진 대회...")
+            shown = re.sub(r"^[-•▪◦●○■□※➢❖✓]\s*", "", line)
+            srcs.append(Source(slide=r["page"], snippet=shown[:120], source=r["source"]))
             for w in _keywords(self.line_words[i].get(line, []), qwords,
                                self.idf, weak=self.weak, page=r["page"]):
                 if w not in kws:
@@ -373,17 +514,45 @@ class ReadyQ:
             self._log(c, question)
             return c
 
-        # 2단계 - 발표자료와 관련이 있는가.
-        # 검색 엔진은 무조건 상위 k 개를 돌려주므로, 여기서 걸러야 '근거 없음'이 나온다.
-        if known_ratio(question, self.nouns, self.idf) < MIN_KNOWN_RATIO:
-            c = self._empty(question, "no_evidence", t0, NO_EVIDENCE_ADVICE)
+        # 연습에서 확정한 기본 질문 답이 있으면 그걸 띄운다. 여기서는 추론하지 않는다.
+        core_id = self._core_id(question)
+        if core_id and core_id in self.core_cards:
+            c = self._core_cue(question, self.core_cards[core_id], t0)
             self._log(c, question)
             return c
+        pending = core_answers.LABEL.get(core_id, "") if core_id else ""
+
+        # 2단계 - 발표자료와 관련이 있는가.
+        # 검색 엔진은 무조건 상위 k 개를 돌려주므로, 여기서 걸러야 '근거 없음'이 나온다.
+        query, extra = question, set()
+        if _content_words(question, self.nouns):
+            if known_ratio(question, self.nouns, self.idf) < MIN_KNOWN_RATIO:
+                c = self._empty(question, "no_evidence", t0, NO_EVIDENCE_ADVICE)
+                c.core_pending = pending
+                self._log(c, question)
+                return c
+        else:
+            # "이 프로젝트의 한계는?" 처럼 어느 발표에나 나오는 말로만 된 질문.
+            # 자료 쪽 표현으로 바꿔 찾는다. 바꾼 말도 자료에 없으면 근거 없음이다.
+            terms = [t for w in self.nouns(question) for t in META_EXPAND.get(w, ())]
+            # "왜", "뭔가요" 는 명사가 아니라 위에서 안 잡힌다
+            if re.search(r"왜|어째서", question):
+                terms += _WHY
+            if re.search(r"뭔가|뭐예|뭐에요|무엇|뭐하는|어떤 거", question):
+                terms += _WHAT
+            extra = {t for t in terms if t.lower() in self.idf}
+            if not extra:
+                c = self._empty(question, "no_evidence", t0, NO_EVIDENCE_ADVICE)
+                c.core_pending = pending
+                self._log(c, question)
+                return c
+            query = f"{question} {' '.join(sorted(extra))}"
 
         if self.slow is not None and not self._slow_ready:
             raise RuntimeError("warm() 을 먼저 부르세요 (임베딩 모델 로딩)")
         engine = self.slow if self.slow is not None else self.fast
-        cue = self._cue(question, engine.search([question], k)[0], self.preset, k, t0)
+        cue = self._cue(question, engine.search([query], k)[0], self.preset, k, t0, extra)
+        cue.core_pending = pending
         self._log(cue, question)
         return cue
 
@@ -409,7 +578,7 @@ class ReadyQ:
         메시지는 {"type": "cue.answer", "text", "done", "latency_ms"} 이고,
         마지막 메시지(done=True)에 status 가 붙는다: ok | no_answer | blocked | error | skipped
         """
-        if cue.status != "ok" or not cue.sources:
+        if cue.status != "ok" or not cue.sources or cue.core:
             # 근거 없는 질문에 답변을 만들면 지어낸 말이 된다
             yield {"type": "cue.answer", "text": "", "done": True,
                    "latency_ms": 0.0, "status": "skipped"}
@@ -421,6 +590,54 @@ class ReadyQ:
             if row is not None:
                 by_page.setdefault(s.slide, row["text"])
         yield from answerer.stream(question, list(by_page.items()))
+
+    def flow(self, question: str, cue: Cue) -> Iterator[dict]:
+        """cue() 결과에 이어 말할 순서를 흐름도 칸으로 내보낸다. flow 모드에서만 부른다.
+
+        메시지는 {"type": "cue.flow", "steps": [{"text", "slide"}], "done", "latency_ms"} 이고,
+        마지막 메시지에 status 가 붙는다: ok | no_answer | blocked | error | skipped
+        """
+        if cue.status != "ok" or not cue.sources or cue.core:
+            yield {"type": "cue.flow", "steps": [], "done": True,
+                   "latency_ms": 0.0, "status": "skipped"}
+            return
+        by_page = {}
+        for s in cue.sources:
+            row = next((r for r in self.rows if r["page"] == s.slide and r["source"] == s.source), None)
+            if row is not None:
+                by_page.setdefault(s.slide, row["text"])
+        yield from self._get_answerer().flow(question, cue.question_type, list(by_page.items()))
+
+    def set_core(self, cards: dict) -> None:
+        """연습에서 확정한 기본 질문 카드 {질문 종류 id: 카드}. 확정이 바뀔 때마다 다시 넣는다."""
+        self.core_cards = dict(cards or {})
+
+    def _core_id(self, question: str) -> str | None:
+        """기본 질문인가. 질문에 자료 고유의 내용어가 섞여 있으면 기본 질문으로 보지 않는다.
+
+        "이 프로젝트의 한계는?" 은 기본 질문이고, "AI 탐지의 한계는?" 은 세부 질문이다.
+        세부 질문에 저장된 기본 카드를 띄우면 엉뚱한 답이 된다.
+        """
+        cid = core_answers.classify(question)
+        if not cid:
+            return None
+        core_words = [w for c in core_answers.CORE for w in c["words"]]
+        rest = [w for w in _content_words(question, self.nouns)
+                if not any(w in cw or cw in w for cw in core_words)]
+        return None if rest else cid
+
+    def _core_cue(self, question: str, card: dict, t0: float) -> Cue:
+        srcs = []
+        for step in card["steps"]:
+            row = next((r for r in self.rows if r["page"] == step.get("slide")), None)
+            if row is None or any(s.slide == row["page"] for s in srcs):
+                continue
+            i = self.rows.index(row)
+            words = {w.lower() for w in self.nouns(step["text"])}
+            line, _ = _score_lines(self.prepared[i], words, "사실확인", self.idf)
+            srcs.append(Source(slide=row["page"], snippet=(line or row["text"])[:120], source=row["source"]))
+        return Cue(question_type=classify(question), sources=srcs, status="ok", core=card,
+                   mode=self.mode, stage="core", latency_ms=round((time.time() - t0) * 1000, 2))
 
     def _get_answerer(self):
         if self._answerer is None:
