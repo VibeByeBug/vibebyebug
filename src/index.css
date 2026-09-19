@@ -32,6 +32,35 @@ body {
   border-radius: 2px;
 }
 
+/* 리허설 화면 필름 스트립의 구멍. 넓은 화면은 좌우 세로줄, 좁은 화면(가로 스트립)은 위아래 가로줄 */
+.film-reel { position: relative; }
+.film-reel::before, .film-reel::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 7px;
+  background-image: linear-gradient(180deg, rgba(237, 230, 214, 0.2) 0 11px, transparent 11px 22px);
+  background-size: 100% 22px;
+  pointer-events: none;
+}
+.film-reel::before { left: 7px; }
+.film-reel::after { right: 7px; }
+@media (max-width: 1023px) {
+  .film-reel::before, .film-reel::after {
+    top: auto;
+    bottom: auto;
+    left: 0;
+    right: 0;
+    width: auto;
+    height: 7px;
+    background-image: linear-gradient(90deg, rgba(237, 230, 214, 0.2) 0 11px, transparent 11px 22px);
+    background-size: 22px 100%;
+  }
+  .film-reel::before { top: 7px; }
+  .film-reel::after { bottom: 7px; }
+}
+
 /* ON AIR 탤리 라이트 */
 @keyframes tally-pulse {
   0%, 100% { box-shadow: 0 0 0 0 rgba(229, 50, 45, 0.45); }
