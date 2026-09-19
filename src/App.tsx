@@ -16,6 +16,8 @@ import { SettingsScreen } from './components/SettingsScreen';
 import { StartScreen } from './components/StartScreen';
 import { TextInputFallback } from './components/TextInputFallback';
 import { AskBar } from './components/AskBar';
+import { AudienceControl, type AudienceCandidate } from './components/AudienceControl';
+import { audienceChannel, openAudienceWindow, type AudienceSlide } from './audience';
 import { UploadFailedScreen } from './components/UploadFailedScreen';
 import { UploadScreen } from './components/UploadScreen';
 import { useQaSocket } from './hooks/useQaSocket';
@@ -157,6 +159,65 @@ function App() {
       {listening ? '마이크 끄기' : '마이크 켜기'}
     </button>
   );
+
+  // ── 청중 화면 (프로젝터에 띄운 두 번째 창) ──────────────────────────────
+  // 발표자가 고른 근거 슬라이드 원본만 보낸다. 자동으로 보내지 않는다.
+  const [audienceOpen, setAudienceOpen] = useState(false);
+  const [audienceSlide, setAudienceSlide] = useState<AudienceSlide | null>(null);
+  const audienceSlideRef = useRef<AudienceSlide | null>(null);
+  audienceSlideRef.current = audienceSlide;
+  const channelRef = useRef<ReturnType<typeof audienceChannel> | null>(null);
+  useEffect(() => {
+    const ch = audienceChannel((m) => {
+      if (m.type === 'hello') {
+        // 청중 화면이 새로 열렸거나 새로고침됐다. 지금 띄워야 할 것을 다시 보낸다.
+        setAudienceOpen(true);
+        const cur = audienceSlideRef.current;
+        ch.send(cur ? { type: 'show', slide: cur } : { type: 'clear' });
+      }
+      if (m.type === 'bye') setAudienceOpen(false);
+    });
+    channelRef.current = ch;
+    return () => ch.close();
+  }, []);
+
+  // 띄울 후보: 근거 카드의 슬라이드, 그다음 흐름도 칸의 슬라이드 (겹치는 슬라이드는 한 번)
+  const audienceCandidates: AudienceCandidate[] = [];
+  for (const s of lastResult?.sources ?? []) {
+    if (!audienceCandidates.some((c) => c.page === s.slide)) audienceCandidates.push({ page: s.slide, quote: s.quote });
+  }
+  for (const st of lastFlow?.steps ?? []) {
+    if (st.slide && !audienceCandidates.some((c) => c.page === st.slide))
+      audienceCandidates.push({ page: st.slide, quote: st.text });
+  }
+  audienceCandidates.splice(4);
+
+  function sendToAudience(i: number) {
+    const c = audienceCandidates[i];
+    const pid = upload?.presentation_id;
+    if (!c || !pid) return;
+    const slide = { presentationId: pid, page: c.page, quote: c.quote };
+    setAudienceSlide(slide);
+    channelRef.current?.send({ type: 'show', slide });
+  }
+
+  function clearAudience() {
+    setAudienceSlide(null);
+    channelRef.current?.send({ type: 'clear' });
+  }
+
+  // 숫자키 1~4 로 보내고 0 이나 Esc 로 내린다 (글을 적는 중에는 무시)
+  useEffect(() => {
+    if (screen !== 'hud' || !audienceOpen) return;
+    const onKey = (e: KeyboardEvent) => {
+      const t = e.target as HTMLElement;
+      if (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || e.ctrlKey || e.metaKey || e.altKey) return;
+      if (e.key >= '1' && e.key <= '4') sendToAudience(Number(e.key) - 1);
+      if (e.key === '0' || e.key === 'Escape') clearAudience();
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  });
 
   function handleConnectMic() {
     setQuestion({ partialText: '', finalText: '', isConfirmed: false });
@@ -391,19 +452,17 @@ function App() {
                 {modeToggle}
                 {graphButton}
                 {materialButton}
-                <button
-                  type="button"
-                  onClick={() => {
-                    setTextFromError(false);
-                    setScreen('textInput');
-                  }}
-                  className="border border-[#e5e7eb] h-[32px] px-[12px] rounded-[6px] font-bold text-[13px] text-[#6b7280] whitespace-nowrap"
-                >
-                  글로 질문하기
-                </button>
               </>
             }
             showProfile={false}
+          />
+          <AudienceControl
+            candidates={audienceCandidates}
+            current={audienceSlide?.page ?? null}
+            open={audienceOpen}
+            onOpen={openAudienceWindow}
+            onSend={sendToAudience}
+            onClear={clearAudience}
           />
           <Hud
             result={lastResult}

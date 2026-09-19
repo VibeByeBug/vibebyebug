@@ -219,3 +219,18 @@ body { background-color: #15110d; }
   .logo:hover .logo-q { animation: none; }
   .tilt { transform: none; }
 }
+
+/* 청중 화면의 형광펜: 왼쪽에서 오른쪽으로 그어진다 */
+@keyframes highlight-sweep {
+  from { clip-path: inset(0 100% 0 0); }
+  to { clip-path: inset(0 0 0 0); }
+}
+.highlight-sweep {
+  background: rgba(255, 196, 0, 0.32);
+  box-shadow: 0 0 0 2px rgba(242, 107, 29, 0.85);
+  mix-blend-mode: multiply;
+  animation: highlight-sweep 500ms ease-out 150ms both;
+}
+@media (prefers-reduced-motion: reduce) {
+  .highlight-sweep { animation: none; }
+}

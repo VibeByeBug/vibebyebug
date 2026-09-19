@@ -9,7 +9,7 @@ from fastapi.templating import Jinja2Templates
 from dotenv import load_dotenv
 from fastapi.middleware.cors import CORSMiddleware
 
-from routers import rag_api, upload_api, log_api, core_api, graph_api, notes_api
+from routers import rag_api, upload_api, log_api, core_api, graph_api, notes_api, slides_api
 import engine_store
 
 load_dotenv()
@@ -21,6 +21,7 @@ app.include_router(log_api.router)
 app.include_router(core_api.router)
 app.include_router(graph_api.router)
 app.include_router(notes_api.router)
+app.include_router(slides_api.router)
 
 # ---------------------------------------------------------
 # [보안 설정] CORS 미들웨어 추가 (프론트엔드 접속 허용)
