@@ -121,7 +121,7 @@ export function StartScreen({ onStart, onOpenReport, loggedIn = false }: StartSc
           <div className="slate-stripes h-[36px]" />
           <div className="bg-[#111111] rounded-b-[10px] px-[26px] pt-[20px] pb-[18px] flex flex-col gap-[14px] shadow-[0_40px_70px_-20px_rgba(0,0,0,0.8)]">
             <div className="flex flex-col gap-[4px]">
-              <span className="font-mono text-[11px] tracking-[3px] text-white/50">PRODUCTION</span>
+              <span className="font-slate font-medium text-[12px] tracking-[1px] text-white/55">PRODUCTION</span>
               <input
                 ref={titleInput}
                 type="text"
@@ -131,7 +131,7 @@ export function StartScreen({ onStart, onOpenReport, loggedIn = false }: StartSc
                   if (e.key === 'Enter') start();
                 }}
                 placeholder="발표 이름을 적어주세요"
-                className="bg-transparent font-bold text-[28px] text-white placeholder:text-white/30 outline-none w-full border-b border-white/20 focus:border-[#f26b1d] pb-[6px] transition-colors"
+                className="bg-transparent font-hand text-[40px] leading-[44px] text-white placeholder:text-white/30 outline-none w-full border-b border-white/20 focus:border-[#f26b1d] pb-[2px] transition-colors"
               />
             </div>
             <div className="grid grid-cols-3">
@@ -141,14 +141,18 @@ export function StartScreen({ onStart, onOpenReport, loggedIn = false }: StartSc
                 ['ROLL', '01'],
               ].map(([k, v], i) => (
                 <div key={k} className={`flex flex-col gap-[2px] px-[4px] ${i < 2 ? 'border-r border-white/20' : ''} ${i ? 'pl-[16px]' : ''}`}>
-                  <span className="font-mono text-[11px] tracking-[3px] text-white/50">{k}</span>
-                  <span className="font-display text-[54px] leading-none pt-[4px]">{v}</span>
+                  <span className="font-slate font-medium text-[12px] tracking-[1px] text-white/55">{k}</span>
+                  <span className="font-hand text-[56px] leading-[52px] pt-[2px]">{v}</span>
                 </div>
               ))}
             </div>
-            <div className="flex justify-between border-t border-white/20 pt-[12px] font-mono text-[12px] tracking-[2px] text-white/50">
-              <span>DATE {today}</span>
-              <span>DIRECTOR 발표자</span>
+            <div className="flex justify-between items-baseline border-t border-white/20 pt-[10px]">
+              <span className="font-slate font-medium text-[12px] tracking-[1px] text-white/55">
+                DATE <span className="font-hand text-[26px] tracking-normal text-white ml-[6px]">{today}</span>
+              </span>
+              <span className="font-slate font-medium text-[12px] tracking-[1px] text-white/55">
+                DIRECTOR <span className="font-hand text-[26px] tracking-normal text-white ml-[6px]">발표자</span>
+              </span>
             </div>
           </div>
         </div>
@@ -169,9 +173,9 @@ export function StartScreen({ onStart, onOpenReport, loggedIn = false }: StartSc
                 onClick={onOpenReport}
                 className="flex-1 min-w-0 bg-[#221c16] hover:bg-[#2d251d] transition-colors rounded-[4px] px-[16px] py-[12px] flex flex-col gap-[4px] text-left"
               >
-                <span className="font-mono font-bold text-[11px] tracking-[2px] text-[#f26b1d]">TAKE {i + 1}</span>
+                <span className="font-slate font-semibold text-[12px] tracking-[1px] text-[#f26b1d]">TAKE {i + 1}</span>
                 <span className="font-bold text-[16px] truncate">{p.name}</span>
-                <span className="font-mono text-[11px] text-white/50">{p.date}</span>
+                <span className="text-[12px] text-white/50">{p.date}</span>
               </button>
             ))}
             <button
