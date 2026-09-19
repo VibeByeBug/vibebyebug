@@ -1,4 +1,4 @@
-import { useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import type { UploadResult } from './api';
 import { Header } from './components/Header';
 import { Hud } from './components/Hud';
@@ -83,7 +83,7 @@ function App() {
     </div>
   );
 
-  const { start: startRecognition } = useSpeechRecognition({
+  const { start: startRecognition, stop: stopRecognition, listening } = useSpeechRecognition({
     onPartialResult: handlePartialResult,
     onFinalResult: handleFinalResult,
     onError: () => {
@@ -91,6 +91,24 @@ function App() {
       setScreen('textInput');
     },
   });
+
+  // 실전 화면을 벗어나면 마이크를 끈다 (설정, 리포트 등으로 가도 계속 듣고 있으면 안 된다)
+  useEffect(() => {
+    if (!['recognized', 'hud', 'textInput', 'micConnect'].includes(screen)) stopRecognition();
+  }, [screen, stopRecognition]);
+
+  const micToggle = (
+    <button
+      type="button"
+      onClick={() => (listening ? stopRecognition() : startRecognition())}
+      className={`flex gap-[6px] h-[32px] items-center px-[12px] rounded-[6px] font-bold text-[13px] whitespace-nowrap ${
+        listening ? 'bg-[#bf382e] text-white' : 'border border-[#e5e7eb] text-[#6b7280]'
+      }`}
+    >
+      <span className={`rounded-full size-[8px] ${listening ? 'bg-white animate-pulse' : 'bg-[#9ca3af]'}`} />
+      {listening ? '마이크 끄기' : '마이크 켜기'}
+    </button>
+  );
 
   function handleConnectMic() {
     setQuestion({ partialText: '', finalText: '', isConfirmed: false });
@@ -202,7 +220,15 @@ function App() {
 
       {screen === 'recognized' && (
         <>
-          <Header onNavigate={setScreen} compact listening rightText="분석 준비 중" showProfile={false} />
+          <Header
+            onNavigate={setScreen}
+            compact
+            listening={listening}
+            label="마이크 꺼짐"
+            rightText={listening ? '분석 준비 중' : undefined}
+            rightButtons={micToggle}
+            showProfile={false}
+          />
           <RecognizedQuestion
             partialText={question.partialText}
             finalText={question.finalText}
@@ -236,10 +262,12 @@ function App() {
           <Header
             onNavigate={setScreen}
             compact
-            listening
+            listening={listening}
+            label="마이크 꺼짐"
             rightText={lastResult ? `응답 ${lastResult.responseMs}ms` : '분석 중'}
             rightButtons={
               <>
+                {micToggle}
                 {modeToggle}
                 <button
                   type="button"
