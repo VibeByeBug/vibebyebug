@@ -57,6 +57,35 @@ PROMPT = """발표자가 청중 질문에 바로 읽을 수 있는 답변을 2�
 --- 자료 ---
 {slides}"""
 
+# 어느 자료에도 답이 없을 때 쓰는 추론 모드. 발표자가 빈손으로 서 있지 않게 답은 내되,
+# 화면에 "추론한 답" 으로 따로 표시한다(basis="inferred"). 프로젝트에 대한 구체적 사실은 여전히 지어내지 않는다.
+INFER_HEAD = """[추론 모드] 이 질문은 아래 자료에 직접 답이 없다. 그래도 발표자가 말할 수 있는 답을 만들어야 한다.
+아래 규칙 중 "자료 내용만 근거로" 와 "자료로 답할 수 없으면 없음" 은 이렇게 바꾼다.
+- 자료 내용과 일반적인 지식으로 추론해서 답해. "없음" 이라고 하지 마.
+- 추론이라는 게 드러나게 "~로 볼 수 있습니다", "~일 가능성이 큽니다" 처럼 말해. 확정해서 말하지 마.
+- 이 프로젝트의 날짜, 기간, 인원, 비용, 수치처럼 자료에 없는 구체적 사실은 지어내지 마.
+  그런 걸 묻는 질문이면 "자료에는 없어서 확인이 필요하지만" 으로 시작하고, 자료로 말할 수 있는 관련 내용을 대신 말해.
+- 숫자는 자료에 있는 것만 써.
+- 흐름도라면 자료에서 온 칸은 그 슬라이드 번호, 추론한 칸은 슬라이드 번호 0.
+
+"""
+
+# 추론 모드에서는 "자료로만 답해라", "없으면 없음" 규칙을 프롬프트 안에서 바꿔 끼운다.
+# 머리말로 덮어쓰라고만 했더니 흐름도가 계속 "없음" 을 냈다(규칙 목록 쪽이 더 세게 먹혔다).
+_INFER_SWAP = [
+    ("아래 자료 내용만 근거로 써. 자료에 없는 사실, 숫자, 이름은 절대 지어내지 마.",
+     "아래 자료를 먼저 쓰고, 모자라면 일반적인 지식으로 추론해. 이 프로젝트의 날짜, 기간, 인원, 비용, 수치는 지어내지 마."),
+    ('자료로 답할 수 없으면 "없음" 이라고만 써.', '"없음" 이라고 쓰지 마. 추론해서라도 답해.'),
+    ('자료로 답할 수 없으면 "없음" 한 줄만 써.', '"없음" 이라고 쓰지 마. 자료에 없으면 추론해서 칸을 채우고 그 칸의 슬라이드 번호는 0.'),
+]
+
+
+def _inferize(prompt: str) -> str:
+    for a, b in _INFER_SWAP:
+        prompt = prompt.replace(a, b)
+    return INFER_HEAD + prompt
+
+
 _NUM = re.compile(r"\d+(?:[.,]\d+)*")
 _SENT_END = re.compile(r"(?<=[.!?])\s+")
 
@@ -115,7 +144,8 @@ class Answerer:
             pass          # 준비 실패로 발표를 막지 않는다. 실전 호출에서 다시 시도된다.
         return time.time() - t0
 
-    def stream(self, question: str, slides: list[tuple[int, str]], story: str = "") -> Iterator[dict]:
+    def stream(self, question: str, slides: list[tuple[int, str]], story: str = "",
+               infer: bool = False) -> Iterator[dict]:
         """검사를 통과한 문장이 나올 때마다 지금까지의 답변을 내보낸다.
 
         마지막 메시지는 done=True 이고 status 가 붙는다.
@@ -129,6 +159,8 @@ class Answerer:
         prompt = PROMPT.format(
             question=question, story=_story_block(story),
             slides=_fmt_slides(slides))
+        if infer:
+            prompt = _inferize(prompt)
 
         shown: list[str] = []
         first_ms = None
@@ -338,7 +370,8 @@ def _stream_text(self, prompt: str, t0: float) -> Iterator[tuple[str, str]]:
         cancel.set()
 
 
-def flow(self, question: str, qtype: str, slides: list[tuple[int, str]], story: str = "") -> Iterator[dict]:
+def flow(self, question: str, qtype: str, slides: list[tuple[int, str]], story: str = "",
+         infer: bool = False) -> Iterator[dict]:
     """칸이 완성될 때마다 지금까지의 흐름도를 내보낸다.
 
     {"type": "cue.flow", "steps": [{"text", "detail", "slide", "key", "keys", "link", "why"}], "guide", "done", "latency_ms", "status"}
@@ -369,11 +402,15 @@ def flow(self, question: str, qtype: str, slides: list[tuple[int, str]], story: 
         yield msg(True, "error", "OPENAI_API_KEY 가 없습니다")
         return
 
+    if infer and 0 not in dict(slides):
+        slides = [*slides, (0, "")]      # 추론한 칸이 붙을 자리. 비어 있으니 숫자는 못 쓴다
     prompt = FLOW_PROMPT.format(
         n=FLOW_STEPS, max_chars=FLOW_MAX_CHARS, detail_max=DETAIL_MAX, keys_max=KEYS_MAX, question=question, story=_story_block(story),
         shape=FLOW_SHAPE.get(qtype, FLOW_SHAPE["사실확인"]),
         links=", ".join(LINKS), guide_max=GUIDE_MAX, why_max=WHY_MAX,
         slides=_fmt_slides(slides))
+    if infer:
+        prompt = _inferize(prompt)
 
     def take(line: str):
         """한 줄을 칸으로 만든다. 반환: 칸 dict / "skip" / "blocked" / "none" """

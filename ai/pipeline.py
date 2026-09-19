@@ -605,9 +605,11 @@ class ReadyQ:
             if slides:
                 answerer = self._get_answerer()
                 tag = {} if has_slide else {"basis": "notes"}
-                yield from ({**m, **tag} for m in self._or_fallback(
-                    answerer.stream(question, slides, story),
-                    lambda ctx: answerer.stream(question, *ctx), question, dict(slides)))
+                yield from self._or_infer(
+                    ({**m, **tag} for m in self._or_fallback(
+                        answerer.stream(question, slides, story),
+                        lambda ctx: answerer.stream(question, *ctx), question, dict(slides))),
+                    lambda: answerer.stream(question, slides, story, infer=True), self._related(question, cue))
                 return
         if self._use_fallback(cue):
             ctx = self._fallback(question)
@@ -642,9 +644,12 @@ class ReadyQ:
             if slides:
                 answerer = self._get_answerer()
                 tag = {} if has_slide else {"basis": "notes"}
-                yield from ({**m, **tag} for m in self._or_fallback(
-                    answerer.flow(question, cue.question_type, slides, story),
-                    lambda ctx: answerer.flow(question, cue.question_type, *ctx), question, dict(slides)))
+                yield from self._or_infer(
+                    ({**m, **tag} for m in self._or_fallback(
+                        answerer.flow(question, cue.question_type, slides, story),
+                        lambda ctx: answerer.flow(question, cue.question_type, *ctx), question, dict(slides))),
+                    lambda: answerer.flow(question, cue.question_type, slides, story, infer=True),
+                    self._related(question, cue))
                 return
         if self._use_fallback(cue):
             ctx = self._fallback(question)
@@ -666,6 +671,33 @@ class ReadyQ:
         yield from self._or_fallback(
             answerer.flow(question, cue.question_type, slides, story),
             lambda ctx: answerer.flow(question, cue.question_type, *ctx), question, dict(slides))
+
+    def _related(self, question: str, cue: Cue) -> bool:
+        """발표와 조금이라도 관련된 질문인가. 추론 답은 이런 질문에만 만든다.
+
+        "점심 뭐 먹지?" 같은 잡담에 추론 답을 띄우면 발표자가 헷갈린다. 자료에 있는 낱말이 하나라도 있거나,
+        프로젝트, 한계, 팀처럼 어느 발표에나 나오는 질문 말이 있으면 관련 있다고 본다.
+        """
+        if cue.status == "ok":
+            return True
+        words = [w.lower() for w in self.nouns(question)]
+        if any(w in self.idf for w in words if len(w) >= 2 and w not in FILLER):
+            return True
+        return any(w in META_EXPAND for w in words) or bool(
+            re.search(r"여러분|팀|발표|이거|이것|이 서비스|이 프로젝트|왜|어떻게", question))
+
+    @staticmethod
+    def _or_infer(first: Iterator[dict], infer, related: bool = True) -> Iterator[dict]:
+        """자료로 답하지 못하면(no_answer) 추론 모드로 한 번 더 만든다. 화면에 "추론한 답" 으로 표시된다."""
+        for m in first:
+            # 자료로 답할 수 없다고 했거나, 첫 문장(첫 칸)부터 자료에 없는 숫자가 나와 아무것도 못 띄운 경우
+            empty = m.get("status") == "no_answer" or (
+                m.get("status") == "blocked" and not m.get("text") and not m.get("steps"))
+            if related and m.get("done") and empty:
+                for m2 in infer():
+                    yield {**m2, "basis": "inferred"}
+                return
+            yield m
 
     def _or_fallback(self, first: Iterator[dict], again, question: str, base: dict) -> Iterator[dict]:
         """슬라이드로 만든 답이 "자료로 답할 수 없음" 이면 보강 자료와 논리 지도를 더해 한 번 더 만든다.

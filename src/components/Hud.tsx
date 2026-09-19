@@ -56,12 +56,12 @@ export function Hud({ result, question, answer = null, flow = null, mode = 'keyw
         <p className="font-bold text-[11px] text-[#6b7280] tracking-[1.54px] w-full">
           말할 순서
           {flow?.done && <span className="ml-[8px] font-medium text-[#999]">{Math.round(flow.latency_ms)}ms</span>}
-          {flow?.basis === 'notes' && <NotesTag />}
+          <BasisTag basis={flow?.basis} />
         </p>
         {!flow?.steps.length ? (
           <p className="font-medium text-[17px] text-[#999]">순서를 정리하고 있어요···</p>
         ) : (
-          <FlowSteps steps={flow.steps} />
+          <FlowSteps steps={flow.steps} inferred={flow.basis === 'inferred'} />
         )}
         {flow?.guide && (
           <div className="bg-[#f9fafb] border-l-[4px] border-[#f26b1d] flex flex-col gap-[4px] px-[18px] py-[12px] rounded-[4px] w-full">
@@ -79,7 +79,7 @@ export function Hud({ result, question, answer = null, flow = null, mode = 'keyw
         <p className="font-bold text-[12px] text-[#f26b1d] tracking-[1.2px] w-full">
           추천 답변
           {answer?.done && <span className="ml-[8px] font-medium text-[#999]">{Math.round(answer.latency_ms)}ms</span>}
-          {answer?.basis === 'notes' && <NotesTag />}
+          <BasisTag basis={answer?.basis} />
         </p>
         <p
           className={`font-bold text-[27px] tracking-[-0.675px] leading-[40px] w-full ${
@@ -105,8 +105,9 @@ export function Hud({ result, question, answer = null, flow = null, mode = 'keyw
   // 발표자가 직접 쓴 카드는 슬라이드가 없어서 근거가 0개다. 근거 없음 화면으로 보내면 안 된다.
   // 슬라이드에서 근거를 못 찾았어도 보강 자료와 논리 지도로 만든 답이 오면 그걸 보여준다
   const fromNotes =
-    (mode === 'flow' && flow?.basis === 'notes' && flow.steps.length > 0) ||
-    (mode === 'answer' && answer?.basis === 'notes' && !!answer.text);
+    (mode === 'flow' && !!flow?.basis && flow.steps.length > 0) ||
+    (mode === 'answer' && !!answer?.basis && !!answer.text);
+  const inferred = (mode === 'flow' ? flow?.basis : answer?.basis) === 'inferred';
   if (sources.length === 0 && !core) {
     return (
       <div className="flex flex-1 flex-col gap-[24px] items-start pb-[36px] pt-[32px] px-[44px] w-full">
@@ -122,7 +123,9 @@ export function Hud({ result, question, answer = null, flow = null, mode = 'keyw
             <p className="font-bold text-[19px] text-[#f26b1d] leading-[28px]">발표자료에서 관련 근거를 찾지 못했습니다</p>
             {fromNotes && (
               <p className="font-medium text-[14px] text-[#6b7280] leading-[20px]">
-                대신 보강한 자료(대본, 설명 자료)와 논리 지도의 발표 줄거리로 답을 만들었어요. 한 번 더 확인하고 말해주세요.
+                {inferred
+                  ? '어느 자료에도 답이 없어서 AI 가 추론한 답을 보여드려요. 사실인지 확인하고 말해주세요.'
+                  : '대신 보강한 자료(대본, 설명 자료)와 논리 지도의 발표 줄거리로 답을 만들었어요. 한 번 더 확인하고 말해주세요.'}
               </p>
             )}
           </div>
@@ -313,17 +316,23 @@ function HighlightMany({ text, words }: { text: string; words: string[] }) {
   return <>{out}</>;
 }
 
-export function FlowSteps({ steps }: { steps: FlowStep[] }) {
+export function FlowSteps({ steps, inferred = false }: { steps: FlowStep[]; inferred?: boolean }) {
   return (
     <div className="flex items-stretch w-full">
       {steps.map((step, i) => {
-        const first = i === 0;
+        // 첫 칸은 주황으로 채워 강조한다. 추론한 칸은 밝은 보라 칸이라 글자를 흰색으로 쓰면 안 보인다.
+        const first = i === 0 && !(inferred && !step.slide);
         const words = step.keys?.length ? step.keys : step.key ? [step.key] : [];
         return (
           <div key={i} className="flex flex-1 items-stretch min-w-0">
             <div
               className={`flex flex-1 flex-col gap-[8px] self-stretch px-[16px] py-[13px] rounded-[8px] min-w-0 ${
-                first ? 'bg-[#f26b1d]' : 'bg-[#fff8f3] border border-[#f26b1d]'
+                // AI 가 추론한 칸(근거 슬라이드 없음)은 보라 점선으로 구분한다
+                inferred && !step.slide
+                  ? 'bg-[#f8f5fe] border-2 border-dashed border-[#7c5cbf]'
+                  : first
+                    ? 'bg-[#f26b1d]'
+                    : 'bg-[#fff8f3] border border-[#f26b1d]'
               }`}
             >
               <div className="flex items-center justify-between gap-[8px]">
@@ -335,7 +344,7 @@ export function FlowSteps({ steps }: { steps: FlowStep[] }) {
                   {i + 1}
                 </span>
                 <span className={`font-bold text-[12px] ${first ? 'text-white/80' : 'text-[#9ca3af]'}`}>
-                  {step.slide ? `p.${step.slide}` : '발표자 설명'}
+                  {step.slide ? `p.${step.slide}` : inferred ? 'AI 추론' : '발표자 설명'}
                 </span>
               </div>
               <p
@@ -420,11 +429,21 @@ function HighlightWords({ text, words, color, bold }: { text: string; words: str
   return <>{out}</>;
 }
 
-// 슬라이드 근거로 답하지 못해 보강 자료(대본, 설명 자료)와 논리 지도로 만든 답이라는 표시
-function NotesTag() {
-  return (
-    <span className="ml-[8px] px-[8px] py-[2px] rounded-full bg-[#e8f5ec] font-bold text-[11px] text-[#2f7a47] tracking-normal">
-      보강 자료로 만든 답
-    </span>
-  );
+// 답의 근거 표시.
+//   notes     슬라이드 근거로 답하지 못해 보강 자료(대본, 설명 자료)와 논리 지도로 만든 답
+//   inferred  어느 자료에도 답이 없어 AI 가 추론한 답. 발표자가 그대로 읽지 않게 눈에 띄게 표시한다.
+function BasisTag({ basis }: { basis?: 'notes' | 'inferred' }) {
+  if (basis === 'inferred')
+    return (
+      <span className="ml-[8px] px-[8px] py-[2px] rounded-full bg-[#f1ecfb] border border-[#7c5cbf] font-bold text-[11px] text-[#5b3fa0] tracking-normal">
+        AI 추론, 자료에 없음
+      </span>
+    );
+  if (basis === 'notes')
+    return (
+      <span className="ml-[8px] px-[8px] py-[2px] rounded-full bg-[#e8f5ec] font-bold text-[11px] text-[#2f7a47] tracking-normal">
+        보강 자료로 만든 답
+      </span>
+    );
+  return null;
 }

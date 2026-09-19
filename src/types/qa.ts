@@ -46,7 +46,9 @@ export type AnswerMode = 'keywords' | 'answer' | 'flow';
 export interface QaFlow {
   steps: FlowStep[];
   guide?: string; // 답변 가이드: 어떤 순서로, 어느 슬라이드를 근거로 말하면 되는지
-  basis?: 'notes'; // 슬라이드 근거가 없어 보강 자료와 논리 지도로 만든 답
+  // notes: 슬라이드 근거가 없어 보강 자료와 논리 지도로 만든 답
+  // inferred: 어느 자료에도 답이 없어 AI 가 추론한 답 (화면에 따로 표시한다)
+  basis?: 'notes' | 'inferred';
   done: boolean;
   latency_ms: number;
   status?: 'ok' | 'no_answer' | 'blocked' | 'error' | 'skipped';
@@ -58,5 +60,7 @@ export interface QaAnswer {
   done: boolean;
   latency_ms: number;
   status?: 'ok' | 'no_answer' | 'blocked' | 'error' | 'skipped';
-  basis?: 'notes'; // 슬라이드 근거가 없어 보강 자료와 논리 지도로 만든 답
+  // notes: 슬라이드 근거가 없어 보강 자료와 논리 지도로 만든 답
+  // inferred: 어느 자료에도 답이 없어 AI 가 추론한 답 (화면에 따로 표시한다)
+  basis?: 'notes' | 'inferred';
 }
