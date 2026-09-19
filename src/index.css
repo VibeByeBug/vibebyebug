@@ -93,7 +93,12 @@ body {
   box-shadow: 0 10px 24px rgba(0, 0, 0, 0.5);
 }
 /* 커튼이 걷힌 뒤 내용이 차례로 */
-.curtain-stage .reveal { opacity: 0; transform: translateY(18px); transition: opacity 600ms ease, transform 600ms ease; }
+.curtain-stage .reveal {
+  opacity: 0;
+  transform: translateY(18px);
+  /* 앞 두 개는 등장(늦게 시작), 뒤 세 개는 마우스 반응(바로). 늦게 시작하는 값은 StartGuide 가 넣는다 */
+  transition: opacity 600ms ease, transform 600ms ease, translate 180ms ease, box-shadow 180ms ease, background-color 180ms ease;
+}
 .curtain-stage.open .reveal { opacity: 1; transform: none; }
 
 /* 첫 화면의 "아래로" 안내 */
@@ -171,3 +176,46 @@ body { background-color: #15110d; }
 .theme-dark .border-dashed.border-\[\#e5e7eb\], .theme-dark .border-dashed.border-\[\#d1d5db\] { border-color: rgba(255, 255, 255, 0.28); }
 /* 투명도가 붙은 회색 칸 (지식 지도의 주제 열) */
 .theme-dark .bg-\[\#f3f4f6\]\/70 { background-color: rgba(255, 255, 255, 0.04); }
+
+/* ── 마우스 반응 ─────────────────────────────────────────────────────
+   떠오르기는 transform 대신 translate/scale 속성을 쓴다. 등장 애니메이션(shot-in 등)이 transform 을
+   붙잡고 있어서, transform 으로 띄우면 애니메이션 값에 덮여 움직이지 않는다. */
+
+/* 카드: 올리면 떠오른다 */
+.lift { transition: translate 180ms ease, box-shadow 180ms ease, background-color 180ms ease, border-color 180ms ease; }
+.lift:hover { translate: 0 -4px; box-shadow: 0 16px 32px -16px rgba(0, 0, 0, 0.8); }
+
+/* 주요 버튼: 떠오르며 주황빛, 누르면 눌린다 */
+.cta { transition: translate 150ms ease, box-shadow 150ms ease, scale 100ms ease, background-color 150ms ease; }
+.cta:hover { translate: 0 -2px; box-shadow: 0 12px 30px -8px rgba(242, 107, 29, 0.65); }
+.cta:active { scale: 0.97; translate: 0 0; }
+/* 나머지 버튼도 누를 때 살짝 들어간다 */
+.theme-dark button:active:not(:disabled) { scale: 0.98; }
+
+/* 샷 카드: 한 칸에 올리면 그 칸만 떠오르고 나머지는 흐려진다 */
+.shot-row .shot-card { transition: opacity 200ms ease, translate 200ms ease, box-shadow 200ms ease; }
+.shot-row:hover .shot-card { opacity: 0.5; }
+.shot-row .shot-card:hover { opacity: 1; translate: 0 -6px; box-shadow: 0 18px 36px -16px rgba(242, 107, 29, 0.55); }
+
+/* 사용 방법 카드: 번호가 커진다 */
+.scene-no { display: inline-block; transition: scale 200ms ease; }
+.scene-card:hover .scene-no { scale: 1.15; }
+
+/* 로고의 Q 가 탤리 라이트처럼 깜빡인다 */
+@keyframes flicker {
+  0%, 100% { opacity: 1; }
+  25% { opacity: 0.3; }
+  45% { opacity: 1; }
+  65% { opacity: 0.45; }
+}
+.logo:hover .logo-q { animation: flicker 600ms ease; }
+
+/* 슬레이트 판은 마우스를 따라 입체적으로 기운다 (StartScreen 이 --rx, --ry 를 넣는다) */
+.tilt { transform: perspective(900px) rotateX(var(--rx, 0deg)) rotateY(var(--ry, 0deg)); transition: transform 300ms ease; will-change: transform; }
+
+@media (prefers-reduced-motion: reduce) {
+  .lift:hover, .cta:hover, .shot-row .shot-card:hover { translate: none; }
+  .scene-card:hover .scene-no { scale: none; }
+  .logo:hover .logo-q { animation: none; }
+  .tilt { transform: none; }
+}

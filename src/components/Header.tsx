@@ -42,11 +42,11 @@ export function Header({
         <button
           type="button"
           onClick={() => onNavigate('start')}
-          className={`font-display tracking-[1.5px] whitespace-nowrap leading-none pt-[3px] ${dark ? 'text-white' : 'text-[#111111]'} ${
+          className={`logo font-display tracking-[1.5px] whitespace-nowrap leading-none pt-[3px] ${dark ? 'text-white' : 'text-[#111111]'} ${
             compact ? 'text-[26px]' : 'text-[28px]'
           }`}
         >
-          READY-<span className="text-[#f26b1d]">Q</span>
+          READY-<span className="logo-q text-[#f26b1d]">Q</span>
         </button>
         {(label || listening) && (
           <>
@@ -76,7 +76,7 @@ export function Header({
           <button
             type="button"
             onClick={() => onNavigate('login')}
-            className="bg-[#f26b1d] hover:bg-[#e25c10] transition-colors h-[36px] px-[16px] rounded-[8px] font-bold text-[14px] text-white"
+            className="cta bg-[#f26b1d] hover:bg-[#e25c10] h-[36px] px-[16px] rounded-[8px] font-bold text-[14px] text-white"
           >
             로그인
           </button>

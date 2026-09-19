@@ -297,7 +297,7 @@ export function Hud({
               {visibleSources.map((source, index) => (
                 <div
                   key={`${source.slide}-${index}`}
-                  className="bg-[#1e1914] border border-white/10 flex gap-[18px] items-center px-[18px] py-[16px] rounded-[8px] w-full"
+                  className="lift bg-[#1e1914] border border-white/10 hover:border-[#f26b1d]/60 flex gap-[18px] items-center px-[18px] py-[16px] rounded-[8px] w-full"
                 >
                   <span className="bg-[#0b0907] border border-white/10 flex h-[68px] items-center justify-center rounded-[6px] shrink-0 w-[120px]">
                     <span className="font-mono text-[9px] text-white/40">p{String(source.slide).padStart(3, '0')}</span>
@@ -406,7 +406,7 @@ export function FlowSteps({
       };
   return (
     // 넓은 화면은 칸을 가로로, 좁은 화면(1024px 미만)은 세로로 쌓는다
-    <div className="flex flex-col lg:flex-row items-stretch w-full">
+    <div className="shot-row flex flex-col lg:flex-row items-stretch w-full">
       {steps.map((step, i) => {
         const guess = inferred && !step.slide; // AI 가 추론한 칸 (근거 슬라이드 없음)
         // 첫 칸은 주황으로 채워 강조한다. 추론한 칸은 보라 칸이라 주황 강조를 쓰지 않는다.
@@ -418,7 +418,7 @@ export function FlowSteps({
             {/* 샷 카드: 필름 한 칸처럼 위아래에 구멍 줄. 도착할 때마다 오른쪽에서 밀려 들어온다 */}
             <div
               style={{ animationDelay: `${i * 60}ms` }}
-              className={`shot-in flex flex-1 flex-col gap-[10px] items-center text-center self-stretch px-[16px] py-[10px] rounded-[10px] min-w-0 ${
+              className={`shot-in shot-card flex flex-1 flex-col gap-[10px] items-center text-center self-stretch px-[16px] py-[10px] rounded-[10px] min-w-0 ${
                 guess ? c.guessCard : first ? 'bg-[#f26b1d] shadow-[0_12px_28px_-12px_rgba(242,107,29,0.6)]' : c.card
               }`}
             >

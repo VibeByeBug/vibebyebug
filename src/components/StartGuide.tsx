@@ -79,7 +79,8 @@ export function StartGuide({ onStart }: { onStart: () => void }) {
     return () => io.disconnect();
   }, []);
 
-  const delay = (ms: number) => ({ transitionDelay: open ? `${ms}ms` : '0ms' });
+  // 등장(opacity, transform)만 늦게 시작하고, 마우스 반응(translate 등)은 바로 움직이게 한다
+  const delay = (ms: number) => ({ transitionDelay: open ? `${ms}ms, ${ms}ms, 0ms, 0ms, 0ms` : '0ms' });
 
   return (
     <section
@@ -118,10 +119,10 @@ export function StartGuide({ onStart }: { onStart: () => void }) {
             {SCENES.map((s, i) => (
               <div
                 key={s.no}
-                className="reveal bg-[#221c16] rounded-[6px] px-[18px] py-[18px] flex flex-col gap-[8px] items-center text-center"
+                className="reveal scene-card lift bg-[#221c16] hover:bg-[#2a221b] rounded-[6px] px-[18px] py-[18px] flex flex-col gap-[8px] items-center text-center"
                 style={delay(1000 + i * 140)}
               >
-                <span className="font-display text-[44px] leading-none text-[#f26b1d]">{s.no}</span>
+                <span className="scene-no font-display text-[44px] leading-none text-[#f26b1d]">{s.no}</span>
                 <span className="font-black text-[26px] leading-[32px] tracking-[-0.6px]">{s.title}</span>
                 <span className="font-bold text-[15px] leading-[22px] break-keep">{s.what}</span>
                 <span className="font-normal text-[13px] leading-[20px] text-white/60 break-keep">{s.detail}</span>
@@ -145,7 +146,7 @@ export function StartGuide({ onStart }: { onStart: () => void }) {
         <button
           type="button"
           onClick={onStart}
-          className="reveal bg-[#f26b1d] hover:bg-[#e25c10] transition-colors h-[58px] px-[34px] rounded-[10px] font-bold text-[18px]"
+          className="reveal cta bg-[#f26b1d] hover:bg-[#e25c10] h-[58px] px-[34px] rounded-[10px] font-bold text-[18px]"
           style={delay(1800)}
         >
           새 발표 준비하기
