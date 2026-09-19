@@ -177,6 +177,11 @@ function App() {
             onUploadFail={handleUploadFail}
             onSkip={() => setScreen('preparing')}
             onStartMock={() => setScreen('mockPractice')}
+            onAddMaterial={() => {
+              // 업로드 화면은 다시 열면 결과가 비므로, 자료 보강을 마치면 준비 화면으로 간다
+              setGraphBack('preparing');
+              setScreen('material');
+            }}
           />
         </>
       )}
@@ -195,7 +200,7 @@ function App() {
 
       {screen === 'preparing' && upload && (
         <>
-          <Header onNavigate={setScreen} label={presentationName} showProfile />
+          <Header onNavigate={setScreen} label={presentationName} showProfile rightButtons={materialButton} />
           <PreparingScreen
             presentationId={upload.presentation_id}
             onReady={() => setScreen('micConnect')}
