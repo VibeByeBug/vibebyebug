@@ -6,11 +6,12 @@ import { StartGuide } from './StartGuide';
 interface StartScreenProps {
   onStart: (title: string) => void;
   onOpenReport: () => void;
+  loggedIn?: boolean; // 로그인 전(랜딩)에는 최근 발표와 회고를 숨긴다
 }
 
 // 시작 화면 = 검은 무대. 조명이 커서를 천천히 따라오고, 오른쪽 슬레이트 판에 발표 이름이 쓰인다.
 // 시작하면 슬레이트 팔이 "딱" 닫힌 뒤 넘어간다. (다른 화면은 흰 배경, 시작 화면만 어둡게)
-export function StartScreen({ onStart, onOpenReport }: StartScreenProps) {
+export function StartScreen({ onStart, onOpenReport, loggedIn = false }: StartScreenProps) {
   const [title, setTitle] = useState('');
   const [snap, setSnap] = useState(false);
   const stage = useRef<HTMLDivElement>(null);
@@ -79,11 +80,10 @@ export function StartScreen({ onStart, onOpenReport }: StartScreenProps) {
         style={{ backgroundImage: 'repeating-linear-gradient(0deg, #fff 0 1px, transparent 1px 24px)' }}
       />
 
-      <div className="relative flex flex-1 flex-col lg:flex-row items-center justify-center gap-[56px] px-[96px] pt-[40px] pb-[24px]">
+      <div className="relative flex flex-1 flex-col lg:flex-row items-center justify-center gap-[72px] lg:gap-[56px] px-[24px] md:px-[96px] pt-[40px] pb-[24px]">
         {/* 왼쪽: 문구와 버튼 */}
         <div className="flex flex-col gap-[20px] max-w-[560px]">
-          <p className="font-mono font-bold text-[13px] tracking-[4px] text-[#f26b1d]">SCENE 00  /  무대 입장</p>
-          <p className="font-black text-[68px] tracking-[-2px] leading-[86px]">
+          <p className="font-black text-[44px] leading-[56px] md:text-[68px] md:leading-[86px] tracking-[-2px] break-keep">
             질문이 들어오면,
             <br />
             <span className="text-[#f26b1d]">큐</span>가 뜹니다.
@@ -105,10 +105,12 @@ export function StartScreen({ onStart, onOpenReport }: StartScreenProps) {
             </button>
             <button
               type="button"
-              onClick={onOpenReport}
+              onClick={() =>
+                loggedIn ? onOpenReport() : document.getElementById('how-it-works')?.scrollIntoView({ behavior: 'smooth' })
+              }
               className="border border-white/30 hover:border-white/60 transition-colors h-[58px] px-[24px] rounded-[10px] font-bold text-[18px]"
             >
-              지난 발표 회고 보기
+              {loggedIn ? '지난 발표 회고 보기' : '사용 방법 보기'}
             </button>
           </div>
         </div>
@@ -152,8 +154,10 @@ export function StartScreen({ onStart, onOpenReport }: StartScreenProps) {
         </div>
       </div>
 
-      {/* 최근 발표는 필름 스트립 칸으로 */}
-      <div className="relative px-[96px] pb-[36px] flex flex-col gap-[10px]">
+      {/* 최근 발표는 필름 스트립 칸으로 (로그인한 뒤에만) */}
+      <div className="relative px-[24px] md:px-[96px] pb-[36px] flex flex-col gap-[10px]">
+        {loggedIn && (
+        <>
         <p className="font-bold text-[15px] text-white/70">최근 촬영분</p>
         <div className="bg-[#0b0907] rounded-[6px] px-[10px] py-[8px] flex flex-col gap-[8px]">
           <div className="film-holes text-white/20" />
@@ -180,13 +184,15 @@ export function StartScreen({ onStart, onOpenReport }: StartScreenProps) {
           </div>
           <div className="film-holes text-white/20" />
         </div>
+        </>
+        )}
         {/* 아래 소개로 내려가는 안내 */}
         <button
           type="button"
           onClick={() => document.getElementById('how-it-works')?.scrollIntoView({ behavior: 'smooth' })}
           className="nudge self-center flex flex-col items-center gap-[2px] pt-[14px] text-white/55 hover:text-white transition-colors"
         >
-          <span className="font-mono font-bold text-[12px] tracking-[3px]">사용 방법 보기</span>
+          <span className="font-bold text-[14px]">사용 방법 보기</span>
           <span className="text-[18px] leading-none">↓</span>
         </button>
       </div>

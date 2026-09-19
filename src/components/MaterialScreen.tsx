@@ -118,7 +118,6 @@ export function MaterialScreen({
     <div className="flex flex-col gap-[18px] pb-[40px] pt-[28px] px-[44px] w-full max-w-[1100px] mx-auto">
       <div className="flex flex-col items-center text-center gap-[14px]">
         <div className="flex flex-col gap-[6px] items-center">
-          <p className="font-mono font-bold text-[12px] tracking-[3px] text-[#f26b1d]">SCENE 02  /  리허설</p>
           <p className="font-black text-[30px] text-[#111111] tracking-[-0.8px]">자료 보강</p>
           <p className="font-normal text-[14px] text-[#6b7280] leading-[21px] max-w-[720px]">
             슬라이드에 없는 설명을 모으면 "왜", "어떻게" 질문에 더 깊게 답할 수 있어요. 슬라이드에 이미 있는 말은 답변 근거로

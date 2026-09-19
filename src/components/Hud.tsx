@@ -29,10 +29,13 @@ export function Hud({
   cueNo,
 }: HudProps) {
   // 질문 머리: CUE 번호와 질문. 가운데 정렬, 새 질문이면 아래에서 올라온다.
-  const cueLabel = `CUE ${String(cueNo ?? 1).padStart(2, '0')}   /   질문 인식`;
+  const cueLabel = `CUE ${String(cueNo ?? 1).padStart(2, '0')}`;
   const questionHead = (
     <div key={question} className="rise-in flex flex-col gap-[12px] items-center text-center w-full">
-      <p className="font-mono font-bold text-[12px] text-[#f26b1d] tracking-[3px]">{cueLabel}</p>
+      {/* 슬레이트 번호판처럼: 몇 번째 질문인지 */}
+      <span className="font-display text-[20px] leading-none tracking-[1px] rounded-[4px] bg-[#f26b1d] text-white px-[10px] pt-[5px] pb-[3px]">
+        {cueLabel}
+      </span>
       <p className="font-black text-[42px] text-white tracking-[-1.5px] leading-[54px] max-w-[1100px] break-keep">
         {question}
       </p>
@@ -76,8 +79,8 @@ export function Hud({
   // 흐름도와 추천 답변 칸. 슬라이드 근거가 없을 때(보강 자료로 만든 답)도 같은 모양으로 보여준다.
   const flowSection = (
       <div className="flex flex-col gap-[12px] w-full">
-        <p className="font-mono font-bold text-[12px] text-white/50 tracking-[3px] w-full text-center">
-          SHOT LIST  /  말할 순서
+        <p className="font-bold text-[14px] text-white/55 w-full text-center">
+          말할 순서
           {flow?.done && <span className="ml-[8px] font-medium text-white/35">{Math.round(flow.latency_ms)}ms</span>}
           <BasisTag basis={flow?.basis} />
         </p>
@@ -88,7 +91,7 @@ export function Hud({
         )}
         {flow?.guide && (
           <div className="rise-in bg-white/[0.05] border border-white/10 flex flex-col gap-[6px] items-center text-center px-[24px] py-[14px] rounded-[10px] w-full">
-            <p className="font-mono font-bold text-[11px] text-[#f26b1d] tracking-[3px]">DIRECTOR&apos;S NOTE  /  이렇게 답해보세요</p>
+            <p className="font-bold text-[13px] text-[#f26b1d]">이렇게 답해보세요</p>
             <p className="font-bold text-[18px] text-white leading-[27px] break-keep">{flow.guide}</p>
           </div>
         )}
@@ -99,8 +102,8 @@ export function Hud({
   );
   const answerSection = (
       <div className="rise-in bg-[#1e1914] border-2 border-[#f26b1d] flex flex-col gap-[14px] items-center text-center px-[36px] py-[28px] rounded-[12px] w-full">
-        <p className="font-mono font-bold text-[12px] text-[#f26b1d] tracking-[3px] w-full">
-          TAKE  /  추천 답변
+        <p className="font-bold text-[14px] text-[#f26b1d] w-full">
+          추천 답변
           {answer?.done && <span className="ml-[8px] font-medium text-white/35">{Math.round(answer.latency_ms)}ms</span>}
           <BasisTag basis={answer?.basis} />
         </p>
@@ -170,7 +173,7 @@ export function Hud({
         {pendingNote}
         {fromNotes && (useFlow ? flowSection : answerSection)}
         {!fromNotes && !building && <div className="flex flex-col gap-[12px] w-full">
-          <p className="font-mono font-bold text-[12px] text-white/50 tracking-[3px] w-full text-center">이렇게 넘기세요</p>
+          <p className="font-bold text-[14px] text-white/55 w-full text-center">이렇게 넘기세요</p>
           <div className="flex flex-col gap-[10px] w-full">
             {(result.suggestions ?? []).map((s) => (
               <div key={s} className="bg-[#1e1914] border border-white/10 flex items-center justify-center px-[24px] py-[20px] rounded-[10px] w-full">
@@ -219,7 +222,7 @@ export function Hud({
       {core && (
         <div className="flex flex-col gap-[12px] w-full">
           <p className="font-bold text-[11px] text-[#7ee2a0] tracking-[1.54px] w-full text-center">
-            연습에서 확정한 답  /  {core.label}
+            연습에서 확정한 답: {core.label}
             {core.source === 'answer' ? (
               <span className="ml-[8px] text-white/50">연습에서 내가 한 답</span>
             ) : (
@@ -238,7 +241,7 @@ export function Hud({
 
       {isLimitation && !showAnswer && !showFlow && !core ? (
         <div className="bg-[#1e1914] border-2 border-[#f26b1d] flex flex-col gap-[14px] items-center text-center px-[36px] py-[26px] rounded-[12px] w-full">
-          <p className="font-mono font-bold text-[12px] text-[#f26b1d] tracking-[3px] w-full">추천 답변</p>
+          <p className="font-bold text-[14px] text-[#f26b1d] w-full">추천 답변</p>
           <div className="flex flex-col gap-[12px] w-full">
             {(result.suggestions ?? []).map((s) => (
               <p key={s} className="font-bold text-[27px] text-white tracking-[-0.675px] leading-[40px] w-full">
@@ -251,7 +254,7 @@ export function Hud({
         !showFlow && !core && result.keywords.length > 0 && (
           <>
             <div className="flex flex-col gap-[12px] items-center pt-[4px] w-full">
-              <p className="font-mono font-bold text-[12px] text-white/50 tracking-[3px]">KEYWORDS  /  키워드</p>
+              <p className="font-bold text-[14px] text-white/55">키워드</p>
               <div className="flex flex-wrap gap-[10px] justify-center w-full">
                 {result.keywords.map((keyword, i) => (
                   <span
@@ -325,7 +328,7 @@ export function Hud({
           <p className="font-normal text-[13px] text-white/35 whitespace-nowrap">
             {isLimitation
               ? '한계 질문은 근거보다 답변 문장을 먼저 읽으세요'
-              : `응답 ${result.responseMs}ms   /   Space 로 다음 질문 대기`}
+              : `응답 ${result.responseMs}ms, Space 로 다음 질문 대기`}
           </p>
         </div>
       </div>
@@ -422,11 +425,11 @@ export function FlowSteps({
               <div className={`film-holes w-full ${holes}`} />
               <div className="flex items-center gap-[8px]">
                 <span
-                  className={`font-mono font-bold text-[12px] tracking-[2.5px] ${
+                  className={`font-display text-[26px] leading-none pt-[2px] ${
                     first ? 'text-white' : guess ? c.guessShot : c.shot
                   }`}
                 >
-                  SHOT {i + 1}
+                  {i + 1}
                 </span>
                 <span className={`font-mono font-bold text-[11px] ${first ? 'text-white/70' : c.page}`}>
                   {step.slide ? `p.${step.slide}` : guess ? 'AI 추론' : '발표자 설명'}

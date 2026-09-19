@@ -102,7 +102,6 @@ export function StartGuide({ onStart }: { onStart: () => void }) {
       <div className="relative flex flex-col items-center gap-[56px] px-[24px] md:px-[96px] pt-[120px] pb-[110px]">
         {/* 어떤 사이트인지 */}
         <div className="reveal flex flex-col items-center gap-[14px] text-center max-w-[820px]" style={delay(700)}>
-          <p className="font-mono font-bold text-[13px] tracking-[4px] text-[#f26b1d]">HOW IT WORKS  /  사용 방법</p>
           <p className="font-black text-[44px] tracking-[-1.4px] leading-[56px] break-keep">
             발표 Q&amp;A 를 촬영하듯 준비하세요
           </p>
@@ -122,7 +121,7 @@ export function StartGuide({ onStart }: { onStart: () => void }) {
                 className="reveal bg-[#221c16] rounded-[6px] px-[18px] py-[18px] flex flex-col gap-[8px] items-center text-center"
                 style={delay(1000 + i * 140)}
               >
-                <span className="font-mono font-bold text-[12px] tracking-[3px] text-[#f26b1d]">SCENE {s.no}</span>
+                <span className="font-display text-[44px] leading-none text-[#f26b1d]">{s.no}</span>
                 <span className="font-black text-[26px] leading-[32px] tracking-[-0.6px]">{s.title}</span>
                 <span className="font-bold text-[15px] leading-[22px] break-keep">{s.what}</span>
                 <span className="font-normal text-[13px] leading-[20px] text-white/60 break-keep">{s.detail}</span>
@@ -133,11 +132,12 @@ export function StartGuide({ onStart }: { onStart: () => void }) {
         </div>
 
         {/* 실전 화면 예시 */}
-        <div className="reveal flex flex-col items-center gap-[18px] w-full max-w-[1200px]" style={delay(1600)}>
-          <div className="flex flex-col items-center gap-[8px] text-center">
-            <p className="font-mono font-bold text-[12px] tracking-[3px] text-white/50">ON AIR  /  실전 화면 예시</p>
-            <p className="font-black text-[28px] tracking-[-0.8px] break-keep">“1초 목표를 지키려고 어떤 선택을 했나요?”</p>
-            <p className="font-normal text-[14px] text-white/55">질문이 끝나면 이렇게 말할 순서가 칸으로 떠요.</p>
+        <div className="reveal flex flex-col items-center gap-[22px] w-full max-w-[1200px] mt-[72px]" style={delay(1600)}>
+          <div className="flex flex-col items-center gap-[10px] text-center">
+            <p className="font-black text-[34px] tracking-[-1px] break-keep">실전에서는 이렇게 떠요</p>
+            <p className="font-normal text-[16px] text-white/60 break-keep">
+              청중이 “1초 목표를 지키려고 어떤 선택을 했나요?” 라고 물으면, 질문이 끝나고 말할 순서가 칸으로 떠요.
+            </p>
           </div>
           <FlowSteps steps={DEMO_STEPS} dark />
         </div>

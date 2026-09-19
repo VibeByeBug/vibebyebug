@@ -10,9 +10,9 @@ interface UploadFailedScreenProps {
 export function UploadFailedScreen({ fileName, message, onBackToList, onRetry }: UploadFailedScreenProps) {
   return (
     <div className="flex flex-1 items-center justify-center py-[44px] w-full">
-      <div className="flex flex-col gap-[26px] w-[880px]">
-        <div className="flex flex-col gap-[7px] w-full">
-          <p className="font-bold text-[26px] text-[#1a1a1a] tracking-[-0.78px] leading-[34px] w-full">
+      <div className="flex flex-col gap-[26px] w-full max-w-[880px] px-[16px]">
+        <div className="flex flex-col gap-[7px] items-center text-center w-full">
+          <p className="font-black text-[30px] text-[#1a1a1a] tracking-[-0.8px] leading-[38px] w-full">
             자료 업로드에 실패했어요
           </p>
           <p className="font-normal text-[15px] text-[#6b7280] w-full">

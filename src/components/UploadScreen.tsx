@@ -39,9 +39,9 @@ export function UploadScreen({ onSkip, onStartMock, onAddMaterial, onUploaded, o
   return (
     <div className="flex flex-1 items-center justify-center py-[44px] w-full">
       <input ref={inputRef} type="file" accept=".pdf" onChange={handleFileChange} className="hidden" />
-      <div className="flex flex-col gap-[26px] w-[880px]">
-        <div className="flex flex-col gap-[7px] w-full">
-          <p className="font-bold text-[26px] text-[#1a1a1a] tracking-[-0.78px] leading-[34px] w-full">
+      <div className="flex flex-col gap-[26px] w-full max-w-[880px] px-[16px]">
+        <div className="flex flex-col gap-[7px] items-center text-center w-full">
+          <p className="font-black text-[30px] text-[#1a1a1a] tracking-[-0.8px] leading-[38px] w-full">
             발표자료를 올려주세요
           </p>
           <p className="font-normal text-[15px] text-[#6b7280] w-full">PDF, 최대 50MB</p>

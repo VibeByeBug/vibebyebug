@@ -38,7 +38,7 @@ export function MockPracticeScreen({ onFinish, onIndexChange }: MockPracticeScre
               예상 질문, 출제 근거 p.{question.basisPage}
             </p>
           </div>
-          <p className="font-bold text-[28px] text-[#1a1a1a] tracking-[-0.7px] leading-[39px] w-full">
+          <p className="font-black text-[30px] text-[#1a1a1a] tracking-[-0.8px] leading-[40px] w-full text-center break-keep">
             {question.question}
           </p>
         </div>

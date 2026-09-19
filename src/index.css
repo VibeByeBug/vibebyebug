@@ -116,3 +116,58 @@ body {
   .nudge { animation: none; }
 }
 @keyframes rise-fade { from { opacity: 0; } to { opacity: 1; } }
+
+/* ── 전체 검은 무대 테마 ─────────────────────────────────────────────
+   화면들은 흰 바탕 기준 색(흰 카드, 회색 글자, 회색 테두리)으로 만들어져 있다. 화면 17개를 하나씩 다시
+   칠하는 대신, 앱 맨 바깥(.theme-dark) 아래에서 그 색들을 무대 색으로 바꾼다.
+   Tailwind 유틸리티는 @layer 안에 있어서, 레이어 밖의 이 규칙이 우선한다. */
+body { background-color: #15110d; }
+
+/* 표면 */
+.theme-dark .bg-white { background-color: #1c1713; }
+.theme-dark .bg-\[\#fafafa\], .theme-dark .bg-\[\#f9fafb\], .theme-dark .bg-\[\#f3f4f6\],
+.theme-dark .bg-\[\#f2f2f2\], .theme-dark .bg-\[\#fcfcfd\] { background-color: rgba(255, 255, 255, 0.05); }
+.theme-dark .bg-\[\#e5e7eb\] { background-color: rgba(255, 255, 255, 0.14); }
+.theme-dark .hover\:bg-\[\#fafafa\]:hover { background-color: rgba(255, 255, 255, 0.06); }
+/* 강조 바탕 (주황, 초록, 보라, 빨강 옅은 칸) */
+.theme-dark .bg-\[\#fff3eb\], .theme-dark .bg-\[\#fff8f3\], .theme-dark .bg-\[\#fff8f2\],
+.theme-dark .bg-\[\#fff0de\], .theme-dark .bg-\[\#fde3d1\] { background-color: rgba(242, 107, 29, 0.14); }
+.theme-dark .bg-\[\#e8f5ec\], .theme-dark .bg-\[\#f3faf5\] { background-color: rgba(64, 153, 89, 0.16); }
+.theme-dark .bg-\[\#f8f5fe\] { background-color: rgba(124, 92, 191, 0.18); }
+.theme-dark .bg-\[\#fae5e0\] { background-color: rgba(191, 56, 46, 0.18); }
+/* 검은 버튼(선택된 탭, "설명 추가" 등)은 무대 위에서 안 보이므로 주황으로. 슬레이트 판 같은 div 는 그대로 */
+.theme-dark button.bg-\[\#1a1a1a\], .theme-dark button.bg-\[\#111111\] { background-color: #f26b1d; }
+
+/* 글자 */
+.theme-dark .text-\[\#1a1a1a\], .theme-dark .text-\[\#111111\], .theme-dark .text-black,
+.theme-dark .text-\[\#262626\], .theme-dark .text-\[\#3c4043\] { color: #f5f5f4; }
+.theme-dark .text-\[\#374151\], .theme-dark .text-\[\#4b5563\], .theme-dark .text-\[\#4d4d4d\] { color: rgba(255, 255, 255, 0.78); }
+.theme-dark .text-\[\#6b7280\], .theme-dark .text-\[\#666\], .theme-dark .text-\[\#808080\] { color: rgba(255, 255, 255, 0.6); }
+.theme-dark .text-\[\#9ca3af\], .theme-dark .text-\[\#999\], .theme-dark .text-\[\#c4c8cf\] { color: rgba(255, 255, 255, 0.42); }
+.theme-dark .text-\[\#c2410c\] { color: #ffb08a; }
+.theme-dark .text-\[\#2f7a47\], .theme-dark .text-\[\#409959\] { color: #7ee2a0; }
+.theme-dark .text-\[\#5b3fa0\] { color: #c4b1f5; }
+.theme-dark .text-\[\#bf382e\] { color: #ff7a70; }
+
+/* 테두리 */
+.theme-dark .border-\[\#e5e7eb\], .theme-dark .border-\[\#f3f4f6\], .theme-dark .border-\[\#d1d5db\],
+.theme-dark .border-\[\#e6e6e6\], .theme-dark .border-\[\#dadce0\],
+.theme-dark .hover\:border-\[\#e5e7eb\]:hover { border-color: rgba(255, 255, 255, 0.12); }
+.theme-dark .border-\[\#fbd5bd\] { border-color: rgba(242, 107, 29, 0.35); }
+.theme-dark .border-\[\#b7dfc3\] { border-color: rgba(64, 153, 89, 0.4); }
+
+/* 입력칸 */
+.theme-dark input, .theme-dark textarea { color: #f5f5f4; }
+.theme-dark input::placeholder, .theme-dark textarea::placeholder { color: rgba(255, 255, 255, 0.35); }
+.theme-dark select, .theme-dark option { background-color: #1c1713; color: #f5f5f4; }
+
+/* 슬라이드 순서 지도(SVG)의 칸과 글자 */
+.theme-dark svg rect[fill="#ffffff"] { fill: #1c1713; }
+.theme-dark svg rect[fill="#fff8f3"] { fill: rgba(242, 107, 29, 0.16); }
+.theme-dark svg rect[fill="#e8f5ec"] { fill: rgba(64, 153, 89, 0.2); }
+.theme-dark svg text[fill="#1a1a1a"] { fill: #f5f5f4; }
+.theme-dark svg text[fill="#2f7a47"] { fill: #7ee2a0; }
+/* 점선 칸(파일 올리기 등)은 무대 위에서 테두리가 묻히므로 조금 더 밝게 */
+.theme-dark .border-dashed.border-\[\#e5e7eb\], .theme-dark .border-dashed.border-\[\#d1d5db\] { border-color: rgba(255, 255, 255, 0.28); }
+/* 투명도가 붙은 회색 칸 (지식 지도의 주제 열) */
+.theme-dark .bg-\[\#f3f4f6\]\/70 { background-color: rgba(255, 255, 255, 0.04); }

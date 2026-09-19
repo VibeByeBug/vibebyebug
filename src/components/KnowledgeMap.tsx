@@ -286,7 +286,7 @@ export function KnowledgeMap({
                   {node.page ? `  p.${node.page}` : ''}
                 </span>
                 <p className="font-black text-[19px] text-[#111111] break-keep">{node.name}</p>
-                <p className="font-mono text-[11px] tracking-[2px] text-[#9ca3af]">{node.topic}</p>
+                <p className="font-bold text-[12px] text-[#9ca3af]">{node.topic}</p>
               </div>
               <p className="font-normal text-[13px] text-[#374151] leading-[20px] bg-[#f9fafb] rounded-[8px] px-[12px] py-[10px] max-h-[200px] overflow-auto whitespace-pre-line">
                 {node.text.replace(/ \/ /g, '\n')}
