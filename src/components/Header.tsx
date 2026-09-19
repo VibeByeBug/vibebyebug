@@ -11,6 +11,8 @@ interface HeaderProps {
   showProfile?: boolean;
   activeMenu?: 'history' | 'settings';
   onNavigate: (screen: ScreenName) => void;
+  cueKey?: number; // 바뀔 때마다 아래 슬레이트 줄무늬가 한 칸 밀린다 (새 질문 신호)
+  dark?: boolean; // 시작 화면(검은 무대)용
 }
 
 export function Header({
@@ -22,34 +24,39 @@ export function Header({
   showProfile = true,
   activeMenu,
   onNavigate,
+  cueKey,
+  dark = false,
 }: HeaderProps) {
   const [menuOpen, setMenuOpen] = useState(false);
 
   return (
+    <div className="w-full shrink-0">
     <header
-      className={`border-b border-[#e5e7eb] flex items-center justify-between px-[28px] w-full shrink-0 ${
-        compact ? 'h-[56px]' : 'h-[60px]'
+      className={`flex items-center justify-between px-[28px] w-full ${compact ? 'h-[56px]' : 'h-[60px]'} ${
+        dark ? 'bg-[#0b0907]' : 'bg-white'
       }`}
     >
       <div className="flex gap-[14px] items-center">
         <button
           type="button"
           onClick={() => onNavigate('start')}
-          className={`font-['Noto_Sans_KR'] font-black tracking-[-0.54px] text-[#1a1a1a] whitespace-nowrap ${
-            compact ? 'text-[18px]' : 'text-[19px]'
+          className={`font-display tracking-[1.5px] whitespace-nowrap leading-none pt-[3px] ${dark ? 'text-white' : 'text-[#111111]'} ${
+            compact ? 'text-[26px]' : 'text-[28px]'
           }`}
         >
-          Ready-<span className="text-[#f26b1d]">Q</span>
+          READY-<span className="text-[#f26b1d]">Q</span>
         </button>
         {(label || listening) && (
           <>
             <div className="bg-[#e5e7eb] h-[16px] w-px" />
             {listening ? (
-              <div className="flex gap-[7px] items-center">
-                <span className="size-[16px] text-[#1a1a1a]">
+              // 마이크가 켜져 있으면 촬영장의 ON AIR 표시등처럼
+              <div className="flex gap-[7px] items-center bg-[#e5322d] rounded-full pl-[9px] pr-[11px] h-[26px]">
+                <span className="tally-pulse bg-white rounded-full size-[8px]" />
+                <span className="font-mono font-bold text-[12px] tracking-[1.5px] text-white whitespace-nowrap">ON AIR</span>
+                <span className="size-[14px] text-white">
                   <MicSmallIcon />
                 </span>
-                <p className="font-bold text-[13px] text-[#1a1a1a] whitespace-nowrap">듣는 중</p>
               </div>
             ) : (
               <p className="font-medium text-[14px] text-[#6b7280] whitespace-nowrap">{label}</p>
@@ -68,12 +75,14 @@ export function Header({
               <button
                 type="button"
                 onClick={() => setMenuOpen((v) => !v)}
-                className="border border-[#e5e7eb] flex gap-[9px] h-[38px] items-center pl-[6px] pr-[10px] rounded-[6px]"
+                className={`border flex gap-[9px] h-[38px] items-center pl-[6px] pr-[10px] rounded-[6px] ${
+                  dark ? 'border-white/20' : 'border-[#e5e7eb]'
+                }`}
               >
                 <span className="bg-[#f3f4f6] border border-[#e5e7eb] flex items-center justify-center rounded-full size-[26px]">
                   <span className="font-bold text-[11px] text-[#6b7280]">사</span>
                 </span>
-                <span className="font-bold text-[14px] text-[#1a1a1a] whitespace-nowrap">사용자</span>
+                <span className={`font-bold text-[14px] whitespace-nowrap ${dark ? 'text-white' : 'text-[#1a1a1a]'}`}>사용자</span>
                 <span className={`size-[14px] text-[#6b7280] transition-transform ${menuOpen ? 'rotate-180' : ''}`}>
                   <ChevronDownIcon />
                 </span>
@@ -143,5 +152,8 @@ export function Header({
         )}
       </div>
     </header>
+    {/* 슬레이트 줄무늬. 새 질문(cueKey)이 오면 한 칸 밀린다 */}
+    <div key={cueKey} className={`slate-stripes h-[6px] w-full ${cueKey ? 'slate-sweep' : ''}`} />
+    </div>
   );
 }

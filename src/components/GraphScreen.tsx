@@ -213,14 +213,15 @@ export function GraphScreen({
   return (
     <div className="flex flex-col gap-[22px] pb-[48px] pt-[28px] px-[16px] md:px-[44px] w-full max-w-[1400px] mx-auto">
       {/* 머리말 */}
-      <div className="flex flex-col md:flex-row md:items-end justify-between gap-[14px]">
-        <div className="flex flex-col gap-[8px]">
-          <p className="font-bold text-[26px] text-[#1a1a1a] tracking-[-0.6px]">발표 논리 지도</p>
+      <div className="flex flex-col items-center text-center gap-[14px]">
+        <div className="flex flex-col gap-[8px] items-center">
+          <p className="font-mono font-bold text-[12px] tracking-[3px] text-[#f26b1d]">BOARD  /  발표 콘티 보드</p>
+          <p className="font-black text-[30px] text-[#111111] tracking-[-0.8px]">발표 논리 지도</p>
           <p className="font-normal text-[14px] text-[#6b7280] leading-[21px] max-w-[720px]">
             슬라이드 사이의 주장과 근거를 이은 지도입니다. 질문이 들어오면 실전 답변은 이 연결을 따라 여러 슬라이드를 함께
             봅니다. 슬라이드를 누르면 어떤 슬라이드와 엮어 답하면 되는지 보여줍니다.
           </p>
-          <div className="flex flex-wrap gap-[8px] pt-[2px]">
+          <div className="flex flex-wrap justify-center gap-[8px] pt-[2px]">
             <Stat label="슬라이드" value={`${graph.nodes.length}장`} />
             <Stat label="연결" value={`${graph.edges.length}개`} />
             <Stat
@@ -293,7 +294,7 @@ export function GraphScreen({
       <div className="flex flex-col lg:flex-row gap-[20px] items-stretch lg:items-start">
         {/* 지도 */}
         <div className="flex flex-col gap-[10px] flex-1 min-w-0">
-          <div className="flex flex-wrap items-center justify-between gap-[10px]">
+          <div className="flex flex-col items-center gap-[10px]">
             <SectionTitle>연결 지도</SectionTitle>
             <div className="flex flex-wrap gap-[6px]">
               {relations.map((r) => {
@@ -586,7 +587,7 @@ export function GraphScreen({
 }
 
 function SectionTitle({ children }: { children: React.ReactNode }) {
-  return <p className="font-bold text-[12px] text-[#6b7280] tracking-[1px]">{children}</p>;
+  return <p className="font-mono font-bold text-[12px] text-[#6b7280] tracking-[3px] text-center">{children}</p>;
 }
 
 function Stat({ label, value, tone = 'gray' }: { label: string; value: string; tone?: 'gray' | 'green' }) {

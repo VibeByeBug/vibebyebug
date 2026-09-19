@@ -15,21 +15,38 @@ interface HudProps {
   mode?: AnswerMode;
   notice?: string | null;
   onChangeType?: (type: QuestionType) => void;
+  cueNo?: number; // 몇 번째 질문인지 (슬레이트의 CUE 번호)
 }
 
-export function Hud({ result, question, answer = null, flow = null, mode = 'keywords', notice = null, onChangeType }: HudProps) {
+export function Hud({
+  result,
+  question,
+  answer = null,
+  flow = null,
+  mode = 'keywords',
+  notice = null,
+  onChangeType,
+  cueNo,
+}: HudProps) {
+  // 질문 머리: CUE 번호와 질문. 가운데 정렬, 새 질문이면 아래에서 올라온다.
+  const cueLabel = `CUE ${String(cueNo ?? 1).padStart(2, '0')}   /   질문 인식`;
+  const questionHead = (
+    <div key={question} className="rise-in flex flex-col gap-[12px] items-center text-center w-full">
+      <p className="font-mono font-bold text-[12px] text-[#f26b1d] tracking-[3px]">{cueLabel}</p>
+      <p className="font-black text-[42px] text-[#111111] tracking-[-1.5px] leading-[54px] max-w-[1100px] break-keep">
+        {question}
+      </p>
+    </div>
+  );
   const [expanded, setExpanded] = useState(false);
   // 뒷받침 근거는 접어둔다. 필요할 때만 펼쳐서 슬라이드 원문을 확인한다.
   const [sourcesOpen, setSourcesOpen] = useState(false);
 
   if (!result) {
     return (
-      <div className="flex flex-1 flex-col gap-[24px] items-start pb-[36px] pt-[32px] px-[44px] w-full">
-        <div className="flex flex-col gap-[14px] w-full">
-          <p className="font-bold text-[11px] text-[#6b7280] tracking-[1.54px] w-full">인식된 질문</p>
-          <p className="font-bold text-[44px] text-[#1a1a1a] tracking-[-1.76px] leading-[57px] w-full">{question}</p>
-        </div>
-        <p className={`font-medium text-[17px] ${notice ? 'text-[#bf382e]' : 'text-[#6b7280]'}`}>
+      <div className="flex flex-1 flex-col gap-[26px] items-center pb-[36px] pt-[34px] px-[44px] w-full max-w-[1320px] mx-auto">
+        {questionHead}
+        <p className={`font-medium text-[17px] text-center ${notice ? 'text-[#bf382e]' : 'text-[#6b7280]'}`}>
           {notice ?? '근거를 찾고 있어요···'}
         </p>
       </div>
@@ -53,36 +70,36 @@ export function Hud({ result, question, answer = null, flow = null, mode = 'keyw
   // 흐름도와 추천 답변 칸. 슬라이드 근거가 없을 때(보강 자료로 만든 답)도 같은 모양으로 보여준다.
   const flowSection = (
       <div className="flex flex-col gap-[12px] w-full">
-        <p className="font-bold text-[11px] text-[#6b7280] tracking-[1.54px] w-full">
-          말할 순서
+        <p className="font-mono font-bold text-[12px] text-[#6b7280] tracking-[3px] w-full text-center">
+          SHOT LIST  /  말할 순서
           {flow?.done && <span className="ml-[8px] font-medium text-[#999]">{Math.round(flow.latency_ms)}ms</span>}
           <BasisTag basis={flow?.basis} />
         </p>
         {!flow?.steps.length ? (
-          <p className="font-medium text-[17px] text-[#999]">순서를 정리하고 있어요···</p>
+          <p className="font-medium text-[17px] text-[#999] text-center">순서를 정리하고 있어요···</p>
         ) : (
           <FlowSteps steps={flow.steps} inferred={flow.basis === 'inferred'} />
         )}
         {flow?.guide && (
-          <div className="bg-[#f9fafb] border-l-[4px] border-[#f26b1d] flex flex-col gap-[4px] px-[18px] py-[12px] rounded-[4px] w-full">
-            <p className="font-bold text-[12px] text-[#f26b1d]">이렇게 답해보세요</p>
-            <p className="font-medium text-[17px] text-[#1a1a1a] leading-[26px]">{flow.guide}</p>
+          <div className="rise-in bg-[#f9fafb] border border-[#e5e7eb] flex flex-col gap-[6px] items-center text-center px-[24px] py-[14px] rounded-[10px] w-full">
+            <p className="font-mono font-bold text-[11px] text-[#f26b1d] tracking-[3px]">DIRECTOR&apos;S NOTE  /  이렇게 답해보세요</p>
+            <p className="font-bold text-[18px] text-[#111111] leading-[27px] break-keep">{flow.guide}</p>
           </div>
         )}
         {flow?.status === 'blocked' && (
-          <p className="font-normal text-[13px] text-[#6b7280]">자료에 없는 숫자가 나와서 뒤 칸은 표시하지 않았습니다.</p>
+          <p className="font-normal text-[13px] text-[#6b7280] text-center">자료에 없는 숫자가 나와서 뒤 칸은 표시하지 않았습니다.</p>
         )}
       </div>
   );
   const answerSection = (
-      <div className="bg-[#fff3eb] border border-[#f26b1d] flex flex-col gap-[14px] px-[28px] py-[26px] rounded-[6px] w-full">
-        <p className="font-bold text-[12px] text-[#f26b1d] tracking-[1.2px] w-full">
-          추천 답변
+      <div className="rise-in bg-white border-2 border-[#f26b1d] flex flex-col gap-[14px] items-center text-center px-[36px] py-[28px] rounded-[12px] w-full">
+        <p className="font-mono font-bold text-[12px] text-[#f26b1d] tracking-[3px] w-full">
+          TAKE  /  추천 답변
           {answer?.done && <span className="ml-[8px] font-medium text-[#999]">{Math.round(answer.latency_ms)}ms</span>}
           <BasisTag basis={answer?.basis} />
         </p>
         <p
-          className={`font-bold text-[27px] tracking-[-0.675px] leading-[40px] w-full ${
+          className={`font-bold text-[27px] tracking-[-0.675px] leading-[40px] w-full break-keep ${
             answer?.text ? 'text-[#1a1a1a]' : 'text-[#999]'
           }`}
         >
@@ -110,17 +127,14 @@ export function Hud({ result, question, answer = null, flow = null, mode = 'keyw
   const inferred = (mode === 'flow' ? flow?.basis : answer?.basis) === 'inferred';
   if (sources.length === 0 && !core) {
     return (
-      <div className="flex flex-1 flex-col gap-[24px] items-start pb-[36px] pt-[32px] px-[44px] w-full">
-        <div className="flex flex-col gap-[14px] w-full">
-          <p className="font-bold text-[11px] text-[#6b7280] tracking-[1.54px] w-full">인식된 질문</p>
-          <p className="font-bold text-[44px] text-[#1a1a1a] tracking-[-1.76px] leading-[57px] w-full">{question}</p>
-        </div>
-        <div className="bg-[#fff3eb] border border-[#e5e7eb] flex gap-[12px] items-center px-[22px] py-[20px] rounded-[6px] w-full">
+      <div className="flex flex-1 flex-col gap-[26px] items-center pb-[36px] pt-[34px] px-[44px] w-full max-w-[1320px] mx-auto">
+        {questionHead}
+        <div className="bg-white border border-[#e5e7eb] flex gap-[12px] items-center justify-center text-center px-[22px] py-[18px] rounded-[10px] w-full">
           <span className="size-[20px] text-[#f26b1d] shrink-0">
             <MinusCircleIcon />
           </span>
           <div className="flex flex-col gap-[2px]">
-            <p className="font-bold text-[19px] text-[#f26b1d] leading-[28px]">발표자료에서 관련 근거를 찾지 못했습니다</p>
+            <p className="font-bold text-[19px] text-[#111111] leading-[28px]">발표자료에서 관련 근거를 찾지 못했습니다</p>
             {fromNotes && (
               <p className="font-medium text-[14px] text-[#6b7280] leading-[20px]">
                 {inferred
@@ -134,10 +148,10 @@ export function Hud({ result, question, answer = null, flow = null, mode = 'keyw
         {fromNotes && mode === 'flow' && flowSection}
         {fromNotes && mode === 'answer' && answerSection}
         {!fromNotes && <div className="flex flex-col gap-[12px] w-full">
-          <p className="font-bold text-[11px] text-[#6b7280] tracking-[1.54px] w-full">추천 답변</p>
+          <p className="font-mono font-bold text-[12px] text-[#6b7280] tracking-[3px] w-full text-center">이렇게 넘기세요</p>
           <div className="flex flex-col gap-[10px] w-full">
             {(result.suggestions ?? []).map((s) => (
-              <div key={s} className="border border-[#e5e7eb] flex items-center justify-between px-[24px] py-[22px] rounded-[6px] w-full">
+              <div key={s} className="border border-[#e5e7eb] flex items-center justify-center px-[24px] py-[20px] rounded-[10px] w-full">
                 <p className="font-bold text-[24px] text-[#1a1a1a] tracking-[-0.6px] leading-[35px] whitespace-nowrap">
                   “{s}”
                 </p>
@@ -150,11 +164,10 @@ export function Hud({ result, question, answer = null, flow = null, mode = 'keyw
   }
 
   return (
-    <div className="flex flex-1 flex-col gap-[24px] items-start pb-[36px] pt-[32px] px-[44px] w-full">
-      <div className="flex flex-col gap-[16px] w-full">
-        <p className="font-bold text-[11px] text-[#6b7280] tracking-[1.54px] w-full">인식된 질문</p>
-        <p className="font-bold text-[44px] text-[#1a1a1a] tracking-[-1.76px] leading-[57px] w-full">{question}</p>
-        <div className="flex gap-[8px] items-start w-full">
+    <div className="flex flex-1 flex-col gap-[26px] items-center pb-[36px] pt-[34px] px-[44px] w-full max-w-[1320px] mx-auto">
+      <div className="flex flex-col gap-[16px] items-center w-full">
+        {questionHead}
+        <div className="flex gap-[8px] items-start justify-center w-full">
           {QUESTION_TYPES.map((type) => {
             const active = type === result.type;
             return (
@@ -162,8 +175,8 @@ export function Hud({ result, question, answer = null, flow = null, mode = 'keyw
                 key={type}
                 type="button"
                 onClick={() => onChangeType?.(type)}
-                className={`flex flex-col items-start px-[16px] py-[8px] rounded-[6px] self-stretch ${
-                  active ? 'bg-[#f26b1d]' : 'border border-[#e5e7eb]'
+                className={`flex flex-col items-center px-[16px] py-[7px] rounded-full self-stretch transition-colors ${
+                  active ? 'bg-[#111111]' : 'border border-[#e5e7eb] hover:border-[#111111]'
                 }`}
               >
                 <span className={`text-[15px] whitespace-nowrap ${active ? 'font-bold text-white' : 'font-medium text-[#6b7280]'}`}>
@@ -177,8 +190,8 @@ export function Hud({ result, question, answer = null, flow = null, mode = 'keyw
 
       {core && (
         <div className="flex flex-col gap-[12px] w-full">
-          <p className="font-bold text-[11px] text-[#409959] tracking-[1.54px] w-full">
-            연습에서 확정한 답 · {core.label}
+          <p className="font-bold text-[11px] text-[#409959] tracking-[1.54px] w-full text-center">
+            연습에서 확정한 답  /  {core.label}
             {core.source === 'answer' ? (
               <span className="ml-[8px] text-[#6b7280]">연습에서 내가 한 답</span>
             ) : (
@@ -196,8 +209,8 @@ export function Hud({ result, question, answer = null, flow = null, mode = 'keyw
       {showAnswer && answerSection}
 
       {isLimitation && !showAnswer && !showFlow && !core ? (
-        <div className="bg-[#fff3eb] border border-[#f26b1d] flex flex-col gap-[14px] px-[28px] py-[26px] rounded-[6px] w-full">
-          <p className="font-bold text-[12px] text-[#f26b1d] tracking-[1.2px] w-full">추천 답변</p>
+        <div className="bg-white border-2 border-[#f26b1d] flex flex-col gap-[14px] items-center text-center px-[36px] py-[26px] rounded-[12px] w-full">
+          <p className="font-mono font-bold text-[12px] text-[#f26b1d] tracking-[3px] w-full">추천 답변</p>
           <div className="flex flex-col gap-[12px] w-full">
             {(result.suggestions ?? []).map((s) => (
               <p key={s} className="font-bold text-[27px] text-[#1a1a1a] tracking-[-0.675px] leading-[40px] w-full">
@@ -209,11 +222,15 @@ export function Hud({ result, question, answer = null, flow = null, mode = 'keyw
       ) : (
         !showFlow && !core && result.keywords.length > 0 && (
           <>
-            <div className="border-t border-[#e5e7eb] flex flex-col gap-[12px] pt-[20px] w-full">
-              <p className="font-bold text-[11px] text-[#6b7280] tracking-[1.54px] w-full">키워드</p>
-              <div className="flex flex-wrap gap-[10px] w-full">
-                {result.keywords.map((keyword) => (
-                  <span key={keyword} className="bg-[#f26b1d] flex flex-col items-start px-[18px] py-[10px] rounded-full">
+            <div className="flex flex-col gap-[12px] items-center pt-[4px] w-full">
+              <p className="font-mono font-bold text-[12px] text-[#6b7280] tracking-[3px]">KEYWORDS  /  키워드</p>
+              <div className="flex flex-wrap gap-[10px] justify-center w-full">
+                {result.keywords.map((keyword, i) => (
+                  <span
+                    key={keyword}
+                    style={{ animationDelay: `${i * 50}ms` }}
+                    className="shot-in bg-[#f26b1d] flex flex-col items-center px-[20px] py-[10px] rounded-full"
+                  >
                     <span className="font-black text-[22px] text-white whitespace-nowrap">{keyword}</span>
                   </span>
                 ))}
@@ -225,7 +242,7 @@ export function Hud({ result, question, answer = null, flow = null, mode = 'keyw
       )}
 
       <div
-        className={`flex flex-col gap-[12px] items-start w-full ${
+        className={`flex flex-col gap-[12px] items-center w-full ${
           isLimitation ? 'border-t border-[#e5e7eb] pt-[20px]' : ''
         }`}
       >
@@ -262,7 +279,7 @@ export function Hud({ result, question, answer = null, flow = null, mode = 'keyw
               ))}
             </div>
 
-            <div className={`flex gap-[14px] items-center w-full ${!canExpand ? 'hidden' : ''}`}>
+            <div className={`flex gap-[14px] items-center justify-center w-full ${!canExpand ? 'hidden' : ''}`}>
               <button
                 type="button"
                 onClick={() => setExpanded((prev) => !prev)}
@@ -276,11 +293,11 @@ export function Hud({ result, question, answer = null, flow = null, mode = 'keyw
             </div>
           </>
         )}
-        <div className={`flex gap-[14px] items-center w-full ${sources.length === 0 ? 'hidden' : ''}`}>
+        <div className={`flex gap-[14px] items-center justify-center w-full ${sources.length === 0 ? 'hidden' : ''}`}>
           <p className="font-normal text-[13px] text-[#999] whitespace-nowrap">
             {isLimitation
               ? '한계 질문은 근거보다 답변 문장을 먼저 읽으세요'
-              : `응답 ${result.responseMs}ms · Space 로 다음 질문 대기`}
+              : `응답 ${result.responseMs}ms   /   Space 로 다음 질문 대기`}
           </p>
         </div>
       </div>
@@ -320,36 +337,39 @@ export function FlowSteps({ steps, inferred = false }: { steps: FlowStep[]; infe
   return (
     <div className="flex items-stretch w-full">
       {steps.map((step, i) => {
+        const guess = inferred && !step.slide; // AI 가 추론한 칸 (근거 슬라이드 없음)
         // 첫 칸은 주황으로 채워 강조한다. 추론한 칸은 밝은 보라 칸이라 글자를 흰색으로 쓰면 안 보인다.
-        const first = i === 0 && !(inferred && !step.slide);
+        const first = i === 0 && !guess;
         const words = step.keys?.length ? step.keys : step.key ? [step.key] : [];
         return (
           <div key={i} className="flex flex-1 items-stretch min-w-0">
+            {/* 샷 카드: 필름 한 칸처럼 위아래에 구멍 줄. 도착할 때마다 오른쪽에서 밀려 들어온다 */}
             <div
-              className={`flex flex-1 flex-col gap-[8px] self-stretch px-[16px] py-[13px] rounded-[8px] min-w-0 ${
-                // AI 가 추론한 칸(근거 슬라이드 없음)은 보라 점선으로 구분한다
-                inferred && !step.slide
+              style={{ animationDelay: `${i * 60}ms` }}
+              className={`shot-in flex flex-1 flex-col gap-[10px] items-center text-center self-stretch px-[16px] py-[10px] rounded-[10px] min-w-0 ${
+                guess
                   ? 'bg-[#f8f5fe] border-2 border-dashed border-[#7c5cbf]'
                   : first
-                    ? 'bg-[#f26b1d]'
-                    : 'bg-[#fff8f3] border border-[#f26b1d]'
+                    ? 'bg-[#f26b1d] shadow-[0_12px_28px_-12px_rgba(242,107,29,0.6)]'
+                    : 'bg-white border-2 border-[#f26b1d]'
               }`}
             >
-              <div className="flex items-center justify-between gap-[8px]">
+              <div className={`film-holes w-full ${first ? 'text-white/40' : guess ? 'text-[#7c5cbf]/25' : 'text-[#f26b1d]/25'}`} />
+              <div className="flex items-center gap-[8px]">
                 <span
-                  className={`flex items-center justify-center size-[22px] rounded-full font-black text-[12px] ${
-                    first ? 'bg-white text-[#f26b1d]' : 'bg-[#f26b1d] text-white'
+                  className={`font-mono font-bold text-[12px] tracking-[2.5px] ${
+                    first ? 'text-white' : guess ? 'text-[#5b3fa0]' : 'text-[#f26b1d]'
                   }`}
                 >
-                  {i + 1}
+                  SHOT {i + 1}
                 </span>
-                <span className={`font-bold text-[12px] ${first ? 'text-white/80' : 'text-[#9ca3af]'}`}>
-                  {step.slide ? `p.${step.slide}` : inferred ? 'AI 추론' : '발표자 설명'}
+                <span className={`font-mono font-bold text-[11px] ${first ? 'text-white/70' : 'text-[#9ca3af]'}`}>
+                  {step.slide ? `p.${step.slide}` : guess ? 'AI 추론' : '발표자 설명'}
                 </span>
               </div>
               <p
-                className={`font-black text-[18px] tracking-[-0.4px] leading-[25px] break-keep ${
-                  first ? 'text-white' : 'text-[#1a1a1a]'
+                className={`font-black text-[19px] tracking-[-0.4px] leading-[26px] break-keep ${
+                  first ? 'text-white' : 'text-[#111111]'
                 }`}
               >
                 <HighlightWords text={step.text} words={words} color={first ? '#ffe45c' : '#e0470f'} />
@@ -364,12 +384,12 @@ export function FlowSteps({ steps, inferred = false }: { steps: FlowStep[]; infe
                 </p>
               )}
               {words.length > 0 && (
-                <div className="flex flex-wrap gap-[5px] mt-auto pt-[2px]">
+                <div className="flex flex-wrap justify-center gap-[5px] mt-auto">
                   {words.map((w) => (
                     <span
                       key={w}
-                      className={`px-[8px] py-[2px] rounded-full font-bold text-[12px] ${
-                        first ? 'bg-white/20 text-white' : 'bg-[#ffe8d9] text-[#c2410c]'
+                      className={`px-[9px] py-[2px] rounded-full font-bold text-[12px] ${
+                        first ? 'bg-white/20 text-white' : 'bg-[#f3f4f6] text-[#c2410c]'
                       }`}
                     >
                       {w}
@@ -377,11 +397,15 @@ export function FlowSteps({ steps, inferred = false }: { steps: FlowStep[]; infe
                   ))}
                 </div>
               )}
+              <div className={`film-holes w-full ${first ? 'text-white/40' : guess ? 'text-[#7c5cbf]/25' : 'text-[#f26b1d]/25'}`} />
             </div>
             {i < steps.length - 1 && (
               // 칸과 칸 사이 파이프라인. 연결어(입으로 말할 말)와 왜 이어지는지(논리)를 같이 보여준다.
-              <div className="flex flex-col items-center justify-center shrink-0 w-[130px] gap-[4px] px-[8px]">
-                {step.link && <span className="font-bold text-[14px] text-[#f26b1d] whitespace-nowrap">{step.link}</span>}
+              <div
+                style={{ animationDelay: `${i * 60 + 30}ms` }}
+                className="shot-in flex flex-col items-center justify-center shrink-0 w-[124px] gap-[4px] px-[8px]"
+              >
+                {step.link && <span className="font-bold text-[15px] text-[#f26b1d] whitespace-nowrap">{step.link}</span>}
                 <div className="flex items-center w-full">
                   <div className="h-[2px] flex-1 bg-[#f26b1d]" />
                   <span className="font-black text-[14px] text-[#f26b1d] leading-none -ml-[2px]">▶</span>

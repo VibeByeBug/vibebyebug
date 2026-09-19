@@ -116,10 +116,11 @@ export function MaterialScreen({
 
   return (
     <div className="flex flex-col gap-[18px] pb-[40px] pt-[28px] px-[44px] w-full max-w-[1100px] mx-auto">
-      <div className="flex items-end justify-between gap-[20px]">
-        <div className="flex flex-col gap-[6px]">
-          <p className="font-bold text-[24px] text-[#1a1a1a] tracking-[-0.6px]">자료 보강</p>
-          <p className="font-normal text-[14px] text-[#6b7280] leading-[21px]">
+      <div className="flex flex-col items-center text-center gap-[14px]">
+        <div className="flex flex-col gap-[6px] items-center">
+          <p className="font-mono font-bold text-[12px] tracking-[3px] text-[#f26b1d]">SCENE 02  /  리허설</p>
+          <p className="font-black text-[30px] text-[#111111] tracking-[-0.8px]">자료 보강</p>
+          <p className="font-normal text-[14px] text-[#6b7280] leading-[21px] max-w-[720px]">
             슬라이드에 없는 설명을 모으면 "왜", "어떻게" 질문에 더 깊게 답할 수 있어요. 슬라이드에 이미 있는 말은 답변 근거로
             쓰지 않고, 청중 질문을 찾는 표현으로만 둡니다.
           </p>
@@ -133,7 +134,7 @@ export function MaterialScreen({
               dirty ? 'bg-[#f26b1d] text-white' : 'border border-[#e5e7eb] text-[#6b7280]'
             }`}
           >
-            {graphBusy ? '지도 만드는 중··· (15초)' : '논리 지도 다시 만들기'}
+            {graphBusy ? '지도 만드는 중... (30초 안팎)' : '논리 지도 다시 만들기'}
           </button>
           <button
             type="button"
@@ -144,14 +145,14 @@ export function MaterialScreen({
           </button>
         </div>
       </div>
-      {graphMsg && <p className="font-medium text-[13px] text-[#409959]">{graphMsg}</p>}
+      {graphMsg && <p className="font-medium text-[13px] text-[#409959] text-center">{graphMsg}</p>}
       {dirty && !graphMsg && (
-        <p className="font-medium text-[13px] text-[#f26b1d]">
+        <p className="font-medium text-[13px] text-[#f26b1d] text-center">
           설명이 바뀌었어요. 검색과 답변에는 바로 반영됐고, 논리 지도에도 넣으려면 "논리 지도 다시 만들기"를 눌러주세요.
         </p>
       )}
 
-      <div className="flex gap-[6px] border-b border-[#e5e7eb]">
+      <div className="flex justify-center gap-[6px] border-b border-[#e5e7eb]">
         {(
           [
             ['rehearsal', '리허설 녹음'],

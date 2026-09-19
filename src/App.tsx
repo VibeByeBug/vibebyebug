@@ -43,9 +43,15 @@ function App() {
   uploadRef.current = upload;
   modeRef.current = mode;
 
+  // 몇 번째 질문인지. 실전 화면의 CUE 번호와 슬레이트 줄무늬 신호에 쓴다.
+  const [cueNo, setCueNo] = useState(0);
+
   function sendQuestion(text: string) {
     const pid = uploadRef.current?.presentation_id;
-    if (pid) ask(text, pid, modeRef.current);
+    if (pid) {
+      setCueNo((n) => n + 1);
+      ask(text, pid, modeRef.current);
+    }
   }
 
   function handlePartialResult(text: string) {
@@ -162,7 +168,7 @@ function App() {
 
       {screen === 'start' && (
         <>
-          <Header onNavigate={setScreen} />
+          <Header onNavigate={setScreen} dark />
           <StartScreen
             onStart={(title) => {
               setPresentationName(title);
@@ -325,6 +331,7 @@ function App() {
         <>
           <Header
             onNavigate={setScreen}
+            cueKey={cueNo}
             compact
             listening={listening}
             label="마이크 꺼짐"
@@ -356,6 +363,7 @@ function App() {
             mode={mode}
             notice={notice}
             question={question.finalText}
+            cueNo={cueNo}
           />
         </>
       )}
