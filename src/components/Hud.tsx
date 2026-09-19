@@ -19,6 +19,8 @@ interface HudProps {
 
 export function Hud({ result, question, answer = null, flow = null, mode = 'keywords', notice = null, onChangeType }: HudProps) {
   const [expanded, setExpanded] = useState(false);
+  // 뒷받침 근거는 접어둔다. 필요할 때만 펼쳐서 슬라이드 원문을 확인한다.
+  const [sourcesOpen, setSourcesOpen] = useState(false);
 
   if (!result) {
     return (
@@ -160,7 +162,13 @@ export function Hud({ result, question, answer = null, flow = null, mode = 'keyw
               answer?.text ? 'text-[#1a1a1a]' : 'text-[#999]'
             }`}
           >
-            {answer?.text ? `“${answer.text}”` : '답변을 만들고 있어요···'}
+            {answer?.text ? (
+              <>
+                “<HighlightMany text={answer.text} words={result.keywords} />”
+              </>
+            ) : (
+              '답변을 만들고 있어요···'
+            )}
           </p>
           {answer?.status === 'blocked' && (
             <p className="font-normal text-[13px] text-[#6b7280]">
@@ -204,36 +212,54 @@ export function Hud({ result, question, answer = null, flow = null, mode = 'keyw
           isLimitation ? 'border-t border-[#e5e7eb] pt-[20px]' : ''
         }`}
       >
-        {sources.length > 0 && <p className="font-bold text-[11px] text-[#6b7280] tracking-[1.54px] w-full">뒷받침 근거</p>}
-        <div className="flex flex-col gap-[10px] w-full">
-          {visibleSources.map((source, index) => (
-            <div
-              key={`${source.slide}-${index}`}
-              className="border border-[#e5e7eb] flex gap-[18px] items-center px-[18px] py-[16px] rounded-[6px] w-full"
-            >
-              <span className="bg-[#f3f4f6] border border-[#e5e7eb] flex h-[68px] items-center justify-center rounded-[6px] shrink-0 w-[120px]">
-                <span className="font-mono text-[9px] text-[#9ca3af]">p{String(source.slide).padStart(3, '0')}</span>
-              </span>
-              <p className="font-black text-[34px] text-[#1a1a1a] tracking-[-1.36px] shrink-0 w-[80px]">
-                p.{source.slide}
-              </p>
-              <p className="flex-1 font-medium text-[19px] text-[#1a1a1a] leading-[28px]">“{source.quote}”</p>
-            </div>
-          ))}
-        </div>
-
-        <div className={`flex gap-[14px] items-center w-full ${sources.length === 0 ? 'hidden' : ''}`}>
+        {sources.length > 0 && (
           <button
             type="button"
-            onClick={() => setExpanded((prev) => !prev)}
-            disabled={!canExpand}
-            className="border border-[#e5e7eb] flex gap-[8px] h-[46px] items-center px-[20px] rounded-[6px] disabled:opacity-40"
+            onClick={() => setSourcesOpen((v) => !v)}
+            className="flex gap-[8px] items-center"
           >
-            <span className={`size-[16px] text-[#1a1a1a] transition-transform ${expanded ? 'rotate-180' : ''}`}>
+            <span className={`size-[14px] text-[#6b7280] transition-transform ${sourcesOpen ? 'rotate-180' : ''}`}>
               <ChevronDownIcon />
             </span>
-            <span className="font-bold text-[15px] text-[#1a1a1a] whitespace-nowrap">근거 더보기 (최대 5개)</span>
+            <span className="font-bold text-[13px] text-[#6b7280] tracking-[0.5px]">
+              뒷받침 근거 ({sources.length}개) {sourcesOpen ? '접기' : '펼치기'}
+            </span>
           </button>
+        )}
+        {sourcesOpen && (
+          <>
+            <div className="flex flex-col gap-[10px] w-full">
+              {visibleSources.map((source, index) => (
+                <div
+                  key={`${source.slide}-${index}`}
+                  className="border border-[#e5e7eb] flex gap-[18px] items-center px-[18px] py-[16px] rounded-[6px] w-full"
+                >
+                  <span className="bg-[#f3f4f6] border border-[#e5e7eb] flex h-[68px] items-center justify-center rounded-[6px] shrink-0 w-[120px]">
+                    <span className="font-mono text-[9px] text-[#9ca3af]">p{String(source.slide).padStart(3, '0')}</span>
+                  </span>
+                  <p className="font-black text-[34px] text-[#1a1a1a] tracking-[-1.36px] shrink-0 w-[80px]">
+                    p.{source.slide}
+                  </p>
+                  <p className="flex-1 font-medium text-[19px] text-[#1a1a1a] leading-[28px]">“{source.quote}”</p>
+                </div>
+              ))}
+            </div>
+
+            <div className={`flex gap-[14px] items-center w-full ${!canExpand ? 'hidden' : ''}`}>
+              <button
+                type="button"
+                onClick={() => setExpanded((prev) => !prev)}
+                className="border border-[#e5e7eb] flex gap-[8px] h-[40px] items-center px-[16px] rounded-[6px]"
+              >
+                <span className={`size-[16px] text-[#1a1a1a] transition-transform ${expanded ? 'rotate-180' : ''}`}>
+                  <ChevronDownIcon />
+                </span>
+                <span className="font-bold text-[14px] text-[#1a1a1a] whitespace-nowrap">근거 더보기 (최대 5개)</span>
+              </button>
+            </div>
+          </>
+        )}
+        <div className={`flex gap-[14px] items-center w-full ${sources.length === 0 ? 'hidden' : ''}`}>
           <p className="font-normal text-[13px] text-[#999] whitespace-nowrap">
             {isLimitation
               ? '한계 질문은 근거보다 답변 문장을 먼저 읽으세요'
@@ -258,35 +284,68 @@ function Highlight({ text, word, color }: { text: string; word?: string; color: 
   );
 }
 
+// 여러 단어를 한 번에 강조한다. 추천 답변에서 키워드와 숫자에 색을 입힌다.
+// AI 를 다시 부르지 않고, 이미 받은 키워드와 답변 속 숫자만 쓴다.
+const NUM_WITH_UNIT = /(?<![A-Za-z\d])\d[\d,.~]*(?![A-Za-z])\s*(?:%|배|[가-힣]{1,2}(?=[\s,.)]|$))?/g; // B2B 의 2 는 빼고
+
+function HighlightMany({ text, words }: { text: string; words: string[] }) {
+  const ranges: [number, number][] = [];
+  for (const w of words) {
+    if (w.length < 2) continue;
+    let at = text.indexOf(w);
+    while (at >= 0) {
+      ranges.push([at, at + w.length]);
+      at = text.indexOf(w, at + w.length);
+    }
+  }
+  for (const m of text.matchAll(NUM_WITH_UNIT)) ranges.push([m.index!, m.index! + m[0].trimEnd().length]);
+  ranges.sort((a, b) => a[0] - b[0]);
+  const out: React.ReactNode[] = [];
+  let pos = 0;
+  for (const [a, b] of ranges) {
+    if (a < pos) continue; // 겹치는 강조는 앞의 것만
+    out.push(text.slice(pos, a), <span key={a} style={{ color: '#e0470f' }}>{text.slice(a, b)}</span>);
+    pos = b;
+  }
+  out.push(text.slice(pos));
+  return <>{out}</>;
+}
+
 function FlowSteps({ steps }: { steps: FlowStep[] }) {
   return (
     <div className="flex items-stretch w-full">
       {steps.map((step, i) => (
-        <div key={i} className="flex flex-1 items-center min-w-0">
+        <div key={i} className="flex flex-1 items-stretch min-w-0">
           <div
-            className={`flex flex-1 flex-col gap-[8px] justify-between self-stretch px-[20px] py-[18px] rounded-[6px] min-w-0 ${
+            className={`flex flex-1 flex-col gap-[5px] justify-between self-stretch px-[14px] py-[11px] rounded-[6px] min-w-0 ${
               i === 0 ? 'bg-[#f26b1d]' : 'bg-[#fff3eb] border border-[#f26b1d]'
             }`}
           >
-            <span className={`font-bold text-[12px] ${i === 0 ? 'text-white/80' : 'text-[#f26b1d]'}`}>{i + 1}</span>
+            <span className={`font-bold text-[11px] ${i === 0 ? 'text-white/80' : 'text-[#f26b1d]'}`}>{i + 1}</span>
             <p
-              className={`font-black text-[24px] tracking-[-0.6px] leading-[32px] break-keep ${
+              className={`font-black text-[18px] tracking-[-0.4px] leading-[25px] break-keep ${
                 i === 0 ? 'text-white' : 'text-[#1a1a1a]'
               }`}
             >
               <Highlight text={step.text} word={step.key} color={i === 0 ? '#ffe45c' : '#e0470f'} />
             </p>
-            <span className={`font-bold text-[13px] ${i === 0 ? 'text-white/80' : 'text-[#6b7280]'}`}>
+            <span className={`font-bold text-[12px] ${i === 0 ? 'text-white/80' : 'text-[#6b7280]'}`}>
               {step.slide ? `p.${step.slide}` : '발표자 작성'}
             </span>
           </div>
           {i < steps.length - 1 && (
-            // 화살표 위 연결어. 이 말을 그대로 말하면 칸과 칸이 문장으로 이어진다.
-            <div className="flex flex-col items-center justify-center shrink-0 w-[74px] gap-[2px]">
-              {step.link && (
-                <span className="font-bold text-[13px] text-[#f26b1d] whitespace-nowrap">{step.link}</span>
+            // 칸과 칸 사이 파이프라인. 연결어(입으로 말할 말)와 왜 이어지는지(논리)를 같이 보여준다.
+            <div className="flex flex-col items-center justify-center shrink-0 w-[150px] gap-[4px] px-[8px]">
+              {step.link && <span className="font-bold text-[14px] text-[#f26b1d] whitespace-nowrap">{step.link}</span>}
+              <div className="flex items-center w-full">
+                <div className="h-[2px] flex-1 bg-[#f26b1d]" />
+                <span className="font-black text-[14px] text-[#f26b1d] leading-none -ml-[2px]">▶</span>
+              </div>
+              {step.why && (
+                <span className="font-medium text-[12px] text-[#6b7280] leading-[16px] text-center break-keep">
+                  {step.why}
+                </span>
               )}
-              <span className="font-black text-[22px] text-[#f26b1d] leading-none">→</span>
             </div>
           )}
         </div>

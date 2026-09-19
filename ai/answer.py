@@ -224,6 +224,7 @@ DEFAULT_LINKS = {
     "한계반론": ("다만", "그럼에도"),
 }
 GUIDE_MAX = 90
+WHY_MAX = 18          # 화살표 아래 연결 논리. 길면 칸보다 눈에 띈다
 
 FLOW_PROMPT = """발표자가 청중 질문에 답할 때 말할 순서를 흐름도 칸 {n}개로 만들어줘.
 발표자는 이걸 한 번 보고 자기 말로 풀어서 답한다. 문장이 아니라 짧은 메모다.
@@ -237,16 +238,18 @@ FLOW_PROMPT = """발표자가 청중 질문에 답할 때 말할 순서를 흐�
 4. 칸마다 근거가 된 슬라이드 번호를 붙여.
 5. 칸마다 핵심 단어 하나를 골라. 칸 내용에 그대로 들어 있는 말이어야 한다 (수치가 있으면 수치).
 6. 칸마다 다음 칸으로 넘어갈 때 말할 연결어를 이 중에서 하나 골라: {links}. 마지막 칸은 "-".
-7. 마지막 줄에 답변 가이드를 한 줄 써. 답변 문장이 아니라 "어떤 순서로, 어느 슬라이드를 근거로 말하면 되는지" 알려주는 코칭이다.
+7. 칸마다 다음 칸으로 왜 이어지는지 논리를 {why_max}자 이내로 적어. 어떤 관계인지가 보여야 한다.
+   예: "500명×9,900원 계산", "그 목표의 전제 조건", "같은 기준으로 비교". 마지막 칸은 "-". 자료에 없는 숫자는 쓰지 마.
+8. 마지막 줄에 답변 가이드를 한 줄 써. 답변 문장이 아니라 "어떤 순서로, 어느 슬라이드를 근거로 말하면 되는지" 알려주는 코칭이다.
    예: "결론인 구독자 수부터 말하고, 12번 슬라이드 매출 계산으로 근거를 댄 뒤 2년 차 목표라는 조건을 덧붙이세요"
    {guide_max}자 이내. 자료에 없는 숫자는 쓰지 마.
-8. 자료로 답할 수 없으면 "없음" 한 줄만 써.
+9. 자료로 답할 수 없으면 "없음" 한 줄만 써.
 
 출력 형식 (다른 말 붙이지 말고 이것만):
-슬라이드번호 | 칸 내용 | 핵심 단어 | 연결어
-12 | 구독 500명 기준 | 500명 | 그래서
-12 | 월 매출 495만원 | 495만원 | 즉
-18 | 2년 차 흑자 전환 | 흑자 전환 | -
+슬라이드번호 | 칸 내용 | 핵심 단어 | 연결어 | 연결 논리
+12 | 구독 500명 기준 | 500명 | 그래서 | 500명×9,900원 계산
+12 | 월 매출 495만원 | 495만원 | 즉 | 고정비를 넘는 시점
+18 | 2년 차 흑자 전환 | 흑자 전환 | - | -
 가이드 | 답변 가이드
 
 질문: {question}
@@ -255,6 +258,12 @@ FLOW_PROMPT = """발표자가 청중 질문에 답할 때 말할 순서를 흐�
 {slides}"""
 
 _FLOW_LINE = re.compile(r"^\D{0,8}?(\d{1,3})\s*(?:\t|\||:|\)|번|\.)\s*(.+)$")
+
+
+def _drop_slide_refs(text: str) -> str:
+    """ "12번 슬라이드", "p.12", "슬라이드 12" 같은 슬라이드 번호를 지운다(숫자 검사용)."""
+    text = re.sub(r"\d{1,3}\s*번\s*(?:슬라이드|장)", "", text)
+    return re.sub(r"(?:p\.?\s*|슬라이드\s*)\d{1,3}", "", text)
 
 
 def _stream_text(self, prompt: str, t0: float) -> Iterator[tuple[str, str]]:
@@ -320,7 +329,8 @@ def flow(self, question: str, qtype: str, slides: list[tuple[int, str]]) -> Iter
 
     def msg(done: bool, status: str = "", note: str = "") -> dict:
         # 연결어는 칸 사이에만 있다. 마지막 칸의 연결어는 비운다.
-        out = [dict(st, link=st["link"] if i < len(steps) - 1 else "") for i, st in enumerate(steps)]
+        out = [dict(st, link=st["link"] if i < len(steps) - 1 else "",
+                    why=st.get("why", "") if i < len(steps) - 1 else "") for i, st in enumerate(steps)]
         m = {"type": "cue.flow", "steps": out, "guide": guide, "done": done,
              "latency_ms": round((time.time() - t0) * 1000, 1)}
         if done:
@@ -336,7 +346,7 @@ def flow(self, question: str, qtype: str, slides: list[tuple[int, str]]) -> Iter
     prompt = FLOW_PROMPT.format(
         n=FLOW_STEPS, max_chars=FLOW_MAX_CHARS, question=question,
         shape=FLOW_SHAPE.get(qtype, FLOW_SHAPE["사실확인"]),
-        links=", ".join(LINKS), guide_max=GUIDE_MAX,
+        links=", ".join(LINKS), guide_max=GUIDE_MAX, why_max=WHY_MAX,
         slides="\n\n".join(f"[{p}번 슬라이드]\n{t}" for p, t in slides))
 
     def take(line: str):
@@ -355,6 +365,10 @@ def flow(self, question: str, qtype: str, slides: list[tuple[int, str]]) -> Iter
         text = parts[0]
         key = parts[1] if len(parts) > 1 else ""
         link = parts[2] if len(parts) > 2 else ""
+        why = parts[3] if len(parts) > 3 else ""
+        # 연결 논리도 숫자를 자료와 대조한다. 틀린 숫자면 설명만 버린다(칸은 살린다).
+        if why in ("-", "") or not numbers_ok(_drop_slide_refs(why), "\n".join(by_slide.values())):
+            why = ""
         # 형식 지시어가 칸에 섞여 나오는 경우가 있었다 ("슬라이드	과정 채점", "<TAB>문제마다...")
         text = re.sub(r"^(?:슬라이드|<?TAB>?|\||\s)+", "", text).strip()
         if not text:
@@ -369,7 +383,8 @@ def flow(self, question: str, qtype: str, slides: list[tuple[int, str]]) -> Iter
         if not key or key not in text:
             num = re.search(r"\d[\d,.~]*\s*(?:%|[가-힣]{1,2})?", text)
             key = num.group(0).strip() if num else ""
-        return {"text": text, "slide": slide, "key": key, "link": link if link in LINKS else ""}
+        return {"text": text, "slide": slide, "key": key, "link": link if link in LINKS else "",
+                "why": why[:WHY_MAX + 6]}
 
     for kind, val in _stream_text(self, prompt, t0):
         if kind == "error":
@@ -386,7 +401,9 @@ def flow(self, question: str, qtype: str, slides: list[tuple[int, str]]) -> Iter
                 return
             if isinstance(got, dict) and "guide" in got:
                 # 가이드도 숫자를 자료와 대조한다. 틀린 숫자가 있으면 가이드만 버린다.
-                if numbers_ok(got["guide"], all_text):
+                # "12번 슬라이드" 의 12 는 슬라이드 번호라 자료 본문에 없다. 이걸 틀린 숫자로 보고
+                # 가이드를 버리는 일이 잦았다. 슬라이드 번호는 빼고 대조한다.
+                if numbers_ok(_drop_slide_refs(got["guide"]), all_text):
                     guide = got["guide"][:GUIDE_MAX + 10]
                     yield msg(False)
                 continue

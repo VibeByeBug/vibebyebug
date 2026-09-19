@@ -23,6 +23,7 @@ export interface FlowStep {
   slide: number | null;
   key?: string; // 칸 안에서 글자 색으로 강조할 핵심 단어
   link?: string; // 다음 칸으로 넘어갈 때 말할 연결어 ("그래서", "근거는")
+  why?: string; // 다음 칸으로 왜 이어지는지 (논리 전개 설명)
 }
 
 // 연습에서 발표자가 확정한 기본 질문 답
