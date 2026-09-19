@@ -1,4 +1,4 @@
-import { useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import type { UploadResult } from './api';
 import { Header } from './components/Header';
 import { Hud } from './components/Hud';
@@ -6,6 +6,8 @@ import { Login } from './components/Login';
 import { MicConnectScreen } from './components/MicConnectScreen';
 import { MockPracticeScreen } from './components/MockPracticeScreen';
 import { CorePracticeScreen } from './components/CorePracticeScreen';
+import { GraphScreen } from './components/GraphScreen';
+import { MaterialScreen } from './components/MaterialScreen';
 import { MyHistoryScreen } from './components/MyHistoryScreen';
 import { PreparingScreen } from './components/PreparingScreen';
 import { RecognizedQuestion } from './components/RecognizedQuestion';
@@ -41,9 +43,15 @@ function App() {
   uploadRef.current = upload;
   modeRef.current = mode;
 
+  // 몇 번째 질문인지. 실전 화면의 CUE 번호와 슬레이트 줄무늬 신호에 쓴다.
+  const [cueNo, setCueNo] = useState(0);
+
   function sendQuestion(text: string) {
     const pid = uploadRef.current?.presentation_id;
-    if (pid) ask(text, pid, modeRef.current);
+    if (pid) {
+      setCueNo((n) => n + 1);
+      ask(text, pid, modeRef.current);
+    }
   }
 
   function handlePartialResult(text: string) {
@@ -83,7 +91,7 @@ function App() {
     </div>
   );
 
-  const { start: startRecognition } = useSpeechRecognition({
+  const { start: startRecognition, stop: stopRecognition, listening } = useSpeechRecognition({
     onPartialResult: handlePartialResult,
     onFinalResult: handleFinalResult,
     onError: () => {
@@ -91,6 +99,57 @@ function App() {
       setScreen('textInput');
     },
   });
+
+  // 실전 화면을 벗어나면 마이크를 끈다 (설정, 리포트 등으로 가도 계속 듣고 있으면 안 된다)
+  useEffect(() => {
+    if (!['recognized', 'hud', 'textInput', 'micConnect', 'graph'].includes(screen)) stopRecognition();
+  }, [screen, stopRecognition]);
+
+  // 논리 지도 화면. 보고 나면 원래 화면으로 돌아간다.
+  const [graphBack, setGraphBack] = useState<ScreenName>('hud');
+  const graphButton = (
+    <button
+      type="button"
+      onClick={() => {
+        setGraphBack(screen);
+        setScreen('graph');
+      }}
+      className="border border-[#e5e7eb] h-[32px] px-[12px] rounded-[6px] font-bold text-[13px] text-[#6b7280] whitespace-nowrap"
+    >
+      지식 지도
+    </button>
+  );
+
+  // 자료 보강 화면. 논리 지도에서 슬라이드를 골라 들어오면 그 슬라이드부터 연다.
+  const [materialBack, setMaterialBack] = useState<ScreenName>('hud');
+  const [materialPage, setMaterialPage] = useState<number | undefined>(undefined);
+  const openMaterial = (back: ScreenName, page?: number) => {
+    setMaterialBack(back);
+    setMaterialPage(page);
+    setScreen('material');
+  };
+  const materialButton = (
+    <button
+      type="button"
+      onClick={() => openMaterial(screen)}
+      className="border border-[#e5e7eb] h-[32px] px-[12px] rounded-[6px] font-bold text-[13px] text-[#6b7280] whitespace-nowrap"
+    >
+      자료 보강
+    </button>
+  );
+
+  const micToggle = (
+    <button
+      type="button"
+      onClick={() => (listening ? stopRecognition() : startRecognition())}
+      className={`flex gap-[6px] h-[32px] items-center px-[12px] rounded-[6px] font-bold text-[13px] whitespace-nowrap ${
+        listening ? 'bg-[#bf382e] text-white' : 'border border-[#e5e7eb] text-[#6b7280]'
+      }`}
+    >
+      <span className={`rounded-full size-[8px] ${listening ? 'bg-white animate-pulse' : 'bg-[#9ca3af]'}`} />
+      {listening ? '마이크 끄기' : '마이크 켜기'}
+    </button>
+  );
 
   function handleConnectMic() {
     setQuestion({ partialText: '', finalText: '', isConfirmed: false });
@@ -109,7 +168,7 @@ function App() {
 
       {screen === 'start' && (
         <>
-          <Header onNavigate={setScreen} />
+          <Header onNavigate={setScreen} dark />
           <StartScreen
             onStart={(title) => {
               setPresentationName(title);
@@ -128,7 +187,9 @@ function App() {
             onUploaded={setUpload}
             onUploadFail={handleUploadFail}
             onSkip={() => setScreen('preparing')}
-            onStartMock={() => setScreen('corePractice')}
+            onStartMock={() => setScreen('mockPractice')}
+            // 업로드 화면은 다시 열면 결과가 비므로, 자료 보강을 마치면 준비 화면으로 간다
+            onAddMaterial={() => openMaterial('preparing')}
           />
         </>
       )}
@@ -147,7 +208,7 @@ function App() {
 
       {screen === 'preparing' && upload && (
         <>
-          <Header onNavigate={setScreen} label={presentationName} showProfile />
+          <Header onNavigate={setScreen} label={presentationName} showProfile rightButtons={materialButton} />
           <PreparingScreen
             presentationId={upload.presentation_id}
             onReady={() => setScreen('micConnect')}
@@ -160,6 +221,29 @@ function App() {
         <>
           <Header onNavigate={setScreen} label="기본 질문 연습" />
           <CorePracticeScreen presentationId={upload.presentation_id} onFinish={() => setScreen('preparing')} />
+        </>
+      )}
+
+      {screen === 'material' && upload && (
+        <>
+          <Header onNavigate={setScreen} label="자료 보강" showProfile={false} />
+          <MaterialScreen
+            key={materialPage ?? 'all'}
+            presentationId={upload.presentation_id}
+            initialPage={materialPage}
+            onBack={() => setScreen(materialBack)}
+          />
+        </>
+      )}
+
+      {screen === 'graph' && upload && (
+        <>
+          <Header onNavigate={setScreen} label="지식 지도" showProfile={false} />
+          <GraphScreen
+            presentationId={upload.presentation_id}
+            onBack={() => setScreen(graphBack)}
+            onAddNote={(page) => openMaterial('graph', page)}
+          />
         </>
       )}
 
@@ -184,6 +268,9 @@ function App() {
             compact
             rightText="대기 중"
             rightButtons={
+              <>
+              {materialButton}
+              {graphButton}
               <button
                 type="button"
                 onClick={() => {
@@ -194,6 +281,7 @@ function App() {
               >
                 글로 질문하기
               </button>
+              </>
             }
           />
           <MicConnectScreen onConnect={handleConnectMic} />
@@ -202,7 +290,16 @@ function App() {
 
       {screen === 'recognized' && (
         <>
-          <Header onNavigate={setScreen} compact listening rightText="분석 준비 중" showProfile={false} />
+          <Header
+            onNavigate={setScreen}
+            dark
+            compact
+            listening={listening}
+            label="마이크 꺼짐"
+            rightText={listening ? '분석 준비 중' : undefined}
+            rightButtons={micToggle}
+            showProfile={false}
+          />
           <RecognizedQuestion
             partialText={question.partialText}
             finalText={question.finalText}
@@ -235,12 +332,18 @@ function App() {
         <>
           <Header
             onNavigate={setScreen}
+            dark
+            cueKey={cueNo}
             compact
-            listening
+            listening={listening}
+            label="마이크 꺼짐"
             rightText={lastResult ? `응답 ${lastResult.responseMs}ms` : '분석 중'}
             rightButtons={
               <>
+                {micToggle}
                 {modeToggle}
+                {graphButton}
+                {materialButton}
                 <button
                   type="button"
                   onClick={() => {
@@ -262,6 +365,7 @@ function App() {
             mode={mode}
             notice={notice}
             question={question.finalText}
+            cueNo={cueNo}
           />
         </>
       )}

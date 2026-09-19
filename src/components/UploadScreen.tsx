@@ -5,11 +5,12 @@ import { DocumentIcon, RefreshIcon, SearchIcon, ImageIcon, WarningIcon, CheckIco
 interface UploadScreenProps {
   onSkip: () => void;
   onStartMock: () => void;
+  onAddMaterial?: () => void;
   onUploaded: (result: UploadResult) => void;
   onUploadFail: (fileName: string, message: string) => void;
 }
 
-export function UploadScreen({ onSkip, onStartMock, onUploaded, onUploadFail }: UploadScreenProps) {
+export function UploadScreen({ onSkip, onStartMock, onAddMaterial, onUploaded, onUploadFail }: UploadScreenProps) {
   const [fileName, setFileName] = useState<string | null>(null);
   const [result, setResult] = useState<UploadResult | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
@@ -147,6 +148,16 @@ export function UploadScreen({ onSkip, onStartMock, onUploaded, onUploadFail }: 
             )}
 
             <div className="flex gap-[10px] items-start justify-end w-full">
+              {onAddMaterial && (
+                <button
+                  type="button"
+                  onClick={onAddMaterial}
+                  disabled={!result}
+                  className="border border-[#f26b1d] flex h-[50px] items-center px-[20px] rounded-[6px] disabled:opacity-40"
+                >
+                  <span className="font-bold text-[16px] text-[#f26b1d] whitespace-nowrap">대본, 설명 자료 추가</span>
+                </button>
+              )}
               <button
                 type="button"
                 onClick={onSkip}

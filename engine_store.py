@@ -52,6 +52,43 @@ def _warm_worker_inner(pid: str, chunks_path: str, preset: str) -> None:
         # 키워드만 쓰는 연결은 rq.answer() 를 안 부르므로 영향이 없다.
         rq = ReadyQ(chunks_path, preset=preset, session=pid, mode="answer")
         took = rq.warm()
+        # 발표자료 논리 지도 (GraphRAG). 한 번 만들면 파일로 남겨서 서버를 다시 켜도 재사용한다.
+        # 만들기에 10~20초 걸리고, 실패해도 검색은 지금처럼 동작한다.
+        import deck_graph
+        import notes as notes_mod
+        # 발표자 설명(리허설, 대본, 설명 자료)이 있으면 검색 색인과 논리 지도에 같이 넣는다
+        notes = notes_mod.NoteStore(Path(chunks_path).parent / "notes" / f"{pid}.json").notes
+        if notes:
+            rq.set_notes(notes)
+        graph_file = Path(chunks_path).parent / "graph" / f"{pid}.json"
+        graph = deck_graph.load(graph_file)
+        if graph is None:
+            import json as _json
+            rows = [_json.loads(l) for l in Path(chunks_path).open(encoding="utf-8")]
+            graph = deck_graph.build(rows, notes)
+            if graph.get("ok"):
+                deck_graph.save(graph, graph_file)
+        rq.set_graph(graph if graph.get("ok") else None)
+        # 리허설 화면과 논리 지도에서 볼 슬라이드 정리본 (보여주기용, 검색에는 안 쓴다)
+        import slide_refine
+        refined_file = Path(chunks_path).parent / "refined" / f"{pid}.json"
+        refined = slide_refine.load(refined_file)
+        if refined is None:
+            import json as _json
+            refined = slide_refine.refine([_json.loads(l) for l in Path(chunks_path).open(encoding="utf-8")])
+            if refined:
+                slide_refine.save(refined, refined_file)
+        # 정리본의 묶음 단위로 슬라이드 지식 조각을 나눈다 (통합 지식 검색)
+        rq.set_refined(refined or {})
+        # 지식 그래프 (조각 사이의 관계). 조각이 많이 바뀌었으면 다시 만든다. 조각 60개 기준 12초 안팎.
+        import knowledge_graph
+        kg_file = Path(chunks_path).parent / "kgraph" / f"{pid}.json"
+        kg = knowledge_graph.load(kg_file)
+        if kg is None or knowledge_graph.coverage(kg, [c["id"] for c in rq.kb]) < 0.8:
+            kg = knowledge_graph.build(rq.kb)
+            if kg.get("ok"):
+                knowledge_graph.save(kg, kg_file)
+        rq.set_kgraph(kg)
         # 연습에서 확정해둔 기본 질문 카드를 올린다 (서버가 재시작돼도 유지)
         core_file = Path(chunks_path).parent / "core" / f"{pid}.json"
         if core_file.exists():

@@ -21,6 +21,11 @@ export interface QaResult {
 export interface FlowStep {
   text: string;
   slide: number | null;
+  detail?: string; // 칸에서 말할 내용을 풀어 쓴 한 문장
+  key?: string; // 칸 안에서 글자 색으로 강조할 핵심 단어
+  keys?: string[]; // 강조할 핵심 개념어 여러 개 (key 는 그 첫 번째)
+  link?: string; // 다음 칸으로 넘어갈 때 말할 연결어 ("그래서", "근거는")
+  why?: string; // 다음 칸으로 왜 이어지는지 (논리 전개 설명)
 }
 
 // 연습에서 발표자가 확정한 기본 질문 답
@@ -40,6 +45,10 @@ export type AnswerMode = 'keywords' | 'answer' | 'flow';
 // 서버 cue.flow. 말할 순서를 짧은 칸으로. 칸이 완성될 때마다 steps 가 늘어난다.
 export interface QaFlow {
   steps: FlowStep[];
+  guide?: string; // 답변 가이드: 어떤 순서로, 어느 슬라이드를 근거로 말하면 되는지
+  // notes: 슬라이드 근거가 없어 보강 자료와 논리 지도로 만든 답
+  // inferred: 어느 자료에도 답이 없어 AI 가 추론한 답 (화면에 따로 표시한다)
+  basis?: 'notes' | 'inferred';
   done: boolean;
   latency_ms: number;
   status?: 'ok' | 'no_answer' | 'blocked' | 'error' | 'skipped';
@@ -51,4 +60,7 @@ export interface QaAnswer {
   done: boolean;
   latency_ms: number;
   status?: 'ok' | 'no_answer' | 'blocked' | 'error' | 'skipped';
+  // notes: 슬라이드 근거가 없어 보강 자료와 논리 지도로 만든 답
+  // inferred: 어느 자료에도 답이 없어 AI 가 추론한 답 (화면에 따로 표시한다)
+  basis?: 'notes' | 'inferred';
 }

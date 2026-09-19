@@ -6,3 +6,72 @@ body {
   font-family: "Noto Sans KR", sans-serif;
   color: #1a1a1a;
 }
+
+/* ── 슬레이트 컨셉 공통 ─────────────────────────────────────────────
+   배경은 흰색, 검정은 슬레이트 줄무늬와 필름 스트립 같은 포인트에만 쓴다. */
+
+/* 슬레이트 줄무늬 (검정, 흰색 사선) */
+.slate-stripes {
+  background: repeating-linear-gradient(-55deg, #111111 0 14px, #ffffff 14px 28px);
+  background-size: 200% 100%;
+}
+
+/* 새 질문이 들어오면 줄무늬가 한 칸 밀린다 (슬레이트를 "딱" 치는 신호) */
+@keyframes slate-sweep {
+  from { background-position: 0 0; }
+  to { background-position: -56px 0; }
+}
+.slate-sweep { animation: slate-sweep 260ms cubic-bezier(0.2, 0.8, 0.2, 1); }
+
+/* 필름 칸 구멍 (샷 카드 위아래) */
+.film-holes {
+  height: 6px;
+  background-image: linear-gradient(90deg, currentColor 0 12px, transparent 12px 24px);
+  background-size: 24px 100%;
+  background-repeat: repeat-x;
+  border-radius: 2px;
+}
+
+/* ON AIR 탤리 라이트 */
+@keyframes tally-pulse {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(229, 50, 45, 0.45); }
+  50% { box-shadow: 0 0 0 7px rgba(229, 50, 45, 0); }
+}
+.tally-pulse { animation: tally-pulse 1.2s ease-in-out infinite; }
+
+/* 샷 카드가 필름 감기듯 오른쪽에서 밀려 들어온다 */
+@keyframes shot-in {
+  from { opacity: 0; transform: translateX(24px); }
+  to { opacity: 1; transform: none; }
+}
+.shot-in { animation: shot-in 220ms cubic-bezier(0.2, 0.8, 0.2, 1) both; }
+
+/* 질문 글자가 아래에서 올라온다 */
+@keyframes rise-in {
+  from { opacity: 0; transform: translateY(12px); }
+  to { opacity: 1; transform: none; }
+}
+.rise-in { animation: rise-in 200ms ease-out both; }
+
+/* 듣는 중 막대 */
+@keyframes wave {
+  0%, 100% { transform: scaleY(0.35); }
+  50% { transform: scaleY(1); }
+}
+.wave-bar { animation: wave 0.9s ease-in-out infinite; transform-origin: center; }
+
+/* 슬레이트 팔: 올리면 닫히며 살짝 흔들린다 */
+.clapper-arm { transform-origin: 6px 100%; transform: rotate(-14deg); transition: transform 180ms cubic-bezier(0.3, 1.6, 0.5, 1); }
+.clapper:hover .clapper-arm, .clapper-arm.snap { transform: rotate(0deg); }
+
+/* 어두운 헤더(시작 화면, 실전 화면)의 오른쪽 버튼들. 버튼은 흰 화면과 같이 쓰므로 여기서 색만 바꾼다. */
+.hdr-dark button { color: rgba(255, 255, 255, 0.82); border-color: rgba(255, 255, 255, 0.22); }
+.hdr-dark div { border-color: rgba(255, 255, 255, 0.22); }
+
+/* 움직임 줄이기 설정이면 페이드만 남긴다 */
+@media (prefers-reduced-motion: reduce) {
+  .slate-sweep, .tally-pulse, .wave-bar { animation: none; }
+  .shot-in, .rise-in { animation: rise-fade 1ms both; }
+  .clapper-arm { transition: none; }
+}
+@keyframes rise-fade { from { opacity: 0; } to { opacity: 1; } }

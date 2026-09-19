@@ -9,7 +9,7 @@ from fastapi.templating import Jinja2Templates
 from dotenv import load_dotenv
 from fastapi.middleware.cors import CORSMiddleware
 
-from routers import rag_api, upload_api, log_api, core_api
+from routers import rag_api, upload_api, log_api, core_api, graph_api, notes_api
 import engine_store
 
 load_dotenv()
@@ -19,6 +19,8 @@ app.include_router(upload_api.router)
 app.include_router(rag_api.router)
 app.include_router(log_api.router)
 app.include_router(core_api.router)
+app.include_router(graph_api.router)
+app.include_router(notes_api.router)
 
 # ---------------------------------------------------------
 # [보안 설정] CORS 미들웨어 추가 (프론트엔드 접속 허용)
@@ -166,6 +168,10 @@ async def websocket_endpoint(websocket: WebSocket):
             mode = msg.get("mode") or session_mode
             if mode in ("answer", "flow"):
                 await _send_extra(websocket, rq, text, cue, mode)
+            elif not cue.sources and not cue.core and cue.status != "ignored":
+                # 키워드 모드인데 슬라이드 근거 카드가 없다. 키워드만으로는 할 말이 없으니
+                # 전체 자료(슬라이드, 대본, 설명 자료, 논리 지도)로 추천 답변을 한 번 만들어 보낸다.
+                await _send_extra(websocket, rq, text, cue, "answer")
 
     except WebSocketDisconnect:
         manager.disconnect(websocket)

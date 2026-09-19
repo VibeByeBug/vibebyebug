@@ -29,6 +29,10 @@ from qtype import classify
 from weak_profile import WeakProfile
 import qa_log
 import core_answers
+import deck_graph
+import notes as notes_mod
+import knowledge
+import knowledge_graph
 
 # 유형별로 슬라이드에서 '무엇을 보여줄지'가 다르다.
 # 검색에 유형을 쓰는 건 실패했지만(README 참고), 무엇을 띄울지 고르는 데는 맞다.
@@ -260,6 +264,18 @@ def _useful_number(w: str) -> bool:
 # 둘 다 크게 흔들지 않는 (3, 1.5). 문항 수가 적어서 더 잘게 맞추지 않았다.
 RANK_BONUS = (3.0, 1.5, 0.0, 0.0, 0.0)
 
+# 논리 지도로 더 붙일 슬라이드 수. 많을수록 흐름도와 추천 답변이 느려진다.
+GRAPH_EXTRA = 3
+# 통합 지식 조각 검색 (knowledge.py). 답변과 흐름도에 넘길 조각 수.
+# 조각 하나가 슬라이드 묶음이나 이어진 문장 3개 정도라, 8개면 슬라이드 서너 장 분량이다.
+KB_K = 8
+# 지식 그래프로 더할 이웃 조각 수. 검색 상위 몇 개의 이웃에서 고를지.
+KG_EXTRA = 3
+KG_SEED = 4
+# 슬라이드에서 근거를 못 찾았을 때 대신 넘길 발표자 설명 수와 슬라이드 수 (_fallback)
+FALLBACK_NOTES = 10
+FALLBACK_SLIDES = 4
+
 HEADING = re.compile(r"^[\[\(<※★①-⑤]|^STEP\s|^\s*[-•]\s*$")
 
 
@@ -435,6 +451,21 @@ class ReadyQ:
         self._slow_docs = docs
         self._slow_ready = False
 
+        # 통합 지식 조각 (슬라이드 + 대본 + 설명 자료 + 리허설). 답변과 흐름도의 근거를 여기서 찾는다.
+        # 화면의 키워드와 근거 카드는 지금처럼 슬라이드 검색(cue)을 쓴다.
+        self.use_kb = True
+        self.notes: list[dict] = []
+        self.refined: dict[int, str] = {}
+        self.kb: list[dict] = []
+        self.kb_index = None
+        self.kgraph: dict | None = None      # set_kgraph() 로 넣는다 (knowledge_graph.py)
+        # 지식 그래프 이웃을 답변 근거에 더할지. 지금은 끈다 (2026-09-19 측정):
+        #   여러 조각을 엮어야 하는 질문 8개 x 2회에서 근거에 든 사실 88% -> 88%, 답변 69% -> 71%.
+        #   조각 60개 중 8개를 검색하면 이미 필요한 사실의 88% 가 들어왔다. 병목은 검색이 아니라
+        #   답변 길이(2문장)였다. 그래프는 화면의 지식 지도에 쓰고, 자료가 커지면 다시 잰다.
+        self.use_kg = False
+        self._build_kb()
+
     def warm(self) -> float:
         """임베딩 모델을 올리고 문서를 색인한다. 발표 시작 전에 부른다.
 
@@ -449,6 +480,7 @@ class ReadyQ:
             return time.time() - t0
         self.slow.index(self._slow_docs)
         self._slow_ready = True
+        self._build_kb()
         # 준비 직후 첫 질문 몇 개가 200~280ms 로 느렸다(이후 50~70ms).
         # 질문 길이가 달라질 때마다 모델 내부 연산이 처음 한 번 준비되는 비용이라
         # 길이가 다른 가짜 질문을 미리 흘려서 발표 전에 치르게 한다. 기록은 남기지 않는다.
@@ -578,6 +610,23 @@ class ReadyQ:
         메시지는 {"type": "cue.answer", "text", "done", "latency_ms"} 이고,
         마지막 메시지(done=True)에 status 가 붙는다: ok | no_answer | blocked | error | skipped
         """
+        if self.use_kb and not cue.core and cue.status != "ignored":
+            slides, story, has_slide = self._kb_context(question)
+            if slides:
+                answerer = self._get_answerer()
+                tag = {} if has_slide else {"basis": "notes"}
+                yield from self._or_infer(
+                    ({**m, **tag} for m in self._or_fallback(
+                        answerer.stream(question, slides, story),
+                        lambda ctx: answerer.stream(question, *ctx), question, dict(slides))),
+                    lambda: answerer.stream(question, slides, story, infer=True), self._related(question, cue))
+                return
+        if self._use_fallback(cue):
+            ctx = self._fallback(question)
+            if ctx:
+                for m in self._get_answerer().stream(question, *ctx):
+                    yield {**m, "basis": "notes"}
+                return
         if cue.status != "ok" or not cue.sources or cue.core:
             # 근거 없는 질문에 답변을 만들면 지어낸 말이 된다
             yield {"type": "cue.answer", "text": "", "done": True,
@@ -588,8 +637,11 @@ class ReadyQ:
         for s in cue.sources:
             row = next((r for r in self.rows if r["page"] == s.slide and r["source"] == s.source), None)
             if row is not None:
-                by_page.setdefault(s.slide, row["text"])
-        yield from answerer.stream(question, list(by_page.items()))
+                by_page.setdefault(s.slide, self._page_text(row))
+        slides, story = self._with_graph(by_page, question)
+        yield from self._or_fallback(
+            answerer.stream(question, slides, story),
+            lambda ctx: answerer.stream(question, *ctx), question, dict(slides))
 
     def flow(self, question: str, cue: Cue) -> Iterator[dict]:
         """cue() 결과에 이어 말할 순서를 흐름도 칸으로 내보낸다. flow 모드에서만 부른다.
@@ -597,6 +649,24 @@ class ReadyQ:
         메시지는 {"type": "cue.flow", "steps": [{"text", "slide"}], "done", "latency_ms"} 이고,
         마지막 메시지에 status 가 붙는다: ok | no_answer | blocked | error | skipped
         """
+        if self.use_kb and not cue.core and cue.status != "ignored":
+            slides, story, has_slide = self._kb_context(question)
+            if slides:
+                answerer = self._get_answerer()
+                tag = {} if has_slide else {"basis": "notes"}
+                yield from self._or_infer(
+                    ({**m, **tag} for m in self._or_fallback(
+                        answerer.flow(question, cue.question_type, slides, story),
+                        lambda ctx: answerer.flow(question, cue.question_type, *ctx), question, dict(slides))),
+                    lambda: answerer.flow(question, cue.question_type, slides, story, infer=True),
+                    self._related(question, cue))
+                return
+        if self._use_fallback(cue):
+            ctx = self._fallback(question)
+            if ctx:
+                for m in self._get_answerer().flow(question, cue.question_type, *ctx):
+                    yield {**m, "basis": "notes"}
+                return
         if cue.status != "ok" or not cue.sources or cue.core:
             yield {"type": "cue.flow", "steps": [], "done": True,
                    "latency_ms": 0.0, "status": "skipped"}
@@ -605,8 +675,271 @@ class ReadyQ:
         for s in cue.sources:
             row = next((r for r in self.rows if r["page"] == s.slide and r["source"] == s.source), None)
             if row is not None:
-                by_page.setdefault(s.slide, row["text"])
-        yield from self._get_answerer().flow(question, cue.question_type, list(by_page.items()))
+                by_page.setdefault(s.slide, self._page_text(row))
+        slides, story = self._with_graph(by_page, question)
+        answerer = self._get_answerer()
+        yield from self._or_fallback(
+            answerer.flow(question, cue.question_type, slides, story),
+            lambda ctx: answerer.flow(question, cue.question_type, *ctx), question, dict(slides))
+
+    def _related(self, question: str, cue: Cue) -> bool:
+        """발표와 조금이라도 관련된 질문인가. 추론 답은 이런 질문에만 만든다.
+
+        "점심 뭐 먹지?" 같은 잡담에 추론 답을 띄우면 발표자가 헷갈린다. 자료에 있는 낱말이 하나라도 있거나,
+        프로젝트, 한계, 팀처럼 어느 발표에나 나오는 질문 말이 있으면 관련 있다고 본다.
+        """
+        if cue.status == "ok":
+            return True
+        words = [w.lower() for w in self.nouns(question)]
+        if any(w in self.idf for w in words if len(w) >= 2 and w not in FILLER):
+            return True
+        return any(w in META_EXPAND for w in words) or bool(
+            re.search(r"여러분|팀|발표|이거|이것|이 서비스|이 프로젝트|왜|어떻게", question))
+
+    @staticmethod
+    def _or_infer(first: Iterator[dict], infer, related: bool = True) -> Iterator[dict]:
+        """자료로 답하지 못하면(no_answer) 추론 모드로 한 번 더 만든다. 화면에 "추론한 답" 으로 표시된다."""
+        for m in first:
+            # 자료로 답할 수 없다고 했거나, 첫 문장(첫 칸)부터 자료에 없는 숫자가 나와 아무것도 못 띄운 경우
+            empty = m.get("status") == "no_answer" or (
+                m.get("status") == "blocked" and not m.get("text") and not m.get("steps"))
+            if related and m.get("done") and empty:
+                for m2 in infer():
+                    yield {**m2, "basis": "inferred"}
+                return
+            yield m
+
+    def _or_fallback(self, first: Iterator[dict], again, question: str, base: dict) -> Iterator[dict]:
+        """슬라이드로 만든 답이 "자료로 답할 수 없음" 이면 보강 자료와 논리 지도를 더해 한 번 더 만든다.
+
+        검색은 슬라이드를 찾았는데 그 슬라이드에 답이 없는 경우다("형태소 분석기는 왜 필요했나요?" 에
+        검색은 비슷한 낱말이 있는 슬라이드를 주지만 이유는 설명 자료에만 있다).
+        """
+        for m in first:
+            if m.get("done") and m.get("status") == "no_answer":
+                ctx = self._fallback(question, base)
+                if ctx:
+                    for m2 in again(ctx):
+                        yield {**m2, "basis": "notes"}
+                    return
+            yield m
+
+    def set_refined(self, refined: dict[int, str] | None) -> None:
+        """AI 정리본 (slide_refine). 슬라이드 조각을 정리본의 묶음 단위로 나누는 데 쓴다."""
+        self.refined = dict(refined or {})
+        self._build_kb()
+
+    def _build_kb(self) -> None:
+        """지식 조각을 다시 만들고 색인한다. 설명이나 정리본이 바뀔 때마다 부른다(19장 기준 1초 안팎)."""
+        self.kb = knowledge.build(self.rows, getattr(self, "notes", []), getattr(self, "refined", {}))
+        self._kb_by_id = {c["id"]: c for c in self.kb}
+        self._kb_words = {c["id"]: {w.lower() for w in self.nouns(c["text"])} for c in self.kb}
+        docs = [c["text"] for c in self.kb]
+        if self.slow is not None and self._slow_ready:
+            # 임베딩 모델은 슬라이드 검색과 같이 쓴다 (다시 올리면 메모리와 시간이 두 배)
+            emb = STEmbedder(self.slow.b.model_id)
+            emb._model = self.slow.b._load()
+            self.kb_index = Hybrid(BM25(), emb)
+        else:
+            self.kb_index = BM25()
+        self.kb_index.index(docs)
+
+    def _kb_context(self, question: str) -> tuple[list[tuple[int, str]], str, bool]:
+        """질문에 맞는 지식 조각 -> (답변 자료, 발표 줄거리, 슬라이드 조각이 하나라도 있었나)."""
+        hits = self.kb_index.search([question], KB_K)[0] if self.kb else []
+        picked = [self.kb[i] for i, _ in hits]
+        if self.use_kg and self.kgraph:
+            picked = self._with_kgraph(picked, question)
+        slides = knowledge.to_context(picked)
+        graph = getattr(self, "graph", None)
+        story = deck_graph.story_text(graph) if graph else ""
+        return slides, story, any(c["kind"] == "slide" for c in picked)
+
+    def set_kgraph(self, graph: dict | None) -> None:
+        """지식 그래프 (knowledge_graph.py). 없으면 검색한 조각만 쓴다."""
+        self.kgraph = graph if graph and graph.get("ok") else None
+
+    def _with_kgraph(self, picked: list[dict], question: str) -> list[dict]:
+        """검색한 조각에 지식 그래프의 이웃을 더하고, 같은 내용이 겹치면 하나만 남긴다.
+
+        이웃을 다 붙이면 연결이 많은 조각(서비스 소개 등)이 질문과 상관없이 매번 끼었다
+        (슬라이드 논리 지도에서 겪은 것과 같다). 질문 낱말과 맞는 이웃만 더한다.
+        """
+        qwords = {w.lower() for w in self.nouns(question)}
+        ids = [c["id"] for c in picked]
+        scored = []
+        for cid, _ in knowledge_graph.neighbors(self.kgraph, ids[:KG_SEED]):
+            c = self._kb_by_id.get(cid)
+            if c is None:
+                continue
+            score, n = _match(self._kb_words.get(cid, set()), qwords, self.idf)
+            if n:
+                scored.append((score, c))
+        scored.sort(key=lambda x: -x[0])
+        out = picked + [c for _, c in scored[:KG_EXTRA]]
+        # 같은 내용: 슬라이드 조각을 남긴다 (화면에 슬라이드 번호를 보여줄 수 있다)
+        same = knowledge_graph.same_pairs(self.kgraph)
+        keep = []
+        for c in out:
+            twin = next((k for k in keep if (k["id"], c["id"]) in same), None)
+            if twin is None:
+                keep.append(c)
+            elif c["kind"] == "slide" and twin["kind"] != "slide":
+                keep[keep.index(twin)] = c
+        return keep
+
+    def set_notes(self, notes: list[dict] | None) -> None:
+        """발표자 설명(리허설, 대본, 설명 자료)을 넣는다. 검색 색인을 다시 만든다.
+
+        검색에는 슬라이드 반복 문장까지 다 붙인다. 청중은 슬라이드 문구가 아니라 말하듯이 묻는데,
+        발표자가 말로 풀어낸 표현이 그 질문과 더 닮았다.
+        답변 근거로는 슬라이드에 없는 설명(explain)과 확인된 사실(fact)만 쓴다(_page_text).
+        화면에 뜨는 근거 문장은 여전히 슬라이드 원문이다(self.prepared 는 그대로).
+        """
+        self.notes = list(notes or [])
+        docs = []
+        for r in self.rows:
+            extra = [n["text"] for n in notes_mod.for_page(self.notes, r["page"], answer_only=False)]
+            docs.append("\n".join([r["text"], *extra]))
+        # 근거 없음 판정도 설명에 나온 말을 알아야 한다. 안 그러면 설명으로 답할 수 있는 질문을 막는다.
+        self.idf = _idf([{"text": d} for d in docs] + [{"text": n["text"]} for n in notes_mod.general(self.notes)],
+                        self.nouns)
+        self.fast = BM25()
+        self.fast.index(docs)
+        self._slow_docs = docs
+        if self.slow is not None and self._slow_ready:
+            self.slow.index(docs)
+        self._build_kb()
+
+    def _page_text(self, row: dict) -> str:
+        """답변 근거로 넘길 슬라이드 내용. 발표자 설명이 있으면 아래에 붙인다."""
+        extra = notes_mod.for_page(getattr(self, "notes", []), row["page"])
+        if not extra:
+            return row["text"]
+        return "\n".join([row["text"], *(f"[발표자 설명] {n['text']}" for n in extra)])
+
+    def _general_notes(self, question: str, limit: int = 3) -> str:
+        """특정 슬라이드가 아닌 프로젝트 설명 중 질문과 맞는 것."""
+        general = notes_mod.general(getattr(self, "notes", []))
+        if not general:
+            return ""
+        qwords = {w.lower() for w in self.nouns(question)}
+        scored = []
+        for n in general:
+            score, k = _match({w.lower() for w in self.nouns(n["text"])}, qwords, self.idf)
+            if k:
+                scored.append((score, n["text"]))
+        scored.sort(key=lambda x: -x[0])
+        return "\n".join(f"[프로젝트 설명] {t}" for _, t in scored[:limit])
+
+    def set_graph(self, graph: dict | None) -> None:
+        """발표자료 논리 지도 (deck_graph). 없으면 지금처럼 검색한 슬라이드만 쓴다."""
+        self.graph = graph
+
+    def _with_graph(self, by_page: dict, question: str = "") -> tuple[list[tuple[int, str]], str]:
+        """검색한 슬라이드에 논리적으로 연결된 슬라이드를 붙인다. 그리고 발표 줄거리.
+
+        "왜 이 방법이 맞나요?" 처럼 문제, 방법, 검증이 여러 장에 흩어진 질문에서
+        검색이 한두 장만 찾아도 나머지를 논리 지도로 끌어온다.
+
+        처음엔 이웃을 전부 붙였더니 연결이 많은 슬라이드(문제 제기 3번 등)가 질문과 상관없이
+        매번 끼었다. 그래서 두 길로 후보를 모으고 질문 단어와 맞는 것만 남긴다.
+          이웃    검색한 슬라이드와 논리 지도로 이어진 슬라이드
+          줄거리  질문과 맞는 줄거리 단계의 슬라이드 (검색이 처음부터 놓친 슬라이드를 찾는 길)
+        """
+        graph = getattr(self, "graph", None)
+        if not graph:
+            return self._add_general(by_page, question), ""
+        pages = list(by_page)
+        qwords = {w.lower() for w in self.nouns(question)} if question else set()
+
+        cands = deck_graph.neighbors(graph, pages, limit=10)
+        for line in graph.get("story", []):
+            lw = {w.lower() for w in self.nouns(line["text"])}
+            if qwords & lw:
+                cands += [p for p in line.get("pages", []) if p not in cands]
+
+        scored = []
+        for p in cands:
+            if p in by_page:
+                continue
+            i = next((k for k, r in enumerate(self.rows) if r["page"] == p), None)
+            if i is None:
+                continue
+            words = set().union(*(w for _, w in self.prepared[i])) if self.prepared[i] else set()
+            score, n = _match(words, qwords, self.idf)
+            if n:
+                scored.append((score, p, i))
+        scored.sort(key=lambda x: -x[0])
+        for _, p, i in scored[:GRAPH_EXTRA]:
+            by_page.setdefault(p, self._page_text(self.rows[i]))
+        return self._add_general(by_page, question), deck_graph.story_text(graph)
+
+    @staticmethod
+    def _use_fallback(cue: Cue) -> bool:
+        """슬라이드에서 근거를 못 찾은 질문인가. 잡음(ignored)과 연습 확정 답(core)은 빼고."""
+        if cue.core or cue.status == "ignored":
+            return False
+        return cue.status == "no_evidence" or not cue.sources
+
+    def _fallback(self, question: str, base: dict | None = None) -> tuple[list[tuple[int, str]], str] | None:
+        """슬라이드에서 근거를 못 찾았을 때 쓸 자료. 발표자 설명과 논리 지도 줄거리로 모은다.
+
+        "이 프로젝트의 의의는?" 처럼 슬라이드 글자와 겹치지 않는 질문도 발표자가 대본이나
+        설명 자료로 넣어둔 내용, 논리 지도가 정리한 발표 줄거리로는 답할 수 있는 경우가 많다.
+        여기서도 모델은 넘긴 자료 안에서만 답하고, 숫자는 자료와 대조한다(answer.py).
+        보강 자료도 논리 지도도 없으면 None - 지금처럼 근거 없음으로 둔다.
+        """
+        notes = [n for n in getattr(self, "notes", []) if n.get("kind") in ("explain", "fact")]
+        graph = getattr(self, "graph", None)
+        if not notes and not graph:
+            return None
+        qwords = {w.lower() for w in self.nouns(question)}
+
+        # 질문과 맞는 설명을 먼저, 모자라면 앞에서부터 채운다 (넓은 질문은 단어가 안 맞아도 설명 전체가 답의 재료다)
+        scored = []
+        for i, n in enumerate(notes):
+            score, k = _match({w.lower() for w in self.nouns(n["text"])}, qwords, self.idf)
+            scored.append((score if k else 0.0, -i, n))
+        scored.sort(key=lambda x: (-x[0], -x[1]))
+        picked = [n for _, _, n in scored[:FALLBACK_NOTES]]
+
+        # base: 검색이 이미 찾은 슬라이드 (있으면 그 위에 보강 자료를 더한다)
+        by_page: dict[int, str] = {p: t for p, t in (base or {}).items() if p}
+        general_lines = [f"[프로젝트 설명] {n['text']}" for n in picked if not n.get("page")]
+        for n in picked:
+            p = n.get("page")
+            if not p:
+                continue
+            row = next((r for r in self.rows if r["page"] == p), None)
+            if row is not None:
+                by_page.setdefault(p, self._page_text(row))
+
+        # 논리 지도: 질문과 맞는 줄거리 단계의 슬라이드를 붙이고, 줄거리 자체도 근거로 넘긴다
+        story = ""
+        if graph:
+            for line in graph.get("story", []):
+                lw = {w.lower() for w in self.nouns(line["text"])}
+                if qwords & lw:
+                    for p in line.get("pages", [])[:2]:
+                        row = next((r for r in self.rows if r["page"] == p), None)
+                        if row is not None and len(by_page) < FALLBACK_SLIDES + len(base or {}):
+                            by_page.setdefault(p, self._page_text(row))
+            story = deck_graph.story_text(graph)
+            if story:
+                general_lines.append("[발표 줄거리] " + " / ".join(s["text"] for s in graph.get("story", [])))
+        if general_lines:
+            by_page[0] = "\n".join(general_lines)
+        # 검색 결과에 더한 게 없으면 다시 만들어도 같은 답이다
+        if not by_page or (base and set(by_page) <= set(base) and by_page.get(0) == base.get(0)):
+            return None
+        return list(by_page.items()), story
+
+    def _add_general(self, by_page: dict, question: str) -> list[tuple[int, str]]:
+        general = self._general_notes(question)
+        if general:
+            by_page.setdefault(0, general)     # 0 = 특정 슬라이드가 아닌 설명
+        return list(by_page.items())
 
     def set_core(self, cards: dict) -> None:
         """연습에서 확정한 기본 질문 카드 {질문 종류 id: 카드}. 확정이 바뀔 때마다 다시 넣는다."""

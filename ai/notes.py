@@ -1,0 +1,281 @@
+"""발표자 설명 모으기 - 리허설 녹음, 발표 대본, 프로젝트 설명 자료.
+
+슬라이드에는 요약만 적혀 있어서 "왜", "어떻게" 를 묻는 질문에 답이 얕았다.
+발표자가 말로 풀어 설명한 내용이나 대본, 기획서에는 슬라이드에 없는 이유, 예시, 맥락이 있다.
+
+들어온 글을 문장으로 나눠 네 가지로 분류한다.
+  repeat    슬라이드에 이미 있는 말     답변 근거로는 안 쓴다. 검색용 표현으로만 둔다
+                                          (청중은 슬라이드 문구가 아니라 말하듯이 묻는다)
+  explain   슬라이드에 없는 이유, 예시, 맥락   저장
+  fact      슬라이드에 없는 새 사실이나 숫자   발표자 확인을 받고 저장
+  filler    군말                             버림
+
+이미 저장된 설명과 겹치는 문장도 뺀다. 리허설을 여러 번 해도 같은 말이 쌓이지 않게.
+모델을 부르는 건 정리 단계뿐이고, 저장은 발표자가 확인한 것만 한다.
+"""
+
+from __future__ import annotations
+
+import json
+import re
+import uuid
+from datetime import datetime
+from pathlib import Path
+
+KINDS = ("repeat", "explain", "fact", "filler", "known")
+SOURCES = ("rehearsal", "script", "doc")
+SOURCE_LABEL = {"rehearsal": "리허설", "script": "발표 대본", "doc": "설명 자료"}
+MAX_CHUNK = 3500      # 긴 자료는 이 길이로 나눠 여러 번 정리한다
+DUP_SIM = 0.6         # 글자 2-gram 겹침이 이 이상이면 같은 설명으로 본다
+GROUNDED = 0.5        # 정리된 문장 글자의 이만큼은 원문에 있어야 한다 (음성 인식 오류 고친 것까지 허용)
+MIN_COVER = 0.6       # 원문의 이만큼은 정리 결과에 담겨야 한다 (군말, 소제목은 빠지므로 1이 아니다)
+
+PROMPT = """발표자가 준비한 {source_label}을 정리해줘. 이걸로 발표 뒤 질의응답에서 쓸 설명 자료를 만든다.
+
+할 일:
+1. 글을 뜻이 하나인 문장으로 나눠. 말투의 군말("어", "그니까", "뭐냐면")은 빼고, 음성 인식이 잘못 받아 적은 말은
+   슬라이드에 나온 용어로 고쳐. 내용은 바꾸지 마. 괄호 안의 설명과 숫자도 빼지 마.
+   나눈 문장은 따로 떼어 읽어도 뜻이 통해야 한다. "이", "그", "두 방식"처럼 앞 문장을 가리키는 말은
+   가리키는 대상을 앞 문장에서 가져와 써.
+2. 문장마다 종류를 골라.
+   repeat  = 슬라이드에 이미 적힌 내용을 다시 말한 것
+   explain = 슬라이드에 없는 이유, 예시, 맥락, 배경 설명
+   fact    = 슬라이드에 없는 새 사실이나 숫자
+   filler  = 인사, 넘어가는 말처럼 정보가 없는 것
+   known   = 아래 "이미 저장된 설명" 과 표현만 다르고 뜻이 같은 것
+3. 문장마다 어느 슬라이드에 대한 설명인지 번호를 붙여. 문장의 주제가 어떤 슬라이드의 제목이나 항목과 같으면
+   (예: 측정값이면 성능, 테스트를 다룬 슬라이드, 기능 설명이면 그 기능이 적힌 슬라이드) 그 번호를 써.
+   청중이 그 슬라이드를 보다가 이 문장이 답이 될 질문을 할 만하면 그 슬라이드다. 프로젝트 전체에 대한 말이라
+   어느 한 슬라이드와도 주제가 맞지 않을 때만 0.
+4. 발표자가 말한 것만 옮겨. 네가 새 내용을 보태지 마. 슬라이드는 번호를 붙이기 위한 참고용이니 슬라이드 내용을
+   옮겨 적지 마. 출력하는 문장은 모두 맨 아래 {source_label}에서 나와야 하고, 그 글을 처음부터 끝까지 빠짐없이 다뤄.
+   글 안의 "10.", "11." 같은 소제목 번호는 슬라이드 번호가 아니다.
+{page_hint}
+출력 형식 (다른 말 붙이지 말고 한 줄에 한 문장):
+슬라이드번호 | 종류 | 문장
+
+--- 슬라이드 ---
+{slides}
+{known_block}
+--- {source_label} ---
+{text}"""
+
+
+def _bigrams(s: str) -> set:
+    s = re.sub(r"\s+", "", s)
+    return {s[i:i + 2] for i in range(len(s) - 1)}
+
+
+def _similar(a: str, b: str) -> float:
+    x, y = _bigrams(a), _bigrams(b)
+    return len(x & y) / min(len(x), len(y)) if x and y else 0.0
+
+
+def _unquote(s: str) -> str:
+    """칸 전체를 감싼 따옴표만 벗긴다. 문장 안의 따옴표("점심 뭐 먹지" 같은)는 살린다."""
+    s = s.strip()
+    if len(s) >= 2 and s[0] == s[-1] and s[0] in "\"'" and s.count(s[0]) == 2:
+        return s[1:-1].strip()
+    return s
+
+
+def _numbers(text: str) -> list[str]:
+    return [n.replace(",", "") for n in re.findall(r"(?<![A-Za-z])\d+(?:[.,]\d+)*", text)]
+
+
+def _chunks(text: str) -> list[str]:
+    """긴 자료를 문단 경계로 나눈다."""
+    out, cur = [], ""
+    for para in re.split(r"\n\s*\n", text):
+        if len(cur) + len(para) > MAX_CHUNK and cur:
+            out.append(cur)
+            cur = ""
+        cur += para + "\n\n"
+    if cur.strip():
+        out.append(cur)
+    return out
+
+
+def _content(s: str) -> str:
+    return re.sub(r"[\s#*>\-|`\"'.,()]", "", s)
+
+
+def _grounded(sent: str, source: str) -> float:
+    """문장의 글자 2-gram 중 원문에 있는 비율. 자료에 없는 문장(슬라이드를 옮겨 적은 것 등)을 거른다."""
+    x = _bigrams(_content(sent))
+    return len(x & _bigrams(_content(source))) / len(x) if x else 0.0
+
+
+def _coverage(sents: list[str], source: str) -> float:
+    """원문 글자 2-gram 중 정리된 문장에 담긴 비율. 낮으면 모델이 자료 일부를 빠뜨린 것이다."""
+    src = _bigrams(_content(source))
+    got = set().union(*(_bigrams(_content(t)) for t in sents)) if sents else set()
+    return len(src & got) / len(src) if src else 1.0
+
+
+def _parse(raw: str, by_page: dict, page: int | None, deck: str,
+           existing: list[dict], known: list[dict]) -> list[dict]:
+    out = []
+    for line in raw.splitlines():
+        parts = [_unquote(x) for x in line.strip().split("|")]
+        if len(parts) < 3 or not parts[2]:
+            continue
+        m = re.search(r"\d+", parts[0])
+        p = int(m.group()) if m else 0
+        p = p if p in by_page else (page or None)
+        kind = parts[1] if parts[1] in KINDS else "explain"
+        sent = parts[2]
+        new_numbers = [n for n in _numbers(sent) if n not in deck]
+        # 슬라이드에 없는 숫자가 있으면 설명이 아니라 새 사실이다. 확인을 받아야 한다.
+        if kind in ("explain", "repeat") and new_numbers:
+            kind = "fact"
+        # 글자가 많이 겹치거나, 모델이 이미 저장된 설명과 같은 뜻이라고 본 것은 중복이다
+        # 비교할 저장된 설명이 없는데 known 이라고 한 것은 같은 자료 안에서 겹친 것이라 중복으로 치지 않는다
+        dup = (kind == "known" and bool(known)) or any(_similar(sent, e["text"]) >= DUP_SIM for e in existing)
+        if kind == "known":
+            kind = "explain"
+        out.append({"page": p, "kind": kind, "text": sent, "dup": dup, "new_numbers": new_numbers})
+    return out
+
+
+def classify(rows: list[dict], text: str, source: str, page: int | None = None,
+             existing: list[dict] | None = None) -> list[dict]:
+    """글을 문장으로 나눠 분류한다. 저장하지 않는다(발표자 확인용).
+
+    반환: [{"page", "kind", "text", "dup", "new_numbers"}]
+      dup          이미 저장된 설명과 겹치는가 (겹치면 기본으로 저장하지 않는다)
+      new_numbers  슬라이드에 없는 숫자 (있으면 fact 로 올려서 확인을 받는다)
+    """
+    from core_answers import _chat
+
+    text = (text or "").strip()
+    if not text:
+        return []
+    by_page = {r["page"]: r["text"] for r in rows}
+    deck = re.sub(r"[\s,]", "", "\n".join(by_page.values()))
+    slides = "\n\n".join(f"[{p}번 슬라이드]\n{t}" for p, t in sorted(by_page.items()))
+    hint = (f"5. 이 녹음은 발표자가 {page}번 슬라이드를 설명한 것이다. 특별한 이유가 없으면 {page}번으로 붙여.\n"
+            if page else "")
+    existing = existing or []
+
+    items: list[dict] = []
+    for part in _chunks(text):
+        known = [e for e in existing if e.get("kind") in ("explain", "fact")
+                 and (page is None or e.get("page") in (page, None))][:40]
+        known_block = ("\n".join(["", "--- 이미 저장된 설명 ---", *(f"- {e['text']}" for e in known), ""])
+                       if known else "")
+        prompt = PROMPT.format(source_label=SOURCE_LABEL.get(source, "자료"), page_hint=hint,
+                               slides=slides, text=part, known_block=known_block)
+        # 모델이 가끔 자료 대신 슬라이드를 옮겨 적거나(자료의 "10." 같은 소제목 번호를 슬라이드 번호로 착각)
+        # 자료 뒷부분을 빠뜨린다. 자료에 없는 문장은 버리고, 빠뜨린 게 많으면 한 번 더 시킨다.
+        best: list[dict] = []
+        best_cover = -1.0
+        for _ in range(2):
+            raw = _chat(prompt)
+            if raw is None:
+                raise RuntimeError("AI 호출에 실패했습니다. 잠시 뒤 다시 시도해주세요.")
+            got = [it for it in _parse(raw, by_page, page, deck, existing, known)
+                   if _grounded(it["text"], part) >= GROUNDED]
+            cover = _coverage([it["text"] for it in got], part)
+            if cover > best_cover:
+                best, best_cover = got, cover
+            if cover >= MIN_COVER:
+                break
+        items.extend(best)
+    _attach_sections(items, text)
+    return items
+
+
+_HEADING = re.compile(r"^\s*(?:#{1,6}\s+.+|\d{1,2}[.)]\s*[^.!?。]{1,40}|[■□▶◆●]\s*.{1,40})\s*$")
+
+
+def _paragraphs(text: str) -> list[tuple[str, str]]:
+    """글을 (소제목, 문단) 목록으로. 소제목은 그 문단 위에서 마지막으로 나온 제목 줄."""
+    out, heading = [], ""
+    for block in re.split(r"\n\s*\n", text):
+        lines = [l for l in block.split("\n") if l.strip()]
+        body = []
+        for l in lines:
+            if _HEADING.match(l) and len(l.strip()) <= 50:
+                if body:
+                    out.append((heading, " ".join(body)))
+                    body = []
+                heading = l.strip().lstrip("#").strip()
+            else:
+                body.append(l.strip())
+        if body:
+            out.append((heading, " ".join(body)))
+    return out
+
+
+def _attach_sections(items: list[dict], text: str) -> None:
+    """문장마다 원래 글의 어느 문단, 어느 소제목 아래였는지 붙인다.
+
+    문장 하나씩 저장하면 "두 방식을 합쳐야 88.9%" 처럼 앞 문장과 소제목이 없어서 뜻이 끊기고,
+    검색에서도 주제어("논리 지도")가 소제목에만 있는 문장을 못 찾았다. 지식 조각을 만들 때
+    같은 문단의 문장을 소제목과 함께 묶는다(knowledge.py).
+    """
+    paras = _paragraphs(text)
+    if not paras:
+        return
+    for it in items:
+        best = max(range(len(paras)), key=lambda i: _grounded(it["text"], paras[i][1]))
+        if _grounded(it["text"], paras[best][1]) >= GROUNDED:
+            it["para"] = best
+            it["section"] = paras[best][0]
+
+
+class NoteStore:
+    """발표 하나의 발표자 설명. data/notes/{id}.json"""
+
+    def __init__(self, path: Path | str):
+        self.path = Path(path)
+        self.notes: list[dict] = []
+        if self.path.exists():
+            try:
+                self.notes = json.loads(self.path.read_text(encoding="utf-8"))
+            except Exception:
+                self.notes = []
+
+    def add(self, items: list[dict], source: str) -> list[dict]:
+        """확인된 문장을 저장한다. 겹치는 설명은 더 긴 쪽 하나만 남긴다."""
+        added = []
+        for it in items:
+            kind = it.get("kind")
+            text = str(it.get("text", "")).strip()
+            if kind not in ("repeat", "explain", "fact") or not text:
+                continue
+            same = next((n for n in self.notes if _similar(text, n["text"]) >= DUP_SIM), None)
+            if same:
+                if len(text) > len(same["text"]):    # 더 자세한 설명이면 바꾼다
+                    same.update(text=text, updated=datetime.now().isoformat(timespec="seconds"))
+                continue
+            note = {"id": uuid.uuid4().hex[:8], "page": it.get("page"), "kind": kind, "text": text,
+                    "source": source if source in SOURCES else "doc",
+                    "created": datetime.now().isoformat(timespec="seconds")}
+            # 원래 글의 문단 번호와 소제목 (지식 조각을 문단 단위로 묶는 데 쓴다)
+            if it.get("para") is not None:
+                note.update(para=it["para"], section=it.get("section") or "")
+            self.notes.append(note)
+            added.append(note)
+        self._save()
+        return added
+
+    def delete(self, note_id: str) -> None:
+        self.notes = [n for n in self.notes if n["id"] != note_id]
+        self._save()
+
+    def _save(self) -> None:
+        self.path.parent.mkdir(parents=True, exist_ok=True)
+        self.path.write_text(json.dumps(self.notes, ensure_ascii=False, indent=1), encoding="utf-8")
+
+
+def for_page(notes: list[dict], page: int, answer_only: bool = True) -> list[dict]:
+    """슬라이드 하나에 붙은 설명. answer_only 면 답변 근거로 쓸 것(explain, fact)만."""
+    kinds = ("explain", "fact") if answer_only else ("repeat", "explain", "fact")
+    return [n for n in notes if n.get("page") == page and n.get("kind") in kinds]
+
+
+def general(notes: list[dict]) -> list[dict]:
+    """특정 슬라이드가 아닌 설명 (프로젝트 전반)."""
+    return [n for n in notes if not n.get("page") and n.get("kind") in ("explain", "fact")]
