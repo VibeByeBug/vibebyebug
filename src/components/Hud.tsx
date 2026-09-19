@@ -402,7 +402,8 @@ export function FlowSteps({
         why: 'text-[#6b7280]',
       };
   return (
-    <div className="flex items-stretch w-full">
+    // 넓은 화면은 칸을 가로로, 좁은 화면(1024px 미만)은 세로로 쌓는다
+    <div className="flex flex-col lg:flex-row items-stretch w-full">
       {steps.map((step, i) => {
         const guess = inferred && !step.slide; // AI 가 추론한 칸 (근거 슬라이드 없음)
         // 첫 칸은 주황으로 채워 강조한다. 추론한 칸은 보라 칸이라 주황 강조를 쓰지 않는다.
@@ -410,7 +411,7 @@ export function FlowSteps({
         const words = step.keys?.length ? step.keys : step.key ? [step.key] : [];
         const holes = first ? 'text-white/40' : guess ? c.guessHoles : c.holes;
         return (
-          <div key={i} className="flex flex-1 items-stretch min-w-0">
+          <div key={i} className="flex flex-col lg:flex-row flex-1 items-stretch min-w-0">
             {/* 샷 카드: 필름 한 칸처럼 위아래에 구멍 줄. 도착할 때마다 오른쪽에서 밀려 들어온다 */}
             <div
               style={{ animationDelay: `${i * 60}ms` }}
@@ -457,13 +458,14 @@ export function FlowSteps({
               // 칸과 칸 사이 파이프라인. 연결어(입으로 말할 말)와 왜 이어지는지(논리)를 같이 보여준다.
               <div
                 style={{ animationDelay: `${i * 60 + 30}ms` }}
-                className="shot-in flex flex-col items-center justify-center shrink-0 w-[124px] gap-[4px] px-[8px]"
+                className="shot-in flex flex-row lg:flex-col items-center justify-center shrink-0 w-full lg:w-[124px] gap-[8px] lg:gap-[4px] px-[8px] py-[8px] lg:py-0"
               >
                 {step.link && <span className="font-bold text-[15px] text-[#f26b1d] whitespace-nowrap">{step.link}</span>}
-                <div className="flex items-center w-full">
+                <div className="hidden lg:flex items-center w-full">
                   <div className="h-[2px] flex-1 bg-[#f26b1d]" />
                   <span className="font-black text-[14px] text-[#f26b1d] leading-none -ml-[2px]">▶</span>
                 </div>
+                <span className="lg:hidden font-black text-[14px] text-[#f26b1d] leading-none">▼</span>
                 {step.why && (
                   <span className={`font-medium text-[12px] leading-[16px] text-center break-keep ${c.why}`}>{step.why}</span>
                 )}

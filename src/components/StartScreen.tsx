@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { mockRecentPresentations } from '../mocks/recentMock';
 import { ArrowRightIcon } from './icons';
+import { StartGuide } from './StartGuide';
 
 interface StartScreenProps {
   onStart: (title: string) => void;
@@ -13,6 +14,7 @@ export function StartScreen({ onStart, onOpenReport }: StartScreenProps) {
   const [title, setTitle] = useState('');
   const [snap, setSnap] = useState(false);
   const stage = useRef<HTMLDivElement>(null);
+  const titleInput = useRef<HTMLInputElement>(null);
   const today = new Date().toISOString().slice(0, 10).replace(/-/g, '.');
 
   // 스포트라이트: 커서 위치를 천천히 따라간다 (보간 0.12). 리렌더 없이 CSS 변수만 바꾼다.
@@ -43,15 +45,23 @@ export function StartScreen({ onStart, onOpenReport }: StartScreenProps) {
     };
   }, []);
 
+  // 아래 소개 무대의 "새 발표 준비하기": 맨 위 슬레이트로 올라가 발표 이름 칸에 바로 쓰게 한다
+  function backToSlate() {
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+    setTimeout(() => titleInput.current?.focus(), 500);
+  }
+
   function start() {
     setSnap(true);
     setTimeout(() => onStart(title.trim() || '제목 없는 발표'), 220);
   }
 
   return (
+    <div className="flex flex-col bg-[#15110d]">
+    {/* 첫 화면: 화면 높이를 채운다 (헤더 60px + 줄무늬 6px 을 뺀 높이) */}
     <div
       ref={stage}
-      className="relative flex flex-1 flex-col overflow-hidden bg-[#15110d] text-white"
+      className="relative flex min-h-[calc(100vh-66px)] flex-col overflow-hidden bg-[#15110d] text-white"
       style={{ ['--sx' as string]: '70%', ['--sy' as string]: '20%' }}
     >
       {/* 조명과 무대 바닥 */}
@@ -111,6 +121,7 @@ export function StartScreen({ onStart, onOpenReport }: StartScreenProps) {
             <div className="flex flex-col gap-[4px]">
               <span className="font-mono text-[11px] tracking-[3px] text-white/50">PRODUCTION</span>
               <input
+                ref={titleInput}
                 type="text"
                 value={title}
                 onChange={(e) => setTitle(e.target.value)}
@@ -169,7 +180,18 @@ export function StartScreen({ onStart, onOpenReport }: StartScreenProps) {
           </div>
           <div className="film-holes text-white/20" />
         </div>
+        {/* 아래 소개로 내려가는 안내 */}
+        <button
+          type="button"
+          onClick={() => document.getElementById('how-it-works')?.scrollIntoView({ behavior: 'smooth' })}
+          className="nudge self-center flex flex-col items-center gap-[2px] pt-[14px] text-white/55 hover:text-white transition-colors"
+        >
+          <span className="font-mono font-bold text-[12px] tracking-[3px]">사용 방법 보기</span>
+          <span className="text-[18px] leading-none">↓</span>
+        </button>
       </div>
+    </div>
+    <StartGuide onStart={backToSlate} />
     </div>
   );
 }
