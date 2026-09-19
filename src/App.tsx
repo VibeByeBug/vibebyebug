@@ -206,14 +206,15 @@ function App() {
     channelRef.current?.send({ type: 'clear' });
   }
 
-  // 숫자키 1~4 로 보내고 0 이나 Esc 로 내린다 (글을 적는 중에는 무시)
+  // 숫자키 1~4 로 보내고 0 으로 내린다 (글을 적는 중에는 무시).
+  // Esc 는 쓰지 않는다: 전체 화면을 끄거나 메뉴를 닫으려고 누르다가 청중 화면이 내려갔다.
   useEffect(() => {
     if (screen !== 'hud' || !audienceOpen) return;
     const onKey = (e: KeyboardEvent) => {
       const t = e.target as HTMLElement;
       if (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || e.ctrlKey || e.metaKey || e.altKey) return;
       if (e.key >= '1' && e.key <= '4') sendToAudience(Number(e.key) - 1);
-      if (e.key === '0' || e.key === 'Escape') clearAudience();
+      if (e.key === '0') clearAudience();
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
