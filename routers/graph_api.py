@@ -26,6 +26,11 @@ async def get_graph(presentation_id: str):
         for line in path.open(encoding="utf-8"):
             r = json.loads(line)
             texts[r["page"]] = r["text"][:300]
+    # 슬라이드마다 붙은 발표자 설명 (지도에서 점을 누르면 같이 보인다)
+    import notes as notes_mod
+    saved = notes_mod.NoteStore(DATA_DIR / "notes" / f"{presentation_id}.json").notes
     for n in graph.get("nodes", []):
         n["text"] = texts.get(n["page"], "")
+        n["notes"] = [x["text"] for x in notes_mod.for_page(saved, n["page"])]
+    graph["general_notes"] = [x["text"] for x in notes_mod.general(saved)]
     return graph

@@ -55,12 +55,17 @@ def _warm_worker_inner(pid: str, chunks_path: str, preset: str) -> None:
         # 발표자료 논리 지도 (GraphRAG). 한 번 만들면 파일로 남겨서 서버를 다시 켜도 재사용한다.
         # 만들기에 10~20초 걸리고, 실패해도 검색은 지금처럼 동작한다.
         import deck_graph
+        import notes as notes_mod
+        # 발표자 설명(리허설, 대본, 설명 자료)이 있으면 검색 색인과 논리 지도에 같이 넣는다
+        notes = notes_mod.NoteStore(Path(chunks_path).parent / "notes" / f"{pid}.json").notes
+        if notes:
+            rq.set_notes(notes)
         graph_file = Path(chunks_path).parent / "graph" / f"{pid}.json"
         graph = deck_graph.load(graph_file)
         if graph is None:
             import json as _json
             rows = [_json.loads(l) for l in Path(chunks_path).open(encoding="utf-8")]
-            graph = deck_graph.build(rows)
+            graph = deck_graph.build(rows, notes)
             if graph.get("ok"):
                 deck_graph.save(graph, graph_file)
         rq.set_graph(graph if graph.get("ok") else None)

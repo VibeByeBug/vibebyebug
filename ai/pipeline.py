@@ -30,6 +30,7 @@ from weak_profile import WeakProfile
 import qa_log
 import core_answers
 import deck_graph
+import notes as notes_mod
 
 # 유형별로 슬라이드에서 '무엇을 보여줄지'가 다르다.
 # 검색에 유형을 쓰는 건 실패했지만(README 참고), 무엇을 띄울지 고르는 데는 맞다.
@@ -592,7 +593,7 @@ class ReadyQ:
         for s in cue.sources:
             row = next((r for r in self.rows if r["page"] == s.slide and r["source"] == s.source), None)
             if row is not None:
-                by_page.setdefault(s.slide, row["text"])
+                by_page.setdefault(s.slide, self._page_text(row))
         slides, story = self._with_graph(by_page, question)
         yield from answerer.stream(question, slides, story)
 
@@ -610,9 +611,52 @@ class ReadyQ:
         for s in cue.sources:
             row = next((r for r in self.rows if r["page"] == s.slide and r["source"] == s.source), None)
             if row is not None:
-                by_page.setdefault(s.slide, row["text"])
+                by_page.setdefault(s.slide, self._page_text(row))
         slides, story = self._with_graph(by_page, question)
         yield from self._get_answerer().flow(question, cue.question_type, slides, story)
+
+    def set_notes(self, notes: list[dict] | None) -> None:
+        """발표자 설명(리허설, 대본, 설명 자료)을 넣는다. 검색 색인을 다시 만든다.
+
+        검색에는 슬라이드 반복 문장까지 다 붙인다. 청중은 슬라이드 문구가 아니라 말하듯이 묻는데,
+        발표자가 말로 풀어낸 표현이 그 질문과 더 닮았다.
+        답변 근거로는 슬라이드에 없는 설명(explain)과 확인된 사실(fact)만 쓴다(_page_text).
+        화면에 뜨는 근거 문장은 여전히 슬라이드 원문이다(self.prepared 는 그대로).
+        """
+        self.notes = list(notes or [])
+        docs = []
+        for r in self.rows:
+            extra = [n["text"] for n in notes_mod.for_page(self.notes, r["page"], answer_only=False)]
+            docs.append("\n".join([r["text"], *extra]))
+        # 근거 없음 판정도 설명에 나온 말을 알아야 한다. 안 그러면 설명으로 답할 수 있는 질문을 막는다.
+        self.idf = _idf([{"text": d} for d in docs] + [{"text": n["text"]} for n in notes_mod.general(self.notes)],
+                        self.nouns)
+        self.fast = BM25()
+        self.fast.index(docs)
+        self._slow_docs = docs
+        if self.slow is not None and self._slow_ready:
+            self.slow.index(docs)
+
+    def _page_text(self, row: dict) -> str:
+        """답변 근거로 넘길 슬라이드 내용. 발표자 설명이 있으면 아래에 붙인다."""
+        extra = notes_mod.for_page(getattr(self, "notes", []), row["page"])
+        if not extra:
+            return row["text"]
+        return "\n".join([row["text"], *(f"[발표자 설명] {n['text']}" for n in extra)])
+
+    def _general_notes(self, question: str, limit: int = 3) -> str:
+        """특정 슬라이드가 아닌 프로젝트 설명 중 질문과 맞는 것."""
+        general = notes_mod.general(getattr(self, "notes", []))
+        if not general:
+            return ""
+        qwords = {w.lower() for w in self.nouns(question)}
+        scored = []
+        for n in general:
+            score, k = _match({w.lower() for w in self.nouns(n["text"])}, qwords, self.idf)
+            if k:
+                scored.append((score, n["text"]))
+        scored.sort(key=lambda x: -x[0])
+        return "\n".join(f"[프로젝트 설명] {t}" for _, t in scored[:limit])
 
     def set_graph(self, graph: dict | None) -> None:
         """발표자료 논리 지도 (deck_graph). 없으면 지금처럼 검색한 슬라이드만 쓴다."""
@@ -631,7 +675,7 @@ class ReadyQ:
         """
         graph = getattr(self, "graph", None)
         if not graph:
-            return list(by_page.items()), ""
+            return self._add_general(by_page, question), ""
         pages = list(by_page)
         qwords = {w.lower() for w in self.nouns(question)} if question else set()
 
@@ -654,8 +698,14 @@ class ReadyQ:
                 scored.append((score, p, i))
         scored.sort(key=lambda x: -x[0])
         for _, p, i in scored[:GRAPH_EXTRA]:
-            by_page.setdefault(p, self.rows[i]["text"])
-        return list(by_page.items()), deck_graph.story_text(graph)
+            by_page.setdefault(p, self._page_text(self.rows[i]))
+        return self._add_general(by_page, question), deck_graph.story_text(graph)
+
+    def _add_general(self, by_page: dict, question: str) -> list[tuple[int, str]]:
+        general = self._general_notes(question)
+        if general:
+            by_page.setdefault(0, general)     # 0 = 특정 슬라이드가 아닌 설명
+        return list(by_page.items())
 
     def set_core(self, cards: dict) -> None:
         """연습에서 확정한 기본 질문 카드 {질문 종류 id: 카드}. 확정이 바뀔 때마다 다시 넣는다."""

@@ -43,6 +43,7 @@ PROMPT = """발표자가 청중 질문에 바로 읽을 수 있는 답변을 2�
 지켜야 할 것:
 1. 아래 자료 내용만 근거로 써. 자료에 없는 사실, 숫자, 이름은 절대 지어내지 마.
    여러 슬라이드를 이어서 답해도 된다. 발표 줄거리가 있으면 질문이 그 흐름의 어디에 해당하는지 보고 앞뒤 슬라이드를 연결해.
+   [발표자 설명] 과 [프로젝트 설명] 은 발표자가 직접 준 설명이라 근거로 써도 된다. 슬라이드 번호는 그 설명이 붙은 슬라이드(없으면 0).
 2. 숫자는 자료에 적힌 그대로 옮겨. 반올림, 단위 변환, 재계산 금지.
 3. 자료가 보여주는 것보다 세게 단정하지 마. 확인하지 않은 것을 했다고 하지 말고, 한계가 있으면 인정해.
 4. 첫 문장에서 바로 답해. 인사말 금지. 문장은 짧게.
@@ -65,6 +66,12 @@ def _story_block(story: str) -> str:
     if not story:
         return ""
     return f"\n--- 발표 줄거리 (어느 단계의 질문인지 볼 때만 쓴다. 근거는 아래 자료에서) ---\n{story}\n"
+
+
+def _fmt_slides(slides: list[tuple[int, str]]) -> str:
+    """모델에 넘길 자료. 0번은 특정 슬라이드가 아닌 프로젝트 설명이다."""
+    return "\n\n".join((f"[{p}번 슬라이드]\n{t}" if p else f"[프로젝트 설명 (슬라이드 번호 0)]\n{t}")
+                       for p, t in slides)
 
 
 def numbers_ok(text: str, source: str) -> bool:
@@ -121,7 +128,7 @@ class Answerer:
         source = "\n\n".join(t for _, t in slides)
         prompt = PROMPT.format(
             question=question, story=_story_block(story),
-            slides="\n\n".join(f"[{p}번 슬라이드]\n{t}" for p, t in slides))
+            slides=_fmt_slides(slides))
 
         shown: list[str] = []
         first_ms = None
@@ -243,6 +250,7 @@ FLOW_PROMPT = """발표자가 청중 질문에 답할 때 말할 순서를 흐�
 1. 한 칸은 {max_chars}자 이내. 조사와 어미를 빼고 명사형으로 끝내.
 2. 아래 자료 내용만 근거로 써. 자료에 없는 사실, 숫자, 이름은 절대 지어내지 마.
    여러 슬라이드를 이어서 답해도 된다. 발표 줄거리가 있으면 질문이 그 흐름의 어디에 해당하는지 보고 앞뒤 슬라이드를 연결해.
+   [발표자 설명] 과 [프로젝트 설명] 은 발표자가 직접 준 설명이라 근거로 써도 된다. 슬라이드 번호는 그 설명이 붙은 슬라이드(없으면 0).
 3. 숫자는 자료에 적힌 그대로. 반올림, 단위 변환, 재계산 금지.
 4. 칸마다 근거가 된 슬라이드 번호를 붙여.
 5. 칸마다 핵심 단어 하나를 골라. 칸 내용에 그대로 들어 있는 말이어야 한다 (수치가 있으면 수치).
@@ -356,7 +364,7 @@ def flow(self, question: str, qtype: str, slides: list[tuple[int, str]], story: 
         n=FLOW_STEPS, max_chars=FLOW_MAX_CHARS, question=question, story=_story_block(story),
         shape=FLOW_SHAPE.get(qtype, FLOW_SHAPE["사실확인"]),
         links=", ".join(LINKS), guide_max=GUIDE_MAX, why_max=WHY_MAX,
-        slides="\n\n".join(f"[{p}번 슬라이드]\n{t}" for p, t in slides))
+        slides=_fmt_slides(slides))
 
     def take(line: str):
         """한 줄을 칸으로 만든다. 반환: 칸 dict / "skip" / "blocked" / "none" """

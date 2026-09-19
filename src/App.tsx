@@ -7,6 +7,7 @@ import { MicConnectScreen } from './components/MicConnectScreen';
 import { MockPracticeScreen } from './components/MockPracticeScreen';
 import { CorePracticeScreen } from './components/CorePracticeScreen';
 import { GraphScreen } from './components/GraphScreen';
+import { MaterialScreen } from './components/MaterialScreen';
 import { MyHistoryScreen } from './components/MyHistoryScreen';
 import { PreparingScreen } from './components/PreparingScreen';
 import { RecognizedQuestion } from './components/RecognizedQuestion';
@@ -113,6 +114,19 @@ function App() {
     </button>
   );
 
+  const materialButton = (
+    <button
+      type="button"
+      onClick={() => {
+        setGraphBack(screen);
+        setScreen('material');
+      }}
+      className="border border-[#e5e7eb] h-[32px] px-[12px] rounded-[6px] font-bold text-[13px] text-[#6b7280] whitespace-nowrap"
+    >
+      자료 보강
+    </button>
+  );
+
   const micToggle = (
     <button
       type="button"
@@ -197,6 +211,13 @@ function App() {
         </>
       )}
 
+      {screen === 'material' && upload && (
+        <>
+          <Header onNavigate={setScreen} label="자료 보강" showProfile={false} />
+          <MaterialScreen presentationId={upload.presentation_id} onBack={() => setScreen(graphBack)} />
+        </>
+      )}
+
       {screen === 'graph' && upload && (
         <>
           <Header onNavigate={setScreen} label="논리 지도" showProfile={false} />
@@ -226,6 +247,7 @@ function App() {
             rightText="대기 중"
             rightButtons={
               <>
+              {materialButton}
               {graphButton}
               <button
                 type="button"
@@ -296,6 +318,7 @@ function App() {
                 {micToggle}
                 {modeToggle}
                 {graphButton}
+                {materialButton}
                 <button
                   type="button"
                   onClick={() => {

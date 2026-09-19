@@ -6,6 +6,7 @@ interface GraphNode {
   role: string;
   title: string;
   text?: string;
+  notes?: string[]; // 이 슬라이드에 붙은 발표자 설명
 }
 interface GraphEdge {
   from: number;
@@ -17,6 +18,7 @@ interface Graph {
   nodes: GraphNode[];
   edges: GraphEdge[];
   story: { text: string; pages: number[] }[];
+  general_notes?: string[];
 }
 
 // 발표 흐름 순서로 열을 나눈다. 같은 역할의 슬라이드는 한 열에 위아래로 쌓인다.
@@ -203,6 +205,11 @@ export function GraphScreen({ presentationId, onBack }: { presentationId: string
                   <text x="10" y="17" fontSize="11" fontWeight="800" fill={ROLE_COLOR[n.role] ?? '#9ca3af'}>
                     p.{n.page}
                   </text>
+                  {!!n.notes?.length && (
+                    <text x={NODE_W - 8} y="17" fontSize="10" fontWeight="800" fill="#409959" textAnchor="end">
+                      설명 {n.notes.length}
+                    </text>
+                  )}
                   <text x="10" y="33" fontSize="12" fontWeight="700" fill="#1a1a1a">
                     {n.title.length > 11 ? `${n.title.slice(0, 11)}…` : n.title}
                   </text>
@@ -229,6 +236,16 @@ export function GraphScreen({ presentationId, onBack }: { presentationId: string
               <p className="font-normal text-[13px] text-[#4b5563] leading-[20px] whitespace-pre-line max-h-[180px] overflow-auto">
                 {node.text}
               </p>
+              {!!node.notes?.length && (
+                <div className="flex flex-col gap-[4px] bg-[#f3faf5] border border-[#409959] px-[10px] py-[8px] rounded-[6px]">
+                  <p className="font-bold text-[12px] text-[#409959]">발표자 설명 ({node.notes.length})</p>
+                  {node.notes.map((t, i) => (
+                    <p key={i} className="font-medium text-[13px] text-[#1a1a1a] leading-[19px]">
+                      {t}
+                    </p>
+                  ))}
+                </div>
+              )}
               <div className="flex flex-col gap-[6px]">
                 <p className="font-bold text-[12px] text-[#6b7280]">연결 ({nodeEdges.length})</p>
                 {nodeEdges.map((e, i) => (

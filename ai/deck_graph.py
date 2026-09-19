@@ -53,18 +53,31 @@ def _numbers_ok(text: str, source: str) -> bool:
     return all(n.replace(",", "") in src for n in re.findall(r"\d+(?:[.,]\d+)*", text))
 
 
-def build(rows: list[dict]) -> dict:
-    """논리 지도를 만든다. 실패하면 빈 지도를 돌려준다(없어도 검색은 지금처럼 동작한다)."""
-    from core_answers import _chat
+def build(rows: list[dict], notes: list[dict] | None = None) -> dict:
+    """논리 지도를 만든다. 실패하면 빈 지도를 돌려준다(없어도 검색은 지금처럼 동작한다).
 
+    notes 는 발표자 설명(리허설, 대본, 설명 자료). 슬라이드에 없는 이유와 맥락이 들어 있어서
+    같이 읽히면 슬라이드 사이 연결을 더 정확히 찾는다.
+    """
+    from core_answers import _chat
+    import notes as notes_mod
+
+    notes = notes or []
     by_page = {r["page"]: r["text"] for r in rows}
-    slides = "\n\n".join(f"[{p}번 슬라이드]\n{t}" for p, t in sorted(by_page.items()))
-    raw = _chat(PROMPT.format(roles=", ".join(ROLES), relations=", ".join(RELATIONS), slides=slides))
-    graph = {"nodes": [], "edges": [], "story": [], "ok": raw is not None}
+    blocks = []
+    for p, t in sorted(by_page.items()):
+        extra = notes_mod.for_page(notes, p)
+        blocks.append(f"[{p}번 슬라이드]\n{t}" + "".join(f"\n[발표자 설명] {n['text']}" for n in extra))
+    general = notes_mod.general(notes)
+    if general:
+        blocks.append("[프로젝트 전반 설명]\n" + "\n".join(n["text"] for n in general))
+    raw = _chat(PROMPT.format(roles=", ".join(ROLES), relations=", ".join(RELATIONS), slides="\n\n".join(blocks)))
+    graph = {"nodes": [], "edges": [], "story": [], "ok": raw is not None, "notes_used": len(notes)}
     if not raw:
         return graph
 
-    deck = "\n".join(by_page.values())
+    # 숫자 검사 기준에 발표자 설명도 넣는다 (설명에서 나온 숫자는 틀린 게 아니다)
+    deck = "\n".join(by_page.values()) + "\n" + "\n".join(n["text"] for n in notes)
     section = ""
     seen_nodes = set()
     for line in raw.splitlines():

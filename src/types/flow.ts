@@ -7,6 +7,7 @@ export type ScreenName =
   | 'mockPractice'
   | 'corePractice'
   | 'graph'
+  | 'material'
   | 'micConnect'
   | 'recognized'
   | 'textInput'
