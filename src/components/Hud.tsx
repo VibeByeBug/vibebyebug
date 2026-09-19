@@ -336,7 +336,7 @@ export function Hud({
           <p className="font-normal text-[13px] text-white/35 whitespace-nowrap">
             {isLimitation
               ? '한계 질문은 근거보다 답변 문장을 먼저 읽으세요'
-              : `응답 ${result.responseMs}ms, Space 로 다음 질문 대기`}
+              : `응답 ${result.responseMs}ms, Space 로 다음 질문 듣기`}
           </p>
         </div>
       </div>
