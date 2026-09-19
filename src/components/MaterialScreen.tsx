@@ -36,10 +36,13 @@ async function post(url: string, body: unknown) {
   return data;
 }
 
-// 처음 체크 상태: 보충 설명은 저장, 새 사실은 발표자가 직접 확인해서 체크, 중복과 군말은 저장 안 함.
+// 처음 체크 상태: 보충 설명은 저장, 중복과 군말은 저장 안 함.
 // 슬라이드 반복은 답변 근거로는 안 쓰고 검색용 표현으로만 저장하므로 기본 체크.
-function initialCheck(it: Item) {
-  if (it.dup || it.kind === 'filler' || it.kind === 'fact') return false;
+// 새 사실은 리허설에서는 말하다 숫자를 틀릴 수 있어서 발표자가 직접 체크한다.
+// 대본과 설명 자료는 발표자가 써서 올린 글이라 기본 체크하고, 표시만 해둔다.
+function initialCheck(it: Item, source: 'rehearsal' | 'script' | 'doc') {
+  if (it.dup || it.kind === 'filler') return false;
+  if (it.kind === 'fact') return source !== 'rehearsal';
   return true;
 }
 
@@ -196,7 +199,7 @@ function Rehearsal({
         source: 'rehearsal',
         page: slide?.page,
       });
-      setItems((r.items as Item[]).map((it) => ({ ...it, checked: initialCheck(it) })));
+      setItems((r.items as Item[]).map((it) => ({ ...it, checked: initialCheck(it, 'rehearsal') })));
     } catch (e) {
       setError(e instanceof Error ? e.message : '정리하지 못했습니다');
     } finally {
@@ -312,7 +315,7 @@ function DocInput({ presentationId, onSaved }: { presentationId: string; onSaved
     setError(null);
     try {
       const r = await post(`${API_URL}/api/notes/${presentationId}/classify`, { text, source });
-      setItems((r.items as Item[]).map((it) => ({ ...it, checked: initialCheck(it) })));
+      setItems((r.items as Item[]).map((it) => ({ ...it, checked: initialCheck(it, source) })));
     } catch (e) {
       setError(e instanceof Error ? e.message : '정리하지 못했습니다');
     } finally {
@@ -330,7 +333,7 @@ function DocInput({ presentationId, onSaved }: { presentationId: string; onSaved
       const res = await fetch(`${API_URL}/api/notes/${presentationId}/classify-file`, { method: 'POST', body });
       const data = await res.json();
       if (!res.ok) throw new Error(data.detail ?? '파일을 정리하지 못했습니다');
-      setItems((data.items as Item[]).map((it) => ({ ...it, checked: initialCheck(it) })));
+      setItems((data.items as Item[]).map((it) => ({ ...it, checked: initialCheck(it, source) })));
     } catch (e) {
       setError(e instanceof Error ? e.message : '파일을 정리하지 못했습니다');
     } finally {
@@ -465,7 +468,7 @@ function Review({
           </span>
           {it.kind === 'fact' && !it.dup && (
             <span className="font-medium text-[11px] text-[#f26b1d]">
-              슬라이드에 없는 내용이에요{it.new_numbers.length ? ` (${it.new_numbers.join(', ')})` : ''}. 맞으면 체크하세요
+              슬라이드에 없는 내용이에요{it.new_numbers.length ? ` (${it.new_numbers.join(', ')})` : ''}. 맞는지 확인해주세요
             </span>
           )}
         </div>

@@ -27,20 +27,29 @@ SOURCES = ("rehearsal", "script", "doc")
 SOURCE_LABEL = {"rehearsal": "리허설", "script": "발표 대본", "doc": "설명 자료"}
 MAX_CHUNK = 3500      # 긴 자료는 이 길이로 나눠 여러 번 정리한다
 DUP_SIM = 0.6         # 글자 2-gram 겹침이 이 이상이면 같은 설명으로 본다
+GROUNDED = 0.5        # 정리된 문장 글자의 이만큼은 원문에 있어야 한다 (음성 인식 오류 고친 것까지 허용)
+MIN_COVER = 0.6       # 원문의 이만큼은 정리 결과에 담겨야 한다 (군말, 소제목은 빠지므로 1이 아니다)
 
 PROMPT = """발표자가 준비한 {source_label}을 정리해줘. 이걸로 발표 뒤 질의응답에서 쓸 설명 자료를 만든다.
 
 할 일:
 1. 글을 뜻이 하나인 문장으로 나눠. 말투의 군말("어", "그니까", "뭐냐면")은 빼고, 음성 인식이 잘못 받아 적은 말은
-   슬라이드에 나온 용어로 고쳐. 내용은 바꾸지 마.
+   슬라이드에 나온 용어로 고쳐. 내용은 바꾸지 마. 괄호 안의 설명과 숫자도 빼지 마.
+   나눈 문장은 따로 떼어 읽어도 뜻이 통해야 한다. "이", "그", "두 방식"처럼 앞 문장을 가리키는 말은
+   가리키는 대상을 앞 문장에서 가져와 써.
 2. 문장마다 종류를 골라.
    repeat  = 슬라이드에 이미 적힌 내용을 다시 말한 것
    explain = 슬라이드에 없는 이유, 예시, 맥락, 배경 설명
    fact    = 슬라이드에 없는 새 사실이나 숫자
    filler  = 인사, 넘어가는 말처럼 정보가 없는 것
    known   = 아래 "이미 저장된 설명" 과 표현만 다르고 뜻이 같은 것
-3. 문장마다 어느 슬라이드에 대한 설명인지 번호를 붙여. 특정 슬라이드가 아니면 0.
-4. 발표자가 말한 것만 옮겨. 네가 새 내용을 보태지 마.
+3. 문장마다 어느 슬라이드에 대한 설명인지 번호를 붙여. 문장의 주제가 어떤 슬라이드의 제목이나 항목과 같으면
+   (예: 측정값이면 성능, 테스트를 다룬 슬라이드, 기능 설명이면 그 기능이 적힌 슬라이드) 그 번호를 써.
+   청중이 그 슬라이드를 보다가 이 문장이 답이 될 질문을 할 만하면 그 슬라이드다. 프로젝트 전체에 대한 말이라
+   어느 한 슬라이드와도 주제가 맞지 않을 때만 0.
+4. 발표자가 말한 것만 옮겨. 네가 새 내용을 보태지 마. 슬라이드는 번호를 붙이기 위한 참고용이니 슬라이드 내용을
+   옮겨 적지 마. 출력하는 문장은 모두 맨 아래 {source_label}에서 나와야 하고, 그 글을 처음부터 끝까지 빠짐없이 다뤄.
+   글 안의 "10.", "11." 같은 소제목 번호는 슬라이드 번호가 아니다.
 {page_hint}
 출력 형식 (다른 말 붙이지 말고 한 줄에 한 문장):
 슬라이드번호 | 종류 | 문장
@@ -62,6 +71,14 @@ def _similar(a: str, b: str) -> float:
     return len(x & y) / min(len(x), len(y)) if x and y else 0.0
 
 
+def _unquote(s: str) -> str:
+    """칸 전체를 감싼 따옴표만 벗긴다. 문장 안의 따옴표("점심 뭐 먹지" 같은)는 살린다."""
+    s = s.strip()
+    if len(s) >= 2 and s[0] == s[-1] and s[0] in "\"'" and s.count(s[0]) == 2:
+        return s[1:-1].strip()
+    return s
+
+
 def _numbers(text: str) -> list[str]:
     return [n.replace(",", "") for n in re.findall(r"(?<![A-Za-z])\d+(?:[.,]\d+)*", text)]
 
@@ -76,6 +93,48 @@ def _chunks(text: str) -> list[str]:
         cur += para + "\n\n"
     if cur.strip():
         out.append(cur)
+    return out
+
+
+def _content(s: str) -> str:
+    return re.sub(r"[\s#*>\-|`\"'.,()]", "", s)
+
+
+def _grounded(sent: str, source: str) -> float:
+    """문장의 글자 2-gram 중 원문에 있는 비율. 자료에 없는 문장(슬라이드를 옮겨 적은 것 등)을 거른다."""
+    x = _bigrams(_content(sent))
+    return len(x & _bigrams(_content(source))) / len(x) if x else 0.0
+
+
+def _coverage(sents: list[str], source: str) -> float:
+    """원문 글자 2-gram 중 정리된 문장에 담긴 비율. 낮으면 모델이 자료 일부를 빠뜨린 것이다."""
+    src = _bigrams(_content(source))
+    got = set().union(*(_bigrams(_content(t)) for t in sents)) if sents else set()
+    return len(src & got) / len(src) if src else 1.0
+
+
+def _parse(raw: str, by_page: dict, page: int | None, deck: str,
+           existing: list[dict], known: list[dict]) -> list[dict]:
+    out = []
+    for line in raw.splitlines():
+        parts = [_unquote(x) for x in line.strip().split("|")]
+        if len(parts) < 3 or not parts[2]:
+            continue
+        m = re.search(r"\d+", parts[0])
+        p = int(m.group()) if m else 0
+        p = p if p in by_page else (page or None)
+        kind = parts[1] if parts[1] in KINDS else "explain"
+        sent = parts[2]
+        new_numbers = [n for n in _numbers(sent) if n not in deck]
+        # 슬라이드에 없는 숫자가 있으면 설명이 아니라 새 사실이다. 확인을 받아야 한다.
+        if kind in ("explain", "repeat") and new_numbers:
+            kind = "fact"
+        # 글자가 많이 겹치거나, 모델이 이미 저장된 설명과 같은 뜻이라고 본 것은 중복이다
+        # 비교할 저장된 설명이 없는데 known 이라고 한 것은 같은 자료 안에서 겹친 것이라 중복으로 치지 않는다
+        dup = (kind == "known" and bool(known)) or any(_similar(sent, e["text"]) >= DUP_SIM for e in existing)
+        if kind == "known":
+            kind = "explain"
+        out.append({"page": p, "kind": kind, "text": sent, "dup": dup, "new_numbers": new_numbers})
     return out
 
 
@@ -103,30 +162,26 @@ def classify(rows: list[dict], text: str, source: str, page: int | None = None,
     for part in _chunks(text):
         known = [e for e in existing if e.get("kind") in ("explain", "fact")
                  and (page is None or e.get("page") in (page, None))][:40]
-        known_block = ("\n--- 이미 저장된 설명 ---\n" + "\n".join(f"- {e['text']}" for e in known) + "\n"
+        known_block = ("\n".join(["", "--- 이미 저장된 설명 ---", *(f"- {e['text']}" for e in known), ""])
                        if known else "")
-        raw = _chat(PROMPT.format(source_label=SOURCE_LABEL.get(source, "자료"), page_hint=hint,
-                                  slides=slides, text=part, known_block=known_block))
-        if raw is None:
-            raise RuntimeError("AI 호출에 실패했습니다. 잠시 뒤 다시 시도해주세요.")
-        for line in raw.splitlines():
-            parts = [x.strip().strip("\"'") for x in line.strip().split("|")]
-            if len(parts) < 3 or not parts[2]:
-                continue
-            m = re.search(r"\d+", parts[0])
-            p = int(m.group()) if m else 0
-            p = p if p in by_page else (page or None)
-            kind = parts[1] if parts[1] in KINDS else "explain"
-            sent = parts[2]
-            new_numbers = [n for n in _numbers(sent) if n not in deck]
-            # 슬라이드에 없는 숫자가 있으면 설명이 아니라 새 사실이다. 확인을 받아야 한다.
-            if kind in ("explain", "repeat") and new_numbers:
-                kind = "fact"
-            # 글자가 많이 겹치거나, 모델이 이미 저장된 설명과 같은 뜻이라고 본 것은 중복이다
-            dup = kind == "known" or any(_similar(sent, e["text"]) >= DUP_SIM for e in existing)
-            if kind == "known":
-                kind = "explain"
-            items.append({"page": p, "kind": kind, "text": sent, "dup": dup, "new_numbers": new_numbers})
+        prompt = PROMPT.format(source_label=SOURCE_LABEL.get(source, "자료"), page_hint=hint,
+                               slides=slides, text=part, known_block=known_block)
+        # 모델이 가끔 자료 대신 슬라이드를 옮겨 적거나(자료의 "10." 같은 소제목 번호를 슬라이드 번호로 착각)
+        # 자료 뒷부분을 빠뜨린다. 자료에 없는 문장은 버리고, 빠뜨린 게 많으면 한 번 더 시킨다.
+        best: list[dict] = []
+        best_cover = -1.0
+        for _ in range(2):
+            raw = _chat(prompt)
+            if raw is None:
+                raise RuntimeError("AI 호출에 실패했습니다. 잠시 뒤 다시 시도해주세요.")
+            got = [it for it in _parse(raw, by_page, page, deck, existing, known)
+                   if _grounded(it["text"], part) >= GROUNDED]
+            cover = _coverage([it["text"] for it in got], part)
+            if cover > best_cover:
+                best, best_cover = got, cover
+            if cover >= MIN_COVER:
+                break
+        items.extend(best)
     return items
 
 
