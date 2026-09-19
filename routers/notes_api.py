@@ -54,6 +54,8 @@ class Item(BaseModel):
     page: int | None = None
     kind: str
     text: str
+    para: int | None = None        # 원래 글의 문단 번호 (지식 조각을 문단 단위로 묶는다)
+    section: str | None = None     # 그 문단의 소제목
 
 
 class SaveRequest(BaseModel):
@@ -80,6 +82,9 @@ async def refined(pid: str):
         got = await asyncio.to_thread(slide_refine.refine, rows)
         if got:
             slide_refine.save(got, refined_path(pid))
+            rq = engine_store.get_engine(pid)
+            if rq is not None:
+                await asyncio.to_thread(rq.set_refined, got)
     return {"refined": {str(k): v for k, v in (got or {}).items()}}
 
 

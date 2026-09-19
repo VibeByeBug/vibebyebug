@@ -31,6 +31,7 @@ import qa_log
 import core_answers
 import deck_graph
 import notes as notes_mod
+import knowledge
 
 # 유형별로 슬라이드에서 '무엇을 보여줄지'가 다르다.
 # 검색에 유형을 쓰는 건 실패했지만(README 참고), 무엇을 띄울지 고르는 데는 맞다.
@@ -264,6 +265,9 @@ RANK_BONUS = (3.0, 1.5, 0.0, 0.0, 0.0)
 
 # 논리 지도로 더 붙일 슬라이드 수. 많을수록 흐름도와 추천 답변이 느려진다.
 GRAPH_EXTRA = 3
+# 통합 지식 조각 검색 (knowledge.py). 답변과 흐름도에 넘길 조각 수.
+# 조각 하나가 슬라이드 묶음이나 이어진 문장 3개 정도라, 8개면 슬라이드 서너 장 분량이다.
+KB_K = 8
 # 슬라이드에서 근거를 못 찾았을 때 대신 넘길 발표자 설명 수와 슬라이드 수 (_fallback)
 FALLBACK_NOTES = 10
 FALLBACK_SLIDES = 4
@@ -443,6 +447,15 @@ class ReadyQ:
         self._slow_docs = docs
         self._slow_ready = False
 
+        # 통합 지식 조각 (슬라이드 + 대본 + 설명 자료 + 리허설). 답변과 흐름도의 근거를 여기서 찾는다.
+        # 화면의 키워드와 근거 카드는 지금처럼 슬라이드 검색(cue)을 쓴다.
+        self.use_kb = True
+        self.notes: list[dict] = []
+        self.refined: dict[int, str] = {}
+        self.kb: list[dict] = []
+        self.kb_index = None
+        self._build_kb()
+
     def warm(self) -> float:
         """임베딩 모델을 올리고 문서를 색인한다. 발표 시작 전에 부른다.
 
@@ -457,6 +470,7 @@ class ReadyQ:
             return time.time() - t0
         self.slow.index(self._slow_docs)
         self._slow_ready = True
+        self._build_kb()
         # 준비 직후 첫 질문 몇 개가 200~280ms 로 느렸다(이후 50~70ms).
         # 질문 길이가 달라질 때마다 모델 내부 연산이 처음 한 번 준비되는 비용이라
         # 길이가 다른 가짜 질문을 미리 흘려서 발표 전에 치르게 한다. 기록은 남기지 않는다.
@@ -586,6 +600,15 @@ class ReadyQ:
         메시지는 {"type": "cue.answer", "text", "done", "latency_ms"} 이고,
         마지막 메시지(done=True)에 status 가 붙는다: ok | no_answer | blocked | error | skipped
         """
+        if self.use_kb and not cue.core and cue.status != "ignored":
+            slides, story, has_slide = self._kb_context(question)
+            if slides:
+                answerer = self._get_answerer()
+                tag = {} if has_slide else {"basis": "notes"}
+                yield from ({**m, **tag} for m in self._or_fallback(
+                    answerer.stream(question, slides, story),
+                    lambda ctx: answerer.stream(question, *ctx), question, dict(slides)))
+                return
         if self._use_fallback(cue):
             ctx = self._fallback(question)
             if ctx:
@@ -614,6 +637,15 @@ class ReadyQ:
         메시지는 {"type": "cue.flow", "steps": [{"text", "slide"}], "done", "latency_ms"} 이고,
         마지막 메시지에 status 가 붙는다: ok | no_answer | blocked | error | skipped
         """
+        if self.use_kb and not cue.core and cue.status != "ignored":
+            slides, story, has_slide = self._kb_context(question)
+            if slides:
+                answerer = self._get_answerer()
+                tag = {} if has_slide else {"basis": "notes"}
+                yield from ({**m, **tag} for m in self._or_fallback(
+                    answerer.flow(question, cue.question_type, slides, story),
+                    lambda ctx: answerer.flow(question, cue.question_type, *ctx), question, dict(slides)))
+                return
         if self._use_fallback(cue):
             ctx = self._fallback(question)
             if ctx:
@@ -650,6 +682,33 @@ class ReadyQ:
                     return
             yield m
 
+    def set_refined(self, refined: dict[int, str] | None) -> None:
+        """AI 정리본 (slide_refine). 슬라이드 조각을 정리본의 묶음 단위로 나누는 데 쓴다."""
+        self.refined = dict(refined or {})
+        self._build_kb()
+
+    def _build_kb(self) -> None:
+        """지식 조각을 다시 만들고 색인한다. 설명이나 정리본이 바뀔 때마다 부른다(19장 기준 1초 안팎)."""
+        self.kb = knowledge.build(self.rows, getattr(self, "notes", []), getattr(self, "refined", {}))
+        docs = [c["text"] for c in self.kb]
+        if self.slow is not None and self._slow_ready:
+            # 임베딩 모델은 슬라이드 검색과 같이 쓴다 (다시 올리면 메모리와 시간이 두 배)
+            emb = STEmbedder(self.slow.b.model_id)
+            emb._model = self.slow.b._load()
+            self.kb_index = Hybrid(BM25(), emb)
+        else:
+            self.kb_index = BM25()
+        self.kb_index.index(docs)
+
+    def _kb_context(self, question: str) -> tuple[list[tuple[int, str]], str, bool]:
+        """질문에 맞는 지식 조각 -> (답변 자료, 발표 줄거리, 슬라이드 조각이 하나라도 있었나)."""
+        hits = self.kb_index.search([question], KB_K)[0] if self.kb else []
+        picked = [self.kb[i] for i, _ in hits]
+        slides = knowledge.to_context(picked)
+        graph = getattr(self, "graph", None)
+        story = deck_graph.story_text(graph) if graph else ""
+        return slides, story, any(c["kind"] == "slide" for c in picked)
+
     def set_notes(self, notes: list[dict] | None) -> None:
         """발표자 설명(리허설, 대본, 설명 자료)을 넣는다. 검색 색인을 다시 만든다.
 
@@ -671,6 +730,7 @@ class ReadyQ:
         self._slow_docs = docs
         if self.slow is not None and self._slow_ready:
             self.slow.index(docs)
+        self._build_kb()
 
     def _page_text(self, row: dict) -> str:
         """답변 근거로 넘길 슬라이드 내용. 발표자 설명이 있으면 아래에 붙인다."""

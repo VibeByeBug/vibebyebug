@@ -25,6 +25,8 @@ interface Item {
   text: string;
   dup: boolean;
   new_numbers: string[];
+  para?: number; // 원래 글의 문단 번호 (지식 조각을 문단 단위로 묶는다)
+  section?: string; // 그 문단의 소제목
   checked?: boolean;
 }
 
@@ -490,7 +492,9 @@ function Review({
     try {
       const r = await post(`${API_URL}/api/notes/${presentationId}/save`, {
         source,
-        items: items.filter((it) => it.checked && it.kind !== 'filler').map(({ page, kind, text }) => ({ page, kind, text })),
+        items: items
+          .filter((it) => it.checked && it.kind !== 'filler')
+          .map(({ page, kind, text, para, section }) => ({ page, kind, text, para, section })),
       });
       onSaved(r.notes, r.added);
     } finally {

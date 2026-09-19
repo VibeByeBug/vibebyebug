@@ -72,11 +72,14 @@ def _warm_worker_inner(pid: str, chunks_path: str, preset: str) -> None:
         # 리허설 화면과 논리 지도에서 볼 슬라이드 정리본 (보여주기용, 검색에는 안 쓴다)
         import slide_refine
         refined_file = Path(chunks_path).parent / "refined" / f"{pid}.json"
-        if slide_refine.load(refined_file) is None:
+        refined = slide_refine.load(refined_file)
+        if refined is None:
             import json as _json
-            got = slide_refine.refine([_json.loads(l) for l in Path(chunks_path).open(encoding="utf-8")])
-            if got:
-                slide_refine.save(got, refined_file)
+            refined = slide_refine.refine([_json.loads(l) for l in Path(chunks_path).open(encoding="utf-8")])
+            if refined:
+                slide_refine.save(refined, refined_file)
+        # 정리본의 묶음 단위로 슬라이드 지식 조각을 나눈다 (통합 지식 검색)
+        rq.set_refined(refined or {})
         # 연습에서 확정해둔 기본 질문 카드를 올린다 (서버가 재시작돼도 유지)
         core_file = Path(chunks_path).parent / "core" / f"{pid}.json"
         if core_file.exists():

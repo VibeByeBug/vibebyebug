@@ -182,7 +182,47 @@ def classify(rows: list[dict], text: str, source: str, page: int | None = None,
             if cover >= MIN_COVER:
                 break
         items.extend(best)
+    _attach_sections(items, text)
     return items
+
+
+_HEADING = re.compile(r"^\s*(?:#{1,6}\s+.+|\d{1,2}[.)]\s*[^.!?。]{1,40}|[■□▶◆●]\s*.{1,40})\s*$")
+
+
+def _paragraphs(text: str) -> list[tuple[str, str]]:
+    """글을 (소제목, 문단) 목록으로. 소제목은 그 문단 위에서 마지막으로 나온 제목 줄."""
+    out, heading = [], ""
+    for block in re.split(r"\n\s*\n", text):
+        lines = [l for l in block.split("\n") if l.strip()]
+        body = []
+        for l in lines:
+            if _HEADING.match(l) and len(l.strip()) <= 50:
+                if body:
+                    out.append((heading, " ".join(body)))
+                    body = []
+                heading = l.strip().lstrip("#").strip()
+            else:
+                body.append(l.strip())
+        if body:
+            out.append((heading, " ".join(body)))
+    return out
+
+
+def _attach_sections(items: list[dict], text: str) -> None:
+    """문장마다 원래 글의 어느 문단, 어느 소제목 아래였는지 붙인다.
+
+    문장 하나씩 저장하면 "두 방식을 합쳐야 88.9%" 처럼 앞 문장과 소제목이 없어서 뜻이 끊기고,
+    검색에서도 주제어("논리 지도")가 소제목에만 있는 문장을 못 찾았다. 지식 조각을 만들 때
+    같은 문단의 문장을 소제목과 함께 묶는다(knowledge.py).
+    """
+    paras = _paragraphs(text)
+    if not paras:
+        return
+    for it in items:
+        best = max(range(len(paras)), key=lambda i: _grounded(it["text"], paras[i][1]))
+        if _grounded(it["text"], paras[best][1]) >= GROUNDED:
+            it["para"] = best
+            it["section"] = paras[best][0]
 
 
 class NoteStore:
@@ -213,6 +253,9 @@ class NoteStore:
             note = {"id": uuid.uuid4().hex[:8], "page": it.get("page"), "kind": kind, "text": text,
                     "source": source if source in SOURCES else "doc",
                     "created": datetime.now().isoformat(timespec="seconds")}
+            # 원래 글의 문단 번호와 소제목 (지식 조각을 문단 단위로 묶는 데 쓴다)
+            if it.get("para") is not None:
+                note.update(para=it["para"], section=it.get("section") or "")
             self.notes.append(note)
             added.append(note)
         self._save()
