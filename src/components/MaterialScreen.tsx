@@ -46,7 +46,15 @@ function initialCheck(it: Item, source: 'rehearsal' | 'script' | 'doc') {
   return true;
 }
 
-export function MaterialScreen({ presentationId, onBack }: { presentationId: string; onBack: () => void }) {
+export function MaterialScreen({
+  presentationId,
+  onBack,
+  initialPage,
+}: {
+  presentationId: string;
+  onBack: () => void;
+  initialPage?: number; // 논리 지도에서 "이 슬라이드 설명 추가" 로 들어오면 그 슬라이드부터 연다
+}) {
   const [tab, setTab] = useState<'rehearsal' | 'doc' | 'saved'>('rehearsal');
   const [slides, setSlides] = useState<Slide[]>([]);
   const [notes, setNotes] = useState<Note[]>([]);
@@ -144,7 +152,9 @@ export function MaterialScreen({ presentationId, onBack }: { presentationId: str
         ))}
       </div>
 
-      {tab === 'rehearsal' && <Rehearsal presentationId={presentationId} slides={slides} onSaved={onSaved} />}
+      {tab === 'rehearsal' && (
+        <Rehearsal presentationId={presentationId} slides={slides} onSaved={onSaved} initialPage={initialPage} />
+      )}
       {tab === 'doc' && <DocInput presentationId={presentationId} onSaved={onSaved} />}
       {tab === 'saved' && <Saved presentationId={presentationId} slides={slides} notes={notes} onChange={onSaved} />}
     </div>
@@ -155,12 +165,22 @@ function Rehearsal({
   presentationId,
   slides,
   onSaved,
+  initialPage,
 }: {
   presentationId: string;
   slides: Slide[];
   onSaved: (n: Note[]) => void;
+  initialPage?: number;
 }) {
   const [index, setIndex] = useState(0);
+  // 슬라이드 목록이 도착하면 처음 열 슬라이드로 옮긴다 (한 번만)
+  const jumped = useRef(false);
+  useEffect(() => {
+    if (jumped.current || initialPage == null || !slides.length) return;
+    jumped.current = true;
+    const at = slides.findIndex((s) => s.page === initialPage);
+    if (at >= 0) setIndex(at);
+  }, [slides, initialPage]);
   const [transcript, setTranscript] = useState('');
   const [partial, setPartial] = useState('');
   const [items, setItems] = useState<Item[] | null>(null);

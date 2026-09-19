@@ -269,18 +269,6 @@ export function Hud({ result, question, answer = null, flow = null, mode = 'keyw
 }
 
 // 핵심 단어만 글자 색을 바꾼다. 칸 전체를 다 읽지 않아도 숫자와 요점이 먼저 눈에 들어오게.
-function Highlight({ text, word, color }: { text: string; word?: string; color: string }) {
-  if (!word || !text.includes(word)) return <>{text}</>;
-  const at = text.indexOf(word);
-  return (
-    <>
-      {text.slice(0, at)}
-      <span style={{ color }}>{word}</span>
-      {text.slice(at + word.length)}
-    </>
-  );
-}
-
 // 여러 단어를 한 번에 강조한다. 추천 답변에서 키워드와 숫자에 색을 입힌다.
 // AI 를 다시 부르지 않고, 이미 받은 키워드와 답변 속 숫자만 쓴다.
 const NUM_WITH_UNIT = /(?<![A-Za-z\d])\d[\d,.~]*(?![A-Za-z])\s*(?:%|배|[가-힣]{1,2}(?=[\s,.)]|$))?/g; // B2B 의 2 는 빼고
@@ -308,45 +296,109 @@ function HighlightMany({ text, words }: { text: string; words: string[] }) {
   return <>{out}</>;
 }
 
-function FlowSteps({ steps }: { steps: FlowStep[] }) {
+export function FlowSteps({ steps }: { steps: FlowStep[] }) {
   return (
     <div className="flex items-stretch w-full">
-      {steps.map((step, i) => (
-        <div key={i} className="flex flex-1 items-stretch min-w-0">
-          <div
-            className={`flex flex-1 flex-col gap-[5px] justify-between self-stretch px-[14px] py-[11px] rounded-[6px] min-w-0 ${
-              i === 0 ? 'bg-[#f26b1d]' : 'bg-[#fff3eb] border border-[#f26b1d]'
-            }`}
-          >
-            <span className={`font-bold text-[11px] ${i === 0 ? 'text-white/80' : 'text-[#f26b1d]'}`}>{i + 1}</span>
-            <p
-              className={`font-black text-[18px] tracking-[-0.4px] leading-[25px] break-keep ${
-                i === 0 ? 'text-white' : 'text-[#1a1a1a]'
+      {steps.map((step, i) => {
+        const first = i === 0;
+        const words = step.keys?.length ? step.keys : step.key ? [step.key] : [];
+        return (
+          <div key={i} className="flex flex-1 items-stretch min-w-0">
+            <div
+              className={`flex flex-1 flex-col gap-[8px] self-stretch px-[16px] py-[13px] rounded-[8px] min-w-0 ${
+                first ? 'bg-[#f26b1d]' : 'bg-[#fff8f3] border border-[#f26b1d]'
               }`}
             >
-              <Highlight text={step.text} word={step.key} color={i === 0 ? '#ffe45c' : '#e0470f'} />
-            </p>
-            <span className={`font-bold text-[12px] ${i === 0 ? 'text-white/80' : 'text-[#6b7280]'}`}>
-              {step.slide ? `p.${step.slide}` : '발표자 작성'}
-            </span>
-          </div>
-          {i < steps.length - 1 && (
-            // 칸과 칸 사이 파이프라인. 연결어(입으로 말할 말)와 왜 이어지는지(논리)를 같이 보여준다.
-            <div className="flex flex-col items-center justify-center shrink-0 w-[150px] gap-[4px] px-[8px]">
-              {step.link && <span className="font-bold text-[14px] text-[#f26b1d] whitespace-nowrap">{step.link}</span>}
-              <div className="flex items-center w-full">
-                <div className="h-[2px] flex-1 bg-[#f26b1d]" />
-                <span className="font-black text-[14px] text-[#f26b1d] leading-none -ml-[2px]">▶</span>
-              </div>
-              {step.why && (
-                <span className="font-medium text-[12px] text-[#6b7280] leading-[16px] text-center break-keep">
-                  {step.why}
+              <div className="flex items-center justify-between gap-[8px]">
+                <span
+                  className={`flex items-center justify-center size-[22px] rounded-full font-black text-[12px] ${
+                    first ? 'bg-white text-[#f26b1d]' : 'bg-[#f26b1d] text-white'
+                  }`}
+                >
+                  {i + 1}
                 </span>
+                <span className={`font-bold text-[12px] ${first ? 'text-white/80' : 'text-[#9ca3af]'}`}>
+                  {step.slide ? `p.${step.slide}` : '발표자 설명'}
+                </span>
+              </div>
+              <p
+                className={`font-black text-[18px] tracking-[-0.4px] leading-[25px] break-keep ${
+                  first ? 'text-white' : 'text-[#1a1a1a]'
+                }`}
+              >
+                <HighlightWords text={step.text} words={words} color={first ? '#ffe45c' : '#e0470f'} />
+              </p>
+              {step.detail && (
+                <p
+                  className={`font-medium text-[14px] leading-[21px] break-keep ${
+                    first ? 'text-white/95' : 'text-[#374151]'
+                  }`}
+                >
+                  <HighlightWords text={step.detail} words={words} color={first ? '#ffe45c' : '#e0470f'} bold />
+                </p>
+              )}
+              {words.length > 0 && (
+                <div className="flex flex-wrap gap-[5px] mt-auto pt-[2px]">
+                  {words.map((w) => (
+                    <span
+                      key={w}
+                      className={`px-[8px] py-[2px] rounded-full font-bold text-[12px] ${
+                        first ? 'bg-white/20 text-white' : 'bg-[#ffe8d9] text-[#c2410c]'
+                      }`}
+                    >
+                      {w}
+                    </span>
+                  ))}
+                </div>
               )}
             </div>
-          )}
-        </div>
-      ))}
+            {i < steps.length - 1 && (
+              // 칸과 칸 사이 파이프라인. 연결어(입으로 말할 말)와 왜 이어지는지(논리)를 같이 보여준다.
+              <div className="flex flex-col items-center justify-center shrink-0 w-[130px] gap-[4px] px-[8px]">
+                {step.link && <span className="font-bold text-[14px] text-[#f26b1d] whitespace-nowrap">{step.link}</span>}
+                <div className="flex items-center w-full">
+                  <div className="h-[2px] flex-1 bg-[#f26b1d]" />
+                  <span className="font-black text-[14px] text-[#f26b1d] leading-none -ml-[2px]">▶</span>
+                </div>
+                {step.why && (
+                  <span className="font-medium text-[12px] text-[#6b7280] leading-[16px] text-center break-keep">
+                    {step.why}
+                  </span>
+                )}
+              </div>
+            )}
+          </div>
+        );
+      })}
     </div>
   );
+}
+
+// 칸 제목과 설명 안의 핵심 단어들에 색을 입힌다. 겹치면 긴 단어가 이긴다.
+function HighlightWords({ text, words, color, bold }: { text: string; words: string[]; color: string; bold?: boolean }) {
+  const ranges: [number, number][] = [];
+  for (const w of [...words].sort((a, b) => b.length - a.length)) {
+    if (w.length < 2) continue;
+    let at = text.indexOf(w);
+    while (at >= 0) {
+      const end = at + w.length;
+      if (!ranges.some(([s, e]) => at < e && end > s)) ranges.push([at, end]);
+      at = text.indexOf(w, end);
+    }
+  }
+  if (!ranges.length) return <>{text}</>;
+  ranges.sort((a, b) => a[0] - b[0]);
+  const out: React.ReactNode[] = [];
+  let pos = 0;
+  ranges.forEach(([s, e], i) => {
+    if (s > pos) out.push(text.slice(pos, s));
+    out.push(
+      <span key={i} style={{ color, fontWeight: bold ? 800 : undefined }}>
+        {text.slice(s, e)}
+      </span>,
+    );
+    pos = e;
+  });
+  if (pos < text.length) out.push(text.slice(pos));
+  return <>{out}</>;
 }

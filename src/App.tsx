@@ -114,13 +114,18 @@ function App() {
     </button>
   );
 
+  // 자료 보강 화면. 논리 지도에서 슬라이드를 골라 들어오면 그 슬라이드부터 연다.
+  const [materialBack, setMaterialBack] = useState<ScreenName>('hud');
+  const [materialPage, setMaterialPage] = useState<number | undefined>(undefined);
+  const openMaterial = (back: ScreenName, page?: number) => {
+    setMaterialBack(back);
+    setMaterialPage(page);
+    setScreen('material');
+  };
   const materialButton = (
     <button
       type="button"
-      onClick={() => {
-        setGraphBack(screen);
-        setScreen('material');
-      }}
+      onClick={() => openMaterial(screen)}
       className="border border-[#e5e7eb] h-[32px] px-[12px] rounded-[6px] font-bold text-[13px] text-[#6b7280] whitespace-nowrap"
     >
       자료 보강
@@ -177,11 +182,8 @@ function App() {
             onUploadFail={handleUploadFail}
             onSkip={() => setScreen('preparing')}
             onStartMock={() => setScreen('mockPractice')}
-            onAddMaterial={() => {
-              // 업로드 화면은 다시 열면 결과가 비므로, 자료 보강을 마치면 준비 화면으로 간다
-              setGraphBack('preparing');
-              setScreen('material');
-            }}
+            // 업로드 화면은 다시 열면 결과가 비므로, 자료 보강을 마치면 준비 화면으로 간다
+            onAddMaterial={() => openMaterial('preparing')}
           />
         </>
       )}
@@ -219,14 +221,23 @@ function App() {
       {screen === 'material' && upload && (
         <>
           <Header onNavigate={setScreen} label="자료 보강" showProfile={false} />
-          <MaterialScreen presentationId={upload.presentation_id} onBack={() => setScreen(graphBack)} />
+          <MaterialScreen
+            key={materialPage ?? 'all'}
+            presentationId={upload.presentation_id}
+            initialPage={materialPage}
+            onBack={() => setScreen(materialBack)}
+          />
         </>
       )}
 
       {screen === 'graph' && upload && (
         <>
           <Header onNavigate={setScreen} label="논리 지도" showProfile={false} />
-          <GraphScreen presentationId={upload.presentation_id} onBack={() => setScreen(graphBack)} />
+          <GraphScreen
+            presentationId={upload.presentation_id}
+            onBack={() => setScreen(graphBack)}
+            onAddNote={(page) => openMaterial('graph', page)}
+          />
         </>
       )}
 
