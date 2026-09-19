@@ -115,67 +115,71 @@ export function MaterialScreen({
   const answerNotes = notes.filter((n) => n.kind !== 'repeat').length;
 
   return (
-    <div className="flex flex-col gap-[18px] pb-[40px] pt-[28px] px-[44px] w-full max-w-[1100px] mx-auto">
-      <div className="flex flex-col items-center text-center gap-[14px]">
-        <div className="flex flex-col gap-[6px] items-center">
-          <p className="font-black text-[30px] text-[#111111] tracking-[-0.8px]">자료 보강</p>
-          <p className="font-normal text-[14px] text-[#6b7280] leading-[21px] max-w-[720px]">
-            슬라이드에 없는 설명을 모으면 "왜", "어떻게" 질문에 더 깊게 답할 수 있어요. 슬라이드에 이미 있는 말은 답변 근거로
-            쓰지 않고, 청중 질문을 찾는 표현으로만 둡니다.
-          </p>
+    <div className="flex flex-col gap-[16px] pb-[36px] pt-[24px] px-[16px] sm:px-[32px] w-full max-w-[1400px] mx-auto">
+      <div className="flex flex-col items-center text-center gap-[6px]">
+        <p className="font-black text-[30px] text-white tracking-[-0.8px]">자료 보강</p>
+        <p className="font-normal text-[14px] text-white/55 leading-[21px] max-w-[720px] break-keep">
+          슬라이드에 없는 설명을 모으면 "왜", "어떻게" 질문에 더 깊게 답할 수 있어요. 슬라이드에 이미 있는 말은 답변 근거로
+          쓰지 않고, 청중 질문을 찾는 표현으로만 둡니다.
+        </p>
+      </div>
+
+      {/* 탭은 가운데, 지도 다시 만들기와 돌아가기는 오른쪽 */}
+      <div className="grid grid-cols-1 lg:grid-cols-[1fr_auto_1fr] items-center gap-[12px]">
+        <div className="hidden lg:block" />
+        <div className="justify-self-center flex gap-[4px] rounded-[10px] border border-white/10 bg-white/[0.05] p-[4px]">
+          {(
+            [
+              ['rehearsal', '리허설 녹음', null],
+              ['doc', '대본, 설명 자료', null],
+              ['saved', '저장된 설명', answerNotes],
+            ] as const
+          ).map(([key, label, n]) => (
+            <button
+              key={key}
+              type="button"
+              onClick={() => setTab(key)}
+              className={`flex items-center gap-[7px] h-[36px] px-[16px] rounded-[7px] font-bold text-[14px] whitespace-nowrap transition-colors ${
+                tab === key ? 'bg-[#ede6d6] text-[#15110d]' : 'text-white/60 hover:text-white hover:bg-white/[0.06]'
+              }`}
+            >
+              {label}
+              {n !== null && <span className={`font-mono text-[13px] ${tab === key ? 'text-[#f26b1d]' : 'text-white/40'}`}>{n}</span>}
+            </button>
+          ))}
         </div>
-        <div className="flex gap-[8px] shrink-0">
+        <div className="flex gap-[8px] justify-center lg:justify-end">
           <button
             type="button"
             onClick={rebuildGraph}
             disabled={graphBusy}
-            className={`h-[38px] px-[14px] rounded-[6px] font-bold text-[14px] whitespace-nowrap disabled:opacity-50 ${
-              dirty ? 'bg-[#f26b1d] text-white' : 'border border-[#e5e7eb] text-[#6b7280]'
+            className={`cta h-[38px] px-[16px] rounded-[8px] font-bold text-[14px] whitespace-nowrap disabled:opacity-50 ${
+              dirty ? 'bg-[#f26b1d] text-white' : 'border border-white/20 text-white/75 hover:border-white/45'
             }`}
           >
-            {graphBusy ? '지도 만드는 중... (30초 안팎)' : '지식 지도 다시 만들기'}
+            {graphBusy ? '지도 만드는 중··· (30초 안팎)' : '지식 지도 다시 만들기'}
           </button>
           <button
             type="button"
             onClick={onBack}
-            className="border border-[#e5e7eb] h-[38px] px-[14px] rounded-[6px] font-bold text-[14px] text-[#6b7280]"
+            className="h-[38px] px-[16px] rounded-[8px] border border-white/20 font-bold text-[14px] text-white/75 hover:border-white/45"
           >
             돌아가기
           </button>
         </div>
       </div>
-      {graphMsg && <p className="font-medium text-[13px] text-[#409959] text-center">{graphMsg}</p>}
+      {graphMsg && <p className="font-medium text-[13px] text-[#7ee2a0] text-center">{graphMsg}</p>}
       {dirty && !graphMsg && (
-        <p className="font-medium text-[13px] text-[#f26b1d] text-center">
+        <p className="font-medium text-[13px] text-[#ff9a5c] text-center break-keep">
           설명이 바뀌었어요. 검색과 답변에는 바로 반영됐고, 지식 지도에도 넣으려면 "지식 지도 다시 만들기"를 눌러주세요.
         </p>
       )}
-
-      <div className="flex justify-center gap-[6px] border-b border-[#e5e7eb]">
-        {(
-          [
-            ['rehearsal', '리허설 녹음'],
-            ['doc', '대본, 설명 자료'],
-            ['saved', `저장된 설명 (${answerNotes})`],
-          ] as const
-        ).map(([key, label]) => (
-          <button
-            key={key}
-            type="button"
-            onClick={() => setTab(key)}
-            className={`px-[14px] py-[10px] font-bold text-[14px] -mb-px border-b-2 ${
-              tab === key ? 'border-[#f26b1d] text-[#1a1a1a]' : 'border-transparent text-[#9ca3af]'
-            }`}
-          >
-            {label}
-          </button>
-        ))}
-      </div>
 
       {tab === 'rehearsal' && (
         <Rehearsal
           presentationId={presentationId}
           slides={slides}
+          notes={notes}
           onSaved={onSaved}
           initialPage={initialPage}
           refining={refining}
@@ -187,15 +191,21 @@ export function MaterialScreen({
   );
 }
 
+// 리허설 화면: 왼쪽 필름 스트립(슬라이드 고르기), 가운데 슬라이드 카드, 오른쪽 녹음 패널과 정리 결과.
+// 세 칸이 화면 높이에 맞춰 따로 스크롤되어, 설명을 길게 말해도 슬라이드가 밀려 올라가지 않는다.
+const PANE_H = 'lg:h-[calc(100vh-300px)] lg:min-h-[520px]';
+
 function Rehearsal({
   presentationId,
   slides,
+  notes,
   onSaved,
   initialPage,
   refining,
 }: {
   presentationId: string;
   slides: Slide[];
+  notes: Note[];
   onSaved: (n: Note[]) => void;
   initialPage?: number;
   refining?: boolean;
@@ -215,6 +225,9 @@ function Rehearsal({
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [savedMsg, setSavedMsg] = useState<string | null>(null);
+  const [showRaw, setShowRaw] = useState(false);
+  const [take, setTake] = useState(1); // 이 슬라이드에서 몇 번째 녹음인가. 저장할 때마다 하나 올라간다
+  const [secs, setSecs] = useState(0);
   const slide = slides[index];
 
   // 음성 인식 결과는 이어 붙인다. 발표자가 텍스트 칸에서 직접 고칠 수도 있다.
@@ -228,13 +241,29 @@ function Rehearsal({
     onError: () => setError('음성 인식을 시작하지 못했어요. 크롬에서 마이크 권한을 허용해주세요. 글로 적어도 됩니다.'),
   });
 
+  // 녹음 시간. 멈췄다 다시 누르면 이어서 센다
+  useEffect(() => {
+    if (!listening) return;
+    const t = setInterval(() => setSecs((s) => s + 1), 1000);
+    return () => clearInterval(t);
+  }, [listening]);
+
+  // 슬라이드마다 저장된 설명 수 (필름 스트립 배지). 슬라이드 반복은 답변 근거가 아니라 세지 않는다
+  const counts = new Map<number, number>();
+  for (const n of notes) if (n.page != null && n.kind !== 'repeat') counts.set(n.page, (counts.get(n.page) ?? 0) + 1);
+
   function go(next: number) {
+    const to = Math.max(0, Math.min(slides.length - 1, next));
+    if (to === index) return;
     stop();
-    setIndex(Math.max(0, Math.min(slides.length - 1, next)));
+    setIndex(to);
     setTranscript('');
     setPartial('');
     setItems(null);
     setSavedMsg(null);
+    setError(null);
+    setTake(1);
+    setSecs(0);
   }
 
   async function organize() {
@@ -255,81 +284,146 @@ function Rehearsal({
     }
   }
 
-  if (!slide) return <p className="font-medium text-[14px] text-[#6b7280]">슬라이드를 불러오는 중···</p>;
+  if (!slide) return <p className="font-medium text-[14px] text-white/55 text-center py-[40px]">슬라이드를 불러오는 중···</p>;
+
+  const clock = `${String(Math.floor(secs / 60)).padStart(2, '0')}:${String(secs % 60).padStart(2, '0')}`;
 
   return (
-    <div className="flex flex-col lg:flex-row gap-[20px] items-stretch lg:items-start">
-      <div className="flex flex-col gap-[10px] w-full lg:w-[380px] shrink-0">
-        <div className="flex items-center justify-between">
+    <div className="grid grid-cols-1 lg:grid-cols-[172px_minmax(0,1fr)_minmax(0,1.08fr)] gap-[20px] items-start">
+      <FilmStrip presentationId={presentationId} slides={slides} index={index} counts={counts} onPick={go} />
+
+      {/* 슬라이드 카드: 슬라이드 그림, 그 아래 AI 정리본(또는 PDF 원문) */}
+      <section className={`flex flex-col min-w-0 rounded-[12px] border border-white/10 bg-[#1c1713] overflow-hidden ${PANE_H}`}>
+        <div className="flex items-start justify-between gap-[12px] px-[22px] pt-[16px] pb-[12px]">
+          <div className="flex items-baseline gap-[12px] min-w-0">
+            <span className="font-display text-[44px] leading-[40px] text-[#f26b1d] shrink-0">P.{slide.page}</span>
+            <span className="font-bold text-[16px] text-white/85 leading-[22px] line-clamp-2 break-keep">{slide.title}</span>
+          </div>
+          {slide.refined ? (
+            <div className="flex shrink-0 gap-[2px] rounded-full bg-white/[0.07] p-[3px]">
+              {(
+                [
+                  [false, 'AI 정리본'],
+                  [true, 'PDF 원문'],
+                ] as const
+              ).map(([raw, label]) => (
+                <button
+                  key={label}
+                  type="button"
+                  onClick={() => setShowRaw(raw)}
+                  className={`h-[26px] px-[12px] rounded-full font-bold text-[12px] whitespace-nowrap transition-colors ${
+                    showRaw === raw ? 'bg-[#ede6d6] text-[#15110d]' : 'text-white/55 hover:text-white'
+                  }`}
+                >
+                  {label}
+                </button>
+              ))}
+            </div>
+          ) : (
+            refining && <span className="shrink-0 font-medium text-[12px] text-white/45 pt-[6px]">읽기 좋게 정리하는 중···</span>
+          )}
+        </div>
+        <div className="flex-1 overflow-auto px-[22px] pb-[18px] [scrollbar-width:thin] [scrollbar-color:rgba(255,255,255,0.15)_transparent]">
+          <SlideImage key={slide.page} presentationId={presentationId} page={slide.page} />
+          <SlideText raw={slide.text} refined={slide.refined} pending={refining} dark showRaw={showRaw} />
+          {slide.refined && !showRaw && (
+            <p className="mt-[14px] font-medium text-[12px] text-white/40 break-keep">
+              AI 가 PDF 글자를 읽기 좋게 다시 정리했어요. 검색과 답변에는 원문을 씁니다.
+            </p>
+          )}
+        </div>
+        <div className="flex items-center justify-between border-t border-white/10 px-[14px] py-[10px]">
           <button
             type="button"
             onClick={() => go(index - 1)}
             disabled={index === 0}
-            className="border border-[#e5e7eb] h-[34px] px-[12px] rounded-[6px] font-bold text-[13px] text-[#6b7280] disabled:opacity-40"
+            className="h-[32px] px-[12px] rounded-[7px] font-bold text-[13px] text-white/70 hover:bg-white/[0.07] hover:text-white disabled:opacity-30"
           >
             ← 이전
           </button>
-          <select
-            value={index}
-            onChange={(e) => go(Number(e.target.value))}
-            className="border border-[#e5e7eb] h-[34px] px-[8px] rounded-[6px] text-[13px] font-bold text-[#1a1a1a]"
-          >
-            {slides.map((s, i) => (
-              <option key={s.page} value={i}>
-                p.{s.page} {s.title.slice(0, 16)}
-              </option>
-            ))}
-          </select>
+          <span className="font-mono text-[13px] text-white/45">
+            <span className="text-white/85">{index + 1}</span> / {slides.length}
+          </span>
           <button
             type="button"
             onClick={() => go(index + 1)}
             disabled={index === slides.length - 1}
-            className="border border-[#e5e7eb] h-[34px] px-[12px] rounded-[6px] font-bold text-[13px] text-[#6b7280] disabled:opacity-40"
+            className="h-[32px] px-[12px] rounded-[7px] font-bold text-[13px] text-white/70 hover:bg-white/[0.07] hover:text-white disabled:opacity-30"
           >
             다음 →
           </button>
         </div>
-        <div className="bg-[#f9fafb] border border-[#e5e7eb] px-[16px] py-[14px] rounded-[6px] h-[220px] lg:h-[420px] overflow-auto">
-          <p className="font-black text-[20px] text-[#1a1a1a] mb-[6px]">p.{slide.page}</p>
-          <SlideText key={slide.page} raw={slide.text} refined={slide.refined} pending={refining} />
-        </div>
-      </div>
+      </section>
 
-      <div className="flex flex-1 flex-col gap-[12px] min-w-0">
-        <p className="font-normal text-[14px] text-[#6b7280]">
-          이 슬라이드를 실제 발표하듯 설명해보세요. 슬라이드에 없는 이유, 예시, 배경을 말할수록 좋아요.
-        </p>
-        <div className="flex gap-[8px] items-center">
-          <button
-            type="button"
-            onClick={() => (listening ? stop() : start())}
-            className={`flex gap-[8px] h-[40px] items-center px-[16px] rounded-[6px] font-bold text-[14px] ${
-              listening ? 'bg-[#bf382e] text-white' : 'bg-[#1a1a1a] text-white'
-            }`}
-          >
-            <span className={`rounded-full size-[9px] ${listening ? 'bg-white animate-pulse' : 'bg-[#f26b1d]'}`} />
-            {listening ? '녹음 멈추기' : '녹음 시작'}
-          </button>
-          {partial && <span className="font-medium text-[13px] text-[#9ca3af] truncate">{partial}</span>}
-        </div>
-        <textarea
-          value={transcript}
-          onChange={(e) => setTranscript(e.target.value)}
-          placeholder="말한 내용이 여기에 쌓여요. 직접 적거나 고쳐도 됩니다."
-          className="border border-[#e5e7eb] min-h-[140px] px-[14px] py-[12px] rounded-[6px] text-[15px] text-[#1a1a1a] leading-[24px] outline-none resize-y"
-        />
-        <div className="flex justify-end">
+      {/* 녹음 패널과 정리 결과 */}
+      <div className={`flex flex-col gap-[14px] min-w-0 lg:overflow-auto lg:pr-[4px] [scrollbar-width:thin] [scrollbar-color:rgba(255,255,255,0.15)_transparent] ${PANE_H}`}>
+        <section
+          className={`flex flex-col gap-[14px] rounded-[12px] border bg-[#0b0907] px-[22px] py-[18px] transition-colors ${
+            listening ? 'border-[#e5322d]/60' : 'border-white/10'
+          }`}
+        >
+          <div className="flex items-start justify-between gap-[16px]">
+            <div className="flex flex-col gap-[8px] min-w-0">
+              <div className="flex items-center gap-[10px]">
+                <span className="font-display text-[40px] leading-[38px] tracking-[1px] text-[#ede6d6]">TAKE {take}</span>
+                {listening && (
+                  <span className="flex items-center gap-[6px] rounded-full bg-[#e5322d] px-[9px] h-[22px] font-bold text-[12px] text-white">
+                    <span className="size-[6px] rounded-full bg-white tally-pulse" />
+                    녹음 중
+                  </span>
+                )}
+              </div>
+              <p className="font-normal text-[13px] text-white/55 leading-[20px] max-w-[380px] break-keep">
+                이 슬라이드를 실제로 발표하듯 설명해보세요. 슬라이드에 없는 이유, 예시, 배경이 모일수록 답이 깊어져요.
+              </p>
+            </div>
+            <div className="flex flex-col items-center gap-[6px] shrink-0">
+              <button
+                type="button"
+                onClick={() => (listening ? stop() : start())}
+                aria-label={listening ? '녹음 멈추기' : '녹음 시작'}
+                title={listening ? '녹음 멈추기' : '녹음 시작'}
+                className="relative grid place-items-center size-[84px] rounded-full hover:scale-[1.04] transition-[scale]"
+              >
+                <span
+                  className={`absolute inset-0 rounded-full border-[5px] ${
+                    listening ? 'border-[#e5322d]/70 tally-pulse' : 'border-[#e5322d]/30'
+                  }`}
+                />
+                <span
+                  className={`bg-[#e5322d] transition-all duration-200 ${
+                    listening ? 'size-[30px] rounded-[7px]' : 'size-[56px] rounded-full'
+                  }`}
+                />
+              </button>
+              <span className={`font-mono font-bold text-[14px] ${listening ? 'text-[#ede6d6]' : 'text-white/40'}`}>{clock}</span>
+            </div>
+          </div>
+          <div className="h-px bg-white/10" />
+          <textarea
+            value={transcript}
+            onChange={(e) => setTranscript(e.target.value)}
+            placeholder="녹음 버튼을 누르고 말하면 여기에 쌓여요. 직접 적거나 고쳐도 됩니다."
+            className="min-h-[150px] w-full resize-y bg-transparent font-medium text-[16px] leading-[26px] text-[#ede6d6] caret-[#f26b1d] outline-none placeholder:text-white/30"
+          />
+          {partial && <p className="font-medium text-[15px] leading-[24px] text-white/40">{partial}</p>}
+        </section>
+
+        <div className="flex items-center justify-between gap-[12px]">
+          <span className="font-medium text-[12px] text-white/40">
+            {transcript.trim() ? `${transcript.trim().length}자` : ''}
+          </span>
           <button
             type="button"
             onClick={organize}
             disabled={!transcript.trim() || busy}
-            className="bg-[#f26b1d] h-[40px] px-[18px] rounded-[6px] font-bold text-[14px] text-white disabled:opacity-40"
+            className="cta h-[42px] px-[20px] rounded-[8px] bg-[#f26b1d] font-bold text-[15px] text-white disabled:opacity-40"
           >
-            {busy ? 'AI가 정리하는 중···' : '정리하기'}
+            {busy ? 'AI가 정리하는 중···' : '정리하기 →'}
           </button>
         </div>
-        {error && <p className="font-medium text-[13px] text-[#bf382e]">{error}</p>}
-        {savedMsg && <p className="font-medium text-[13px] text-[#409959]">{savedMsg}</p>}
+        {error && <p className="font-medium text-[13px] text-[#ff7a70]">{error}</p>}
+        {savedMsg && <p className="font-medium text-[13px] text-[#7ee2a0]">{savedMsg}</p>}
         {items && (
           <Review
             items={items}
@@ -340,12 +434,97 @@ function Rehearsal({
               onSaved(n);
               setItems(null);
               setTranscript('');
-              setSavedMsg(`${added}개 저장했어요. 다음 슬라이드로 넘어가도 됩니다.`);
+              setTake((t) => t + 1);
+              setSecs(0);
+              setSavedMsg(`${added}개 저장했어요. 더 말하거나 다음 슬라이드로 넘어가도 됩니다.`);
             }}
           />
         )}
       </div>
     </div>
+  );
+}
+
+// 슬라이드 그림. PDF 가 없거나 그림을 못 만들면 조용히 숨긴다 (글만으로도 리허설은 된다)
+function SlideImage({ presentationId, page }: { presentationId: string; page: number }) {
+  const [failed, setFailed] = useState(false);
+  if (failed) return null;
+  return (
+    <img
+      src={`${API_URL}/api/slides/${presentationId}/${page}.png`}
+      alt={`${page}번 슬라이드`}
+      onError={() => setFailed(true)}
+      className="mb-[16px] w-full rounded-[6px] border border-white/10 bg-[#f5f5f4]"
+    />
+  );
+}
+
+// 세로 필름 스트립. 좁은 화면에서는 가로로 눕는다
+function FilmStrip({
+  presentationId,
+  slides,
+  index,
+  counts,
+  onPick,
+}: {
+  presentationId: string;
+  slides: Slide[];
+  index: number;
+  counts: Map<number, number>;
+  onPick: (i: number) => void;
+}) {
+  const activeRef = useRef<HTMLButtonElement>(null);
+  useEffect(() => {
+    activeRef.current?.scrollIntoView({ block: 'nearest', inline: 'nearest', behavior: 'smooth' });
+  }, [index]);
+  return (
+    <nav aria-label="슬라이드" className={`overflow-auto [scrollbar-width:none] rounded-[10px] border border-white/10 bg-[#0b0907] ${PANE_H}`}>
+      <div className="film-reel flex lg:flex-col gap-[14px] w-max lg:w-auto px-[14px] py-[22px] lg:px-[22px] lg:py-[14px]">
+        {slides.map((s, i) => {
+          const on = i === index;
+          const n = counts.get(s.page) ?? 0;
+          return (
+            <button
+              key={s.page}
+              ref={on ? activeRef : undefined}
+              type="button"
+              onClick={() => onPick(i)}
+              title={s.title}
+              className={`group flex w-[128px] shrink-0 flex-col gap-[6px] rounded-[6px] p-[5px] text-left transition-colors ${
+                on ? 'bg-[#ede6d6]' : 'hover:bg-white/[0.07]'
+              }`}
+            >
+              <div
+                className={`relative aspect-video w-full overflow-hidden rounded-[3px] bg-[#2a241e] ${
+                  on ? 'ring-2 ring-[#f26b1d]' : 'opacity-70 group-hover:opacity-100'
+                } transition-opacity`}
+              >
+                <img
+                  src={`${API_URL}/api/slides/${presentationId}/${s.page}.png`}
+                  alt=""
+                  loading="lazy"
+                  onError={(e) => (e.currentTarget.style.display = 'none')}
+                  className="size-full object-cover"
+                />
+              </div>
+              <div className="flex items-center justify-between gap-[4px] px-[2px]">
+                <span className={`font-mono font-bold text-[11px] ${on ? 'text-[#f26b1d]' : 'text-white/55'}`}>p.{s.page}</span>
+                {n > 0 && (
+                  <span className="rounded-full bg-[#2f7a47] px-[7px] font-bold text-[10px] leading-[16px] text-white">설명 {n}</span>
+                )}
+              </div>
+              <span
+                className={`px-[2px] font-bold text-[12px] leading-[16px] line-clamp-2 break-keep ${
+                  on ? 'text-[#15110d]' : 'text-white/75'
+                }`}
+              >
+                {s.title}
+              </span>
+            </button>
+          );
+        })}
+      </div>
+    </nav>
   );
 }
 
@@ -483,8 +662,9 @@ function Review({
   const [showHidden, setShowHidden] = useState(false);
   const toggle = (i: number) => setItems(items.map((it, j) => (j === i ? { ...it, checked: !it.checked } : it)));
 
-  const main = items.map((it, i) => ({ it, i })).filter(({ it }) => (it.kind === 'explain' || it.kind === 'fact') && !it.dup);
-  const hidden = items.map((it, i) => ({ it, i })).filter(({ it }) => !((it.kind === 'explain' || it.kind === 'fact') && !it.dup));
+  const isMain = (it: Item) => (it.kind === 'explain' || it.kind === 'fact') && !it.dup;
+  const main = items.map((it, i) => ({ it, i })).filter(({ it }) => isMain(it));
+  const hidden = items.map((it, i) => ({ it, i })).filter(({ it }) => !isMain(it));
   const count = items.filter((it) => it.checked).length;
 
   async function save() {
@@ -502,51 +682,78 @@ function Review({
     }
   }
 
-  const row = ({ it, i }: { it: Item; i: number }) => (
-    <label
-      key={i}
-      className={`flex gap-[10px] items-start px-[12px] py-[9px] rounded-[6px] border ${
-        it.kind === 'fact' ? 'border-[#f26b1d] bg-[#fff8f2]' : 'border-[#e5e7eb] bg-white'
-      }`}
-    >
-      <input type="checkbox" checked={!!it.checked} onChange={() => toggle(i)} className="mt-[4px] accent-[#f26b1d]" />
-      <div className="flex flex-col gap-[3px] min-w-0">
-        <div className="flex gap-[6px] items-center">
-          <span className="font-bold text-[11px] text-[#6b7280]">{it.page ? `p.${it.page}` : '전체'}</span>
-          <span className={`font-bold text-[11px] ${it.kind === 'fact' ? 'text-[#f26b1d]' : 'text-[#409959]'}`}>
-            {it.dup ? '이미 저장됨' : KIND_LABEL[it.kind]}
-          </span>
-          {it.kind === 'fact' && !it.dup && (
-            <span className="font-medium text-[11px] text-[#f26b1d]">
-              슬라이드에 없는 내용이에요{it.new_numbers.length ? ` (${it.new_numbers.join(', ')})` : ''}. 맞는지 확인해주세요
+  const row = ({ it, i }: { it: Item; i: number }) => {
+    const fact = it.kind === 'fact' && !it.dup;
+    const quiet = !isMain(it);
+    return (
+      <label
+        key={i}
+        className={`rise-in flex cursor-pointer gap-[12px] items-start rounded-[10px] border bg-[#1c1713] px-[14px] py-[12px] transition-colors hover:bg-[#241e18] ${
+          fact ? 'border-[#f26b1d]/60' : quiet ? 'border-white/10' : 'border-[#58d68d]/35'
+        }`}
+      >
+        <input type="checkbox" checked={!!it.checked} onChange={() => toggle(i)} className="sr-only" />
+        <span
+          aria-hidden
+          className={`mt-[1px] grid size-[20px] shrink-0 place-items-center rounded-[5px] text-[13px] font-black transition-colors ${
+            it.checked ? 'bg-[#f26b1d] text-white' : 'border border-white/25 text-transparent'
+          }`}
+        >
+          ✓
+        </span>
+        <div className="flex flex-col gap-[4px] min-w-0">
+          <div className="flex flex-wrap gap-x-[8px] gap-y-[2px] items-center">
+            <span className={`font-bold text-[12px] ${fact ? 'text-[#ff9a5c]' : quiet ? 'text-white/45' : 'text-[#7ee2a0]'}`}>
+              {it.dup ? '이미 저장됨' : KIND_LABEL[it.kind]}
             </span>
-          )}
+            <span className="font-mono font-bold text-[11px] text-white/40">{it.page ? `p.${it.page}` : '전체'}</span>
+            {fact && (
+              <span className="font-medium text-[12px] text-[#ff9a5c]/85 break-keep">
+                슬라이드에 없는 내용이에요{it.new_numbers.length ? ` (${it.new_numbers.join(', ')})` : ''}. 맞는지 확인해주세요
+              </span>
+            )}
+          </div>
+          <span className={`font-medium text-[15px] leading-[23px] break-keep ${quiet ? 'text-white/50' : 'text-white/90'}`}>
+            {it.text}
+          </span>
         </div>
-        <span className="font-medium text-[14px] text-[#1a1a1a] leading-[21px]">{it.text}</span>
-      </div>
-    </label>
-  );
+      </label>
+    );
+  };
 
   return (
-    <div className="flex flex-col gap-[8px] border border-[#e5e7eb] rounded-[6px] px-[14px] py-[12px]">
-      <p className="font-bold text-[14px] text-[#1a1a1a]">새로 저장될 설명 ({main.length})</p>
-      {main.length === 0 && <p className="font-normal text-[13px] text-[#6b7280]">슬라이드에 없는 새 설명이 없었어요.</p>}
+    <div className="flex flex-col gap-[10px] pt-[4px]">
+      <div className="flex flex-wrap items-baseline gap-x-[12px] gap-y-[2px]">
+        <p className="font-black text-[18px] text-white">
+          새로 저장될 설명 <span className="font-mono text-[#f26b1d]">{main.length}</span>
+        </p>
+        <p className="font-medium text-[13px] text-white/45">슬라이드에 이미 있는 말과 저장된 설명은 걸렀어요</p>
+      </div>
+      {main.length === 0 && (
+        <p className="rounded-[10px] border border-dashed border-white/15 px-[14px] py-[14px] text-center font-medium text-[14px] text-white/50">
+          슬라이드에 없는 새 설명이 없었어요. 이유나 예시를 더 말해보세요.
+        </p>
+      )}
       {main.map(row)}
       {hidden.length > 0 && (
-        <button type="button" onClick={() => setShowHidden((v) => !v)} className="self-start font-bold text-[12px] text-[#6b7280]">
-          {showHidden ? '▾' : '▸'} 슬라이드에 이미 있는 말, 중복, 군말 ({hidden.length}) {showHidden ? '접기' : '보기'}
+        <button
+          type="button"
+          onClick={() => setShowHidden((v) => !v)}
+          className="self-start font-bold text-[13px] text-white/50 hover:text-white/80"
+        >
+          {showHidden ? '▾' : '▸'} 걸러진 문장 {hidden.length} (슬라이드 반복, 중복, 군말)
         </button>
       )}
       {showHidden && hidden.map(row)}
-      <div className="flex justify-between items-center pt-[4px]">
-        <span className="font-normal text-[12px] text-[#6b7280]">
+      <div className="flex flex-wrap justify-between items-center gap-[10px] pt-[4px]">
+        <span className="font-normal text-[12px] text-white/40 break-keep">
           슬라이드 반복은 답변 근거가 아니라 질문을 찾는 표현으로만 저장돼요.
         </span>
         <button
           type="button"
           onClick={save}
           disabled={busy || count === 0}
-          className="bg-[#1a1a1a] h-[38px] px-[16px] rounded-[6px] font-bold text-[14px] text-white disabled:opacity-40"
+          className="cta h-[42px] px-[20px] rounded-[8px] bg-[#ede6d6] font-bold text-[15px] text-[#15110d] disabled:opacity-40"
         >
           {busy ? '저장 중···' : `체크한 ${count}개 저장`}
         </button>

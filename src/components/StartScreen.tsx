@@ -96,7 +96,7 @@ export function StartScreen({ onStart, onOpenReport, loggedIn = false }: StartSc
             <button
               type="button"
               onClick={start}
-              className="bg-[#f26b1d] hover:bg-[#e25c10] transition-colors flex gap-[10px] h-[58px] items-center px-[28px] rounded-[10px]"
+              className="cta bg-[#f26b1d] hover:bg-[#e25c10] flex gap-[10px] h-[58px] items-center px-[28px] rounded-[10px]"
             >
               <span className="font-bold text-[18px]">새 발표 준비하기</span>
               <span className="size-[18px]">
@@ -116,7 +116,21 @@ export function StartScreen({ onStart, onOpenReport, loggedIn = false }: StartSc
         </div>
 
         {/* 오른쪽: 슬레이트 판. PRODUCTION 칸에 발표 이름을 바로 적는다 */}
-        <div className="clapper w-full max-w-[480px] select-none">
+        <div
+          className="clapper tilt w-full max-w-[480px] select-none mt-[48px] lg:mt-0"
+          onMouseMove={(e) => {
+            // 판 가운데를 기준으로 마우스 쪽으로 최대 7도 기운다
+            const r = e.currentTarget.getBoundingClientRect();
+            const dx = (e.clientX - r.left) / r.width - 0.5;
+            const dy = (e.clientY - r.top) / r.height - 0.5;
+            e.currentTarget.style.setProperty('--ry', `${dx * 14}deg`);
+            e.currentTarget.style.setProperty('--rx', `${-dy * 10}deg`);
+          }}
+          onMouseLeave={(e) => {
+            e.currentTarget.style.setProperty('--ry', '0deg');
+            e.currentTarget.style.setProperty('--rx', '0deg');
+          }}
+        >
           <div className={`clapper-arm slate-stripes h-[58px] rounded-t-[6px] ${snap ? 'snap' : ''}`} />
           <div className="slate-stripes h-[36px]" />
           <div className="bg-[#111111] rounded-b-[10px] px-[26px] pt-[20px] pb-[18px] flex flex-col gap-[14px] shadow-[0_40px_70px_-20px_rgba(0,0,0,0.8)]">
@@ -171,7 +185,7 @@ export function StartScreen({ onStart, onOpenReport, loggedIn = false }: StartSc
                 key={p.id}
                 type="button"
                 onClick={onOpenReport}
-                className="flex-1 min-w-0 bg-[#221c16] hover:bg-[#2d251d] transition-colors rounded-[4px] px-[16px] py-[12px] flex flex-col gap-[4px] text-left"
+                className="lift flex-1 min-w-0 bg-[#221c16] hover:bg-[#2d251d] rounded-[4px] px-[16px] py-[12px] flex flex-col gap-[4px] text-left"
               >
                 <span className="font-slate font-semibold text-[12px] tracking-[1px] text-[#f26b1d]">TAKE {i + 1}</span>
                 <span className="font-bold text-[16px] truncate">{p.name}</span>

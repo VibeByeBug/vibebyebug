@@ -15,16 +15,19 @@ import { Report } from './components/Report';
 import { SettingsScreen } from './components/SettingsScreen';
 import { StartScreen } from './components/StartScreen';
 import { TextInputFallback } from './components/TextInputFallback';
+import { AskBar } from './components/AskBar';
+import { AudienceControl, type AudienceCandidate } from './components/AudienceControl';
+import { audienceChannel, openAudienceWindow, type AudienceSlide } from './audience';
 import { UploadFailedScreen } from './components/UploadFailedScreen';
 import { UploadScreen } from './components/UploadScreen';
 import { useQaSocket } from './hooks/useQaSocket';
+import { cleanQuestion } from './cleanQuestion';
 import { useSpeechRecognition } from './hooks/useSpeechRecognition';
 import { mockRecognizedQuestion } from './mocks/questionMock';
 import { DownloadIcon } from './components/icons';
 import type { ScreenName } from './types/flow';
 import type { AnswerMode } from './types/qa';
 
-const MODE_LABEL: Record<AnswerMode, string> = { keywords: '키워드', flow: '흐름도', answer: '추천 답변' };
 
 function App() {
   // 처음 화면은 로그인 없이 보는 랜딩(슬레이트와 사용 방법). 발표를 시작할 때 로그인을 받는다.
@@ -37,9 +40,10 @@ function App() {
   const [mockProgress, setMockProgress] = useState({ index: 0, total: 7 });
   const [upload, setUpload] = useState<UploadResult | null>(null);
   const [uploadError, setUploadError] = useState<{ fileName: string; message: string } | null>(null);
-  const [mode, setMode] = useState<AnswerMode>('keywords');
+  // 실전 화면은 추천 답변(위)과 흐름도(아래)를 항상 같이 본다. 키워드, 흐름도, 추천 답변 중 고르던 버튼은 없앴다.
+  const mode: AnswerMode = 'both';
   const [textFromError, setTextFromError] = useState(true); // 음성 인식 실패로 온 입력인지
-  const { lastResult, lastAnswer, lastFlow, notice, ask, requestMode } = useQaSocket();
+  const { lastResult, lastAnswer, lastFlow, notice, ask } = useQaSocket();
 
   // 음성 인식 콜백은 인식을 시작한 순간의 값을 붙잡고 있어서, 최신 발표와 모드는 ref 로 읽는다
   const uploadRef = useRef(upload);
@@ -58,51 +62,78 @@ function App() {
     }
   }
 
+  // ── 마이크: 발표자가 켜고 끈다 ─────────────────────────────────────────
+  // 브라우저 음성 인식은 말이 잠깐 멈출 때마다 문장을 끊는다. 예전에는 끊긴 조각마다 질문으로 보내서
+  // 청중이 숨을 고르면 질문 앞부분만 검색됐다. 이제 켠 순간부터 끈 순간까지 들은 말을 모아 한 질문으로 보낸다.
+  const heardRef = useRef(''); // 이번 질문에서 확정된 조각들
+  const interimRef = useRef(''); // 아직 확정 안 된 마지막 조각
+  const finishingRef = useRef(false); // 발표자가 "질문 끝"을 눌렀다 (인식이 완전히 끝나면 보낸다)
+  const [questionMiss, setQuestionMiss] = useState(false); // 끝냈는데 알아들은 말이 없었다
+
   function handlePartialResult(text: string) {
-    setQuestion((prev) => ({ ...prev, partialText: text, isConfirmed: false }));
-    setScreen('recognized');
+    interimRef.current = text;
+    const shown = heardRef.current ? `${heardRef.current} ${text}` : text;
+    setQuestion({ partialText: shown, finalText: '', isConfirmed: false });
   }
 
   function handleFinalResult(text: string) {
+    interimRef.current = '';
+    heardRef.current = heardRef.current ? `${heardRef.current} ${text}` : text;
+    setQuestion({ partialText: heardRef.current, finalText: '', isConfirmed: false });
+  }
+
+  // 모은 말을 정리해서 한 질문으로 보낸다. 인식이 끝났을 때와 늦을 때 대비한 시간 제한, 둘 중 먼저 오는 쪽에서 한 번만.
+  function commitQuestion() {
+    if (!finishingRef.current) return;
+    finishingRef.current = false;
+    const raw = [heardRef.current, interimRef.current].filter(Boolean).join(' ');
+    heardRef.current = '';
+    interimRef.current = '';
+    const text = cleanQuestion(raw);
+    if (!text) {
+      setQuestion({ partialText: '', finalText: '', isConfirmed: false });
+      setQuestionMiss(true);
+      return;
+    }
     setQuestion({ partialText: text, finalText: text, isConfirmed: true });
-    sendQuestion(text); // 화면 전환을 기다리지 않고 바로 보낸다
-    setScreen('recognized');
-    setTimeout(() => setScreen('hud'), 1200);
+    sendQuestion(text);
+    setTimeout(() => setScreen((s) => (s === 'recognized' ? 'hud' : s)), 900);
   }
 
-  // 답을 받은 뒤 모드를 바꾸면 새 모드의 답이 없으니 서버에 다시 요청한다.
-  // 이미 받아둔 답이 있으면 다시 부르지 않는다 (흐름도 ↔ 추천 답변을 오가도 호출은 한 번씩).
-  function changeMode(m: AnswerMode) {
-    setMode(m);
-    if (screen !== 'hud' || !lastResult || lastResult.core || lastResult.sources.length === 0) return;
-    if ((m === 'answer' && !lastAnswer) || (m === 'flow' && !lastFlow)) requestMode(m);
-  }
-
-  const modeToggle = (
-    <div className="border border-[#e5e7eb] flex p-[3px] rounded-[6px]">
-      {(['keywords', 'flow', 'answer'] as const).map((m) => (
-        <button
-          key={m}
-          type="button"
-          onClick={() => changeMode(m)}
-          className={`h-[28px] px-[10px] rounded-[4px] text-[12px] whitespace-nowrap ${
-            mode === m ? 'bg-[#f26b1d] font-bold text-white' : 'font-medium text-[#6b7280]'
-          }`}
-        >
-          {MODE_LABEL[m]}
-        </button>
-      ))}
-    </div>
-  );
-
-  const { start: startRecognition, stop: stopRecognition, listening } = useSpeechRecognition({
+  const {
+    start: startRecognition,
+    stop: stopRecognition,
+    listening,
+  } = useSpeechRecognition({
     onPartialResult: handlePartialResult,
     onFinalResult: handleFinalResult,
+    onEnd: commitQuestion,
     onError: () => {
+      finishingRef.current = false;
       setTextFromError(true);
       setScreen('textInput');
     },
   });
+
+  // 질문 듣기 시작: 받아 적는 화면으로 가서 처음부터 모은다
+  function startQuestion() {
+    heardRef.current = '';
+    interimRef.current = '';
+    finishingRef.current = false;
+    setQuestionMiss(false);
+    setQuestion({ partialText: '', finalText: '', isConfirmed: false });
+    setScreen('recognized');
+    startRecognition();
+  }
+
+  // 질문 끝: 인식을 멈추고, 끄는 순간 말하던 마지막 조각까지 받은 뒤 보낸다
+  function finishQuestion() {
+    finishingRef.current = true;
+    stopRecognition();
+    setTimeout(commitQuestion, 700);
+  }
+
+  const toggleQuestion = () => (listening ? finishQuestion() : startQuestion());
 
   // 실전 화면을 벗어나면 마이크를 끈다 (설정, 리포트 등으로 가도 계속 듣고 있으면 안 된다)
   useEffect(() => {
@@ -145,25 +176,114 @@ function App() {
   const micToggle = (
     <button
       type="button"
-      onClick={() => (listening ? stopRecognition() : startRecognition())}
+      onClick={(e) => {
+        e.currentTarget.blur(); // 눌린 버튼에 포커스가 남으면 다음 Space 가 버튼을 한 번 더 누른다
+        toggleQuestion();
+      }}
+      title="Space 로도 켜고 끌 수 있어요"
       className={`flex gap-[6px] h-[32px] items-center px-[12px] rounded-[6px] font-bold text-[13px] whitespace-nowrap ${
-        listening ? 'bg-[#bf382e] text-white' : 'border border-[#e5e7eb] text-[#6b7280]'
+        listening ? 'bg-[#e5322d] text-white' : 'border border-[#e5e7eb] text-[#6b7280]'
       }`}
     >
-      <span className={`rounded-full size-[8px] ${listening ? 'bg-white animate-pulse' : 'bg-[#9ca3af]'}`} />
-      {listening ? '마이크 끄기' : '마이크 켜기'}
+      <span className={`rounded-full size-[8px] ${listening ? 'bg-white animate-pulse' : 'bg-[#e5322d]'}`} />
+      {listening ? '질문 끝' : '질문 듣기'}
+      <kbd className={`font-mono text-[11px] ${listening ? 'text-white/70' : 'text-[#9ca3af]'}`}>Space</kbd>
     </button>
   );
 
+  // Space 로 질문 듣기와 질문 끝을 오간다 (글을 적는 중에는 무시). 발표 리모컨 버튼을 Space 로 맞춰두면 손에서 바로 된다.
+  useEffect(() => {
+    if (screen !== 'hud' && screen !== 'recognized') return;
+    const onKey = (e: KeyboardEvent) => {
+      const t = e.target as HTMLElement;
+      if ((e.code !== 'Space' && e.key !== ' ') || e.repeat || t.tagName === 'INPUT' || t.tagName === 'TEXTAREA') return;
+      e.preventDefault();
+      toggleQuestion();
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  });
+
+  // ── 청중 화면 (프로젝터에 띄운 두 번째 창) ──────────────────────────────
+  // 발표자가 고른 근거 슬라이드 원본만 보낸다. 자동으로 보내지 않는다.
+  const [audienceOpen, setAudienceOpen] = useState(false);
+  const [audienceSlide, setAudienceSlide] = useState<AudienceSlide | null>(null);
+  const audienceSlideRef = useRef<AudienceSlide | null>(null);
+  audienceSlideRef.current = audienceSlide;
+  const channelRef = useRef<ReturnType<typeof audienceChannel> | null>(null);
+  useEffect(() => {
+    const ch = audienceChannel((m) => {
+      if (m.type === 'hello') {
+        // 청중 화면이 새로 열렸거나 새로고침됐다. 지금 띄워야 할 것을 다시 보낸다.
+        setAudienceOpen(true);
+        const cur = audienceSlideRef.current;
+        ch.send(cur ? { type: 'show', slide: cur } : { type: 'clear' });
+      }
+      if (m.type === 'bye') setAudienceOpen(false);
+    });
+    channelRef.current = ch;
+    return () => ch.close();
+  }, []);
+
+  // 띄울 후보: 근거 카드의 슬라이드, 그다음 흐름도 칸의 슬라이드 (겹치는 슬라이드는 한 번)
+  const audienceCandidates: AudienceCandidate[] = [];
+  for (const s of lastResult?.sources ?? []) {
+    if (!audienceCandidates.some((c) => c.page === s.slide)) audienceCandidates.push({ page: s.slide, quote: s.quote });
+  }
+  for (const st of lastFlow?.steps ?? []) {
+    if (st.slide && !audienceCandidates.some((c) => c.page === st.slide))
+      audienceCandidates.push({ page: st.slide, quote: st.text });
+  }
+  audienceCandidates.splice(4);
+
+  function sendToAudience(i: number) {
+    const c = audienceCandidates[i];
+    const pid = upload?.presentation_id;
+    if (!c || !pid) return;
+    const slide = { presentationId: pid, page: c.page, quote: c.quote };
+    setAudienceSlide(slide);
+    channelRef.current?.send({ type: 'show', slide });
+  }
+
+  function clearAudience() {
+    setAudienceSlide(null);
+    channelRef.current?.send({ type: 'clear' });
+  }
+
+  // 숫자키 1~4 로 보내고 0 으로 내린다 (글을 적는 중에는 무시).
+  // Esc 는 쓰지 않는다: 전체 화면을 끄거나 메뉴를 닫으려고 누르다가 청중 화면이 내려갔다.
+  useEffect(() => {
+    if (screen !== 'hud' || !audienceOpen) return;
+    const onKey = (e: KeyboardEvent) => {
+      const t = e.target as HTMLElement;
+      if (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || e.ctrlKey || e.metaKey || e.altKey) return;
+      if (e.key >= '1' && e.key <= '4') sendToAudience(Number(e.key) - 1);
+      if (e.key === '0') clearAudience();
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  });
+
+  // 마이크 연결: 바로 듣지 않고 질문 대기 화면으로 간다. 질문이 시작되면 발표자가 켠다.
   function handleConnectMic() {
+    heardRef.current = '';
+    interimRef.current = '';
+    setQuestionMiss(false);
     setQuestion({ partialText: '', finalText: '', isConfirmed: false });
     setScreen('recognized');
-    startRecognition();
   }
 
   function handleUploadFail(fileName: string, message: string) {
     setUploadError({ fileName, message });
     setScreen('uploadFailed');
+  }
+
+  // 글로 묻기 (실전 화면 아래 입력줄, 글로 질문하기 화면). 마이크는 켜둔 채로 둔다.
+  function askByText(typed: string) {
+    const text = cleanQuestion(typed) || typed.trim();
+    setQuestion({ partialText: text, finalText: text, isConfirmed: true });
+    sendQuestion(text);
+    setScreen('hud');
   }
 
   function beginPresentation(title: string) {
@@ -333,8 +453,8 @@ function App() {
             dark
             compact
             listening={listening}
-            label="마이크 꺼짐"
-            rightText={listening ? '분석 준비 중' : undefined}
+            label="Space 로 질문 듣기"
+            rightText={listening ? '듣는 중, 질문이 끝나면 Space' : undefined}
             rightButtons={micToggle}
             showProfile={false}
           />
@@ -342,7 +462,11 @@ function App() {
             partialText={question.partialText}
             finalText={question.finalText}
             isConfirmed={question.isConfirmed}
+            listening={listening}
+            missed={questionMiss}
+            onToggle={toggleQuestion}
           />
+          <AskBar onAsk={askByText} />
         </>
       )}
 
@@ -352,17 +476,14 @@ function App() {
             onNavigate={navigate}
             compact
             rightText="음성 인식 대체"
-            rightButtons={modeToggle}
+            rightButtons={
+              <>
+                {micToggle}
+              </>
+            }
             showProfile={false}
           />
-          <TextInputFallback
-            sttError={textFromError}
-            onSubmit={(text) => {
-              setQuestion({ partialText: text, finalText: text, isConfirmed: true });
-              sendQuestion(text);
-              setScreen('hud');
-            }}
-          />
+          <TextInputFallback sttError={textFromError} onSubmit={askByText} />
         </>
       )}
 
@@ -374,27 +495,24 @@ function App() {
             cueKey={cueNo}
             compact
             listening={listening}
-            label="마이크 꺼짐"
+            label="Space 로 질문 듣기"
             rightText={lastResult ? `응답 ${lastResult.responseMs}ms` : '분석 중'}
             rightButtons={
               <>
                 {micToggle}
-                {modeToggle}
                 {graphButton}
                 {materialButton}
-                <button
-                  type="button"
-                  onClick={() => {
-                    setTextFromError(false);
-                    setScreen('textInput');
-                  }}
-                  className="border border-[#e5e7eb] h-[32px] px-[12px] rounded-[6px] font-bold text-[13px] text-[#6b7280] whitespace-nowrap"
-                >
-                  글로 질문하기
-                </button>
               </>
             }
             showProfile={false}
+          />
+          <AudienceControl
+            candidates={audienceCandidates}
+            current={audienceSlide?.page ?? null}
+            open={audienceOpen}
+            onOpen={openAudienceWindow}
+            onSend={sendToAudience}
+            onClear={clearAudience}
           />
           <Hud
             result={lastResult}
@@ -405,6 +523,7 @@ function App() {
             question={question.finalText}
             cueNo={cueNo}
           />
+          <AskBar onAsk={askByText} />
         </>
       )}
 
@@ -449,7 +568,7 @@ function App() {
       {screen === 'settings' && (
         <>
           <Header onNavigate={navigate} label="설정" activeMenu="settings" />
-          <SettingsScreen mode={mode} onModeChange={changeMode} />
+          <SettingsScreen />
         </>
       )}
     </div>

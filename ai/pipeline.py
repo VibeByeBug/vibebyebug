@@ -74,6 +74,11 @@ NO_EVIDENCE_ADVICE = [
 ]
 
 
+# 묻는 말. 명사가 하나도 없어도 이런 말이 있으면 질문이다.
+# "어떻게만들었나" 는 명사가 없어서(어떻게=부사, 만들었나=동사) 잡음으로 버려졌다.
+QUESTION_CUE = re.compile(r"어떻게|어째서|왜|무엇|뭐|뭘|어떤|언제|누가|얼마|몇|\?|나요|까요|습니까|했나|했어|인가|인지|을까|를까")
+
+
 def is_noise(text: str, nouns_fn) -> bool:
     """질문이 아니라 잡음인가."""
     t = (text or "").strip()
@@ -81,7 +86,7 @@ def is_noise(text: str, nouns_fn) -> bool:
         return True
     words = nouns_fn(t)
     if len(words) < MIN_NOUNS:
-        return True
+        return not QUESTION_CUE.search(t)
     # 명사가 있어도 전부 추임새면 잡음이다
     return all(w in FILLER for w in words)
 
@@ -95,6 +100,8 @@ _LIMIT = ("한계", "다만", "향후", "과제", "리스크", "제외", "가상
 _MERIT = ("차별", "기존", "대비", "비교", "강점", "효과", "절감")
 _PLAN = ("목표", "계획", "로드맵", "단계", "출시", "확장")
 _WHAT = ("개요", "소개", "플랫폼", "해결", "목표", "핵심")
+# "어떻게 만들었나요", "어떻게 동작해요" 처럼 방법을 묻는 말
+_HOW = ("방법", "구현", "구조", "단계", "과정", "기술", "설계", "구성")
 META_EXPAND = {
     "프로젝트": (), "서비스": (), "발표": (), "연구": (), "시스템": (), "아이디어": (), "작품": (),
     "주제": (), "내용": (),
@@ -572,6 +579,8 @@ class ReadyQ:
                 terms += _WHY
             if re.search(r"뭔가|뭐예|뭐에요|무엇|뭐하는|어떤 거", question):
                 terms += _WHAT
+            if re.search(r"어떻게|어떤 방법|어떤 식", question):
+                terms += _HOW
             extra = {t for t in terms if t.lower() in self.idf}
             if not extra:
                 c = self._empty(question, "no_evidence", t0, NO_EVIDENCE_ADVICE)

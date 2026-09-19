@@ -40,7 +40,9 @@ export interface CoreCard {
 }
 
 // 키워드만 볼지, 추천 답변까지 볼지 (설정과 실전 화면 상단에서 고른다)
-export type AnswerMode = 'keywords' | 'answer' | 'flow';
+// both: 추천 답변(위)과 흐름도(아래)를 같이 본다. 실전 화면은 이것만 쓴다(키워드만 보는 모드는 없앴다).
+// keywords, answer, flow 는 서버와 옛 화면 호환용으로 남긴다.
+export type AnswerMode = 'keywords' | 'answer' | 'flow' | 'both';
 
 // 서버 cue.flow. 말할 순서를 짧은 칸으로. 칸이 완성될 때마다 steps 가 늘어난다.
 export interface QaFlow {

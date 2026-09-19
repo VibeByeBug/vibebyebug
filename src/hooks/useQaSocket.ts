@@ -49,8 +49,12 @@ export function useQaSocket(): UseQaSocketResult {
           return;
         }
         if (msg.type === 'cue.evidence') {
-          // 잡음(헛기침 등)으로 판정되면 화면을 바꾸지 않는다
-          if (msg.status === 'ignored') return;
+          // 잡음(헛기침 등)으로 판정되면 근거 화면은 그리지 않는다. 다만 질문을 보낸 뒤라 화면이
+          // "근거를 찾고 있어요" 에서 멈추므로, 알아듣지 못했다고 알려준다.
+          if (msg.status === 'ignored') {
+            setNotice('질문으로 알아듣지 못했어요. 다시 말하거나 "글로 질문하기"로 적어주세요.');
+            return;
+          }
           setLastResult(toQaResult(msg));
           setNotice(null);
         } else if (msg.type === 'cue.answer') {

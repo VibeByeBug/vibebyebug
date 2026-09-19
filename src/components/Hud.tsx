@@ -23,7 +23,7 @@ export function Hud({
   question,
   answer = null,
   flow = null,
-  mode = 'keywords',
+  mode = 'both',
   notice = null,
   onChangeType,
   cueNo,
@@ -65,9 +65,11 @@ export function Hud({
   // 추천 답변 모드에서 서버가 만든 답변. 끝났는데 비어 있으면(자료로 답할 수 없음, 오류) 없는 것으로 본다.
   const core = result.core ?? null;
   // 연습에서 확정한 답이 있으면 그 카드만 띄운다. 흐름도, 추천 답변은 만들지 않는다.
-  const showAnswer = !core && mode === 'answer' && !(answer?.done && !answer.text);
-  // 흐름도가 실패하면(자료로 답할 수 없음, 오류) 칸 대신 키워드를 보여준다
-  const showFlow = !core && mode === 'flow' && !(flow?.done && flow.steps.length === 0);
+  const wantAnswer = mode === 'answer' || mode === 'both';
+  const wantFlow = mode === 'flow' || mode === 'both';
+  const showAnswer = !core && wantAnswer && !(answer?.done && !answer.text);
+  // 흐름도가 실패하면(자료로 답할 수 없음, 오류) 흐름도 칸은 숨기고 추천 답변과 근거 카드만 남긴다
+  const showFlow = !core && wantFlow && !(flow?.done && flow.steps.length === 0);
   // 답변 확정 화면을 뺐으므로 "연습에서 확정한 답이 없어요" 안내도 띄우지 않는다
   const pendingNote = null;
 
@@ -133,11 +135,14 @@ export function Hud({
   // 근거 카드가 없어도 서버가 자료를 엮어 만든 답(흐름도, 추천 답변)이 오면 무조건 보여준다.
   // 전에는 "보강 자료로 만든 답" 표시가 붙은 답만 보여줘서, 슬라이드 조각이 섞여 만들어진 답은
   // 화면에서 버려지고 "근거를 찾지 못했습니다" 만 떴다. 키워드 모드에서도 이 경우 추천 답변이 온다.
-  const useFlow = mode === 'flow';
-  const fromNotes = useFlow ? !!flow && flow.steps.length > 0 : !!answer?.text;
+  const hasAnswer = !!answer?.text;
+  const hasFlow = !!flow && flow.steps.length > 0;
+  // 키워드 모드(옛 화면)도 근거가 없으면 서버가 추천 답변을 보내준다
+  const fromNotes = ((wantAnswer || mode === 'keywords') && hasAnswer) || (wantFlow && hasFlow);
   // 아직 만드는 중: 흐름도 모드는 흐름도가 끝나기 전, 나머지는 답변이 오고 있는데 안 끝났을 때
-  const building = useFlow ? !flow?.done : mode === 'answer' ? !answer?.done : !!answer && !answer.done;
-  const inferred = (useFlow ? flow?.basis : answer?.basis) === 'inferred';
+  const building =
+    (wantAnswer && !answer?.done) || (wantFlow && !flow?.done) || (mode === 'keywords' && !!answer && !answer.done);
+  const inferred = (hasAnswer && answer?.basis === 'inferred') || (hasFlow && flow?.basis === 'inferred');
   if (sources.length === 0 && !core) {
     return (
       <div className="relative flex flex-1 flex-col w-full bg-[#15110d] text-white overflow-hidden">
@@ -171,7 +176,9 @@ export function Hud({
           </div>
         </div>
         {pendingNote}
-        {fromNotes && (useFlow ? flowSection : answerSection)}
+        {/* 추천 답변을 위에 크게, 그 아래 흐름도 */}
+        {fromNotes && hasAnswer && answerSection}
+        {fromNotes && wantFlow && (hasFlow || !flow?.done) && flowSection}
         {!fromNotes && !building && <div className="flex flex-col gap-[12px] w-full">
           <p className="font-bold text-[14px] text-white/55 w-full text-center">이렇게 넘기세요</p>
           <div className="flex flex-col gap-[10px] w-full">
@@ -235,9 +242,10 @@ export function Hud({
 
       {!core && pendingNote}
 
-      {showFlow && flowSection}
-
+      {/* 추천 답변을 위에 크게, 그 아래 흐름도 */}
       {showAnswer && answerSection}
+
+      {showFlow && flowSection}
 
       {isLimitation && !showAnswer && !showFlow && !core ? (
         <div className="bg-[#1e1914] border-2 border-[#f26b1d] flex flex-col gap-[14px] items-center text-center px-[36px] py-[26px] rounded-[12px] w-full">
@@ -251,7 +259,7 @@ export function Hud({
           </div>
         </div>
       ) : (
-        !showFlow && !core && result.keywords.length > 0 && (
+        mode === 'keywords' && !core && result.keywords.length > 0 && (
           <>
             <div className="flex flex-col gap-[12px] items-center pt-[4px] w-full">
               <p className="font-bold text-[14px] text-white/55">키워드</p>
@@ -297,7 +305,7 @@ export function Hud({
               {visibleSources.map((source, index) => (
                 <div
                   key={`${source.slide}-${index}`}
-                  className="bg-[#1e1914] border border-white/10 flex gap-[18px] items-center px-[18px] py-[16px] rounded-[8px] w-full"
+                  className="lift bg-[#1e1914] border border-white/10 hover:border-[#f26b1d]/60 flex gap-[18px] items-center px-[18px] py-[16px] rounded-[8px] w-full"
                 >
                   <span className="bg-[#0b0907] border border-white/10 flex h-[68px] items-center justify-center rounded-[6px] shrink-0 w-[120px]">
                     <span className="font-mono text-[9px] text-white/40">p{String(source.slide).padStart(3, '0')}</span>
@@ -328,7 +336,7 @@ export function Hud({
           <p className="font-normal text-[13px] text-white/35 whitespace-nowrap">
             {isLimitation
               ? '한계 질문은 근거보다 답변 문장을 먼저 읽으세요'
-              : `응답 ${result.responseMs}ms, Space 로 다음 질문 대기`}
+              : `응답 ${result.responseMs}ms, Space 로 다음 질문 듣기`}
           </p>
         </div>
       </div>
@@ -406,7 +414,7 @@ export function FlowSteps({
       };
   return (
     // 넓은 화면은 칸을 가로로, 좁은 화면(1024px 미만)은 세로로 쌓는다
-    <div className="flex flex-col lg:flex-row items-stretch w-full">
+    <div className="shot-row flex flex-col lg:flex-row items-stretch w-full">
       {steps.map((step, i) => {
         const guess = inferred && !step.slide; // AI 가 추론한 칸 (근거 슬라이드 없음)
         // 첫 칸은 주황으로 채워 강조한다. 추론한 칸은 보라 칸이라 주황 강조를 쓰지 않는다.
@@ -418,7 +426,7 @@ export function FlowSteps({
             {/* 샷 카드: 필름 한 칸처럼 위아래에 구멍 줄. 도착할 때마다 오른쪽에서 밀려 들어온다 */}
             <div
               style={{ animationDelay: `${i * 60}ms` }}
-              className={`shot-in flex flex-1 flex-col gap-[10px] items-center text-center self-stretch px-[16px] py-[10px] rounded-[10px] min-w-0 ${
+              className={`shot-in shot-card flex flex-1 flex-col gap-[10px] items-center text-center self-stretch px-[16px] py-[10px] rounded-[10px] min-w-0 ${
                 guess ? c.guessCard : first ? 'bg-[#f26b1d] shadow-[0_12px_28px_-12px_rgba(242,107,29,0.6)]' : c.card
               }`}
             >
