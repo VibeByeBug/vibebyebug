@@ -116,7 +116,7 @@ export function StartScreen({ onStart, onOpenReport, loggedIn = false }: StartSc
         </div>
 
         {/* 오른쪽: 슬레이트 판. PRODUCTION 칸에 발표 이름을 바로 적는다 */}
-        <div className="clapper w-full max-w-[480px] select-none">
+        <div className="clapper w-full max-w-[480px] select-none mt-[48px] lg:mt-0">
           <div className={`clapper-arm slate-stripes h-[58px] rounded-t-[6px] ${snap ? 'snap' : ''}`} />
           <div className="slate-stripes h-[36px]" />
           <div className="bg-[#111111] rounded-b-[10px] px-[26px] pt-[20px] pb-[18px] flex flex-col gap-[14px] shadow-[0_40px_70px_-20px_rgba(0,0,0,0.8)]">
