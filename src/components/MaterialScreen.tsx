@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { API_URL } from '../api';
 import { useSpeechRecognition } from '../hooks/useSpeechRecognition';
+import { SlideText } from './SlideText';
 
 // 발표자 설명 모으기: 리허설 녹음, 발표 대본, 설명 자료.
 // AI 가 문장을 나눠 분류하고, 발표자가 확인한 것만 저장한다. 저장된 설명은 검색, 답변, 논리 지도에 들어간다.
@@ -9,6 +10,7 @@ interface Slide {
   page: number;
   title: string;
   text: string;
+  refined?: string | null; // AI 가 읽기 좋게 정리한 글 (보여주기용)
 }
 interface Note {
   id: string;
@@ -62,11 +64,27 @@ export function MaterialScreen({
   const [graphBusy, setGraphBusy] = useState(false);
   const [dirty, setDirty] = useState(false); // 지도를 만든 뒤 설명이 바뀌었나
 
+  const [refining, setRefining] = useState(false);
+
   const load = useCallback(async () => {
     const res = await fetch(`${API_URL}/api/notes/${presentationId}`);
     const data = await res.json();
-    setSlides(data.slides ?? []);
+    const got: Slide[] = data.slides ?? [];
+    setSlides(got);
     setNotes(data.notes ?? []);
+    // 정리본이 아직 없으면 만들어 달라고 한다 (20초 안팎). 그동안은 원문을 보여준다.
+    if (got.length && !got.some((s) => s.refined)) {
+      setRefining(true);
+      try {
+        const r = await fetch(`${API_URL}/api/notes/${presentationId}/refined`).then((x) => x.json());
+        const map: Record<string, string> = r.refined ?? {};
+        setSlides((cur) => cur.map((s) => ({ ...s, refined: map[String(s.page)] ?? s.refined })));
+      } catch {
+        // 정리에 실패해도 원문으로 충분히 쓸 수 있다
+      } finally {
+        setRefining(false);
+      }
+    }
   }, [presentationId]);
 
   useEffect(() => {
@@ -153,7 +171,13 @@ export function MaterialScreen({
       </div>
 
       {tab === 'rehearsal' && (
-        <Rehearsal presentationId={presentationId} slides={slides} onSaved={onSaved} initialPage={initialPage} />
+        <Rehearsal
+          presentationId={presentationId}
+          slides={slides}
+          onSaved={onSaved}
+          initialPage={initialPage}
+          refining={refining}
+        />
       )}
       {tab === 'doc' && <DocInput presentationId={presentationId} onSaved={onSaved} />}
       {tab === 'saved' && <Saved presentationId={presentationId} slides={slides} notes={notes} onChange={onSaved} />}
@@ -166,11 +190,13 @@ function Rehearsal({
   slides,
   onSaved,
   initialPage,
+  refining,
 }: {
   presentationId: string;
   slides: Slide[];
   onSaved: (n: Note[]) => void;
   initialPage?: number;
+  refining?: boolean;
 }) {
   const [index, setIndex] = useState(0);
   // 슬라이드 목록이 도착하면 처음 열 슬라이드로 옮긴다 (한 번만)
@@ -262,8 +288,8 @@ function Rehearsal({
           </button>
         </div>
         <div className="bg-[#f9fafb] border border-[#e5e7eb] px-[16px] py-[14px] rounded-[6px] h-[220px] lg:h-[420px] overflow-auto">
-          <p className="font-black text-[20px] text-[#1a1a1a] mb-[8px]">p.{slide.page}</p>
-          <p className="font-normal text-[13px] text-[#374151] leading-[21px] whitespace-pre-line">{slide.text}</p>
+          <p className="font-black text-[20px] text-[#1a1a1a] mb-[6px]">p.{slide.page}</p>
+          <SlideText key={slide.page} raw={slide.text} refined={slide.refined} pending={refining} />
         </div>
       </div>
 

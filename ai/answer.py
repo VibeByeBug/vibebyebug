@@ -265,7 +265,7 @@ FLOW_PROMPT = """발표자가 청중 질문에 답할 때 말할 순서를 흐�
    예: "500명×9,900원 계산", "그 목표의 전제 조건", "같은 기준으로 비교". 마지막 칸은 "-". 자료에 없는 숫자는 쓰지 마.
 8. 마지막 줄에 답변 가이드를 한 줄 써. 답변 문장이 아니라 "어떤 순서로, 어느 슬라이드를 근거로 말하면 되는지" 알려주는 코칭이다.
    예: "결론인 구독자 수부터 말하고, 12번 슬라이드 매출 계산으로 근거를 댄 뒤 2년 차 목표라는 조건을 덧붙이세요"
-   {guide_max}자 이내. 자료에 없는 숫자는 쓰지 마.
+   {guide_max}자 이내. 자료에 없는 숫자는 쓰지 마. 슬라이드 번호 0 인 자료는 "0번" 이라 하지 말고 "보강 자료" 라고 불러.
 9. 자료로 답할 수 없으면 "없음" 한 줄만 써.
 
 출력 형식 (다른 말 붙이지 말고 이것만, 한 줄에 한 칸):
@@ -417,7 +417,8 @@ def flow(self, question: str, qtype: str, slides: list[tuple[int, str]], story: 
         keys = []
         for k in re.split(r"[,/、]", keys_raw):
             k = k.strip().strip("\"'")
-            is_number = re.fullmatch(r"[\d,.~%\s]+[가-힣]{0,2}", k)
+            # "495만원", "2년", "215ms", "93.3%" 처럼 숫자와 단위뿐인 말
+            is_number = re.fullmatch(r"[\d,.~%\s]+(?:[가-힣]{0,2}|[A-Za-z]{1,3})", k)
             if len(k) >= 2 and not is_number and (k in text or k in detail) and k not in keys:
                 keys.append(k)
         keys = keys[:KEYS_MAX]

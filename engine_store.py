@@ -69,6 +69,14 @@ def _warm_worker_inner(pid: str, chunks_path: str, preset: str) -> None:
             if graph.get("ok"):
                 deck_graph.save(graph, graph_file)
         rq.set_graph(graph if graph.get("ok") else None)
+        # 리허설 화면과 논리 지도에서 볼 슬라이드 정리본 (보여주기용, 검색에는 안 쓴다)
+        import slide_refine
+        refined_file = Path(chunks_path).parent / "refined" / f"{pid}.json"
+        if slide_refine.load(refined_file) is None:
+            import json as _json
+            got = slide_refine.refine([_json.loads(l) for l in Path(chunks_path).open(encoding="utf-8")])
+            if got:
+                slide_refine.save(got, refined_file)
         # 연습에서 확정해둔 기본 질문 카드를 올린다 (서버가 재시작돼도 유지)
         core_file = Path(chunks_path).parent / "core" / f"{pid}.json"
         if core_file.exists():

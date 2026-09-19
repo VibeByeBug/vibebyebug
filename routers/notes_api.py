@@ -6,6 +6,7 @@
   POST   /api/notes/{id}/save           확인한 문장 저장 → 검색 색인에 바로 반영
   DELETE /api/notes/{id}/{note_id}      설명 하나 지우기
   POST   /api/notes/{id}/rebuild-graph  설명까지 넣어 논리 지도 다시 만들기
+  GET    /api/notes/{id}/refined        읽기 좋게 정리한 슬라이드 글 (없으면 만든다, 20초 안팎)
 """
 
 import asyncio
@@ -18,6 +19,7 @@ import ai_engine  # noqa: F401  — ai/ 를 import 경로에 등록
 import deck_graph
 import engine_store
 import notes as notes_mod
+import slide_refine
 from indexing import DATA_DIR, chunks_path
 
 router = APIRouter(prefix="/api/notes", tags=["Presenter Notes"])
@@ -29,6 +31,10 @@ def notes_path(pid: str):
 
 def graph_path(pid: str):
     return DATA_DIR / "graph" / f"{pid}.json"
+
+
+def refined_path(pid: str):
+    return DATA_DIR / "refined" / f"{pid}.json"
 
 
 def _rows(pid: str) -> list[dict]:
@@ -58,10 +64,23 @@ class SaveRequest(BaseModel):
 @router.get("/{pid}")
 async def get_notes(pid: str):
     rows = _rows(pid)
+    refined = slide_refine.load(refined_path(pid)) or {}
     slides = [{"page": r["page"],
                "title": next((l for l in r["text"].split("\n") if l.strip()), "")[:40],
-               "text": r["text"]} for r in rows]
+               "text": r["text"], "refined": refined.get(r["page"])} for r in rows]
     return {"slides": slides, "notes": notes_mod.NoteStore(notes_path(pid)).notes}
+
+
+@router.get("/{pid}/refined")
+async def refined(pid: str):
+    """읽기 좋게 정리한 슬라이드 글. 준비 단계에서 미리 만들어두지만, 없으면 여기서 만든다."""
+    rows = _rows(pid)
+    got = slide_refine.load(refined_path(pid))
+    if got is None:
+        got = await asyncio.to_thread(slide_refine.refine, rows)
+        if got:
+            slide_refine.save(got, refined_path(pid))
+    return {"refined": {str(k): v for k, v in (got or {}).items()}}
 
 
 @router.post("/{pid}/classify")

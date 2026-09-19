@@ -50,7 +50,63 @@ export function Hud({ result, question, answer = null, flow = null, mode = 'keyw
   const canExpand = sources.length > DEFAULT_VISIBLE_SOURCES;
   const isLimitation = result.type === '한계/반론';
 
+  // 흐름도와 추천 답변 칸. 슬라이드 근거가 없을 때(보강 자료로 만든 답)도 같은 모양으로 보여준다.
+  const flowSection = (
+      <div className="flex flex-col gap-[12px] w-full">
+        <p className="font-bold text-[11px] text-[#6b7280] tracking-[1.54px] w-full">
+          말할 순서
+          {flow?.done && <span className="ml-[8px] font-medium text-[#999]">{Math.round(flow.latency_ms)}ms</span>}
+          {flow?.basis === 'notes' && <NotesTag />}
+        </p>
+        {!flow?.steps.length ? (
+          <p className="font-medium text-[17px] text-[#999]">순서를 정리하고 있어요···</p>
+        ) : (
+          <FlowSteps steps={flow.steps} />
+        )}
+        {flow?.guide && (
+          <div className="bg-[#f9fafb] border-l-[4px] border-[#f26b1d] flex flex-col gap-[4px] px-[18px] py-[12px] rounded-[4px] w-full">
+            <p className="font-bold text-[12px] text-[#f26b1d]">이렇게 답해보세요</p>
+            <p className="font-medium text-[17px] text-[#1a1a1a] leading-[26px]">{flow.guide}</p>
+          </div>
+        )}
+        {flow?.status === 'blocked' && (
+          <p className="font-normal text-[13px] text-[#6b7280]">자료에 없는 숫자가 나와서 뒤 칸은 표시하지 않았습니다.</p>
+        )}
+      </div>
+  );
+  const answerSection = (
+      <div className="bg-[#fff3eb] border border-[#f26b1d] flex flex-col gap-[14px] px-[28px] py-[26px] rounded-[6px] w-full">
+        <p className="font-bold text-[12px] text-[#f26b1d] tracking-[1.2px] w-full">
+          추천 답변
+          {answer?.done && <span className="ml-[8px] font-medium text-[#999]">{Math.round(answer.latency_ms)}ms</span>}
+          {answer?.basis === 'notes' && <NotesTag />}
+        </p>
+        <p
+          className={`font-bold text-[27px] tracking-[-0.675px] leading-[40px] w-full ${
+            answer?.text ? 'text-[#1a1a1a]' : 'text-[#999]'
+          }`}
+        >
+          {answer?.text ? (
+            <>
+              “<HighlightMany text={answer.text} words={result.keywords} />”
+            </>
+          ) : (
+            '답변을 만들고 있어요···'
+          )}
+        </p>
+        {answer?.status === 'blocked' && (
+          <p className="font-normal text-[13px] text-[#6b7280]">
+            자료에 없는 숫자가 나와서 뒷부분은 표시하지 않았습니다.
+          </p>
+        )}
+      </div>
+  );
+
   // 발표자가 직접 쓴 카드는 슬라이드가 없어서 근거가 0개다. 근거 없음 화면으로 보내면 안 된다.
+  // 슬라이드에서 근거를 못 찾았어도 보강 자료와 논리 지도로 만든 답이 오면 그걸 보여준다
+  const fromNotes =
+    (mode === 'flow' && flow?.basis === 'notes' && flow.steps.length > 0) ||
+    (mode === 'answer' && answer?.basis === 'notes' && !!answer.text);
   if (sources.length === 0 && !core) {
     return (
       <div className="flex flex-1 flex-col gap-[24px] items-start pb-[36px] pt-[32px] px-[44px] w-full">
@@ -62,12 +118,19 @@ export function Hud({ result, question, answer = null, flow = null, mode = 'keyw
           <span className="size-[20px] text-[#f26b1d] shrink-0">
             <MinusCircleIcon />
           </span>
-          <p className="font-bold text-[19px] text-[#f26b1d] leading-[28px] whitespace-nowrap">
-            발표자료에서 관련 근거를 찾지 못했습니다
-          </p>
+          <div className="flex flex-col gap-[2px]">
+            <p className="font-bold text-[19px] text-[#f26b1d] leading-[28px]">발표자료에서 관련 근거를 찾지 못했습니다</p>
+            {fromNotes && (
+              <p className="font-medium text-[14px] text-[#6b7280] leading-[20px]">
+                대신 보강한 자료(대본, 설명 자료)와 논리 지도의 발표 줄거리로 답을 만들었어요. 한 번 더 확인하고 말해주세요.
+              </p>
+            )}
+          </div>
         </div>
         {pendingNote}
-        <div className="flex flex-col gap-[12px] w-full">
+        {fromNotes && mode === 'flow' && flowSection}
+        {fromNotes && mode === 'answer' && answerSection}
+        {!fromNotes && <div className="flex flex-col gap-[12px] w-full">
           <p className="font-bold text-[11px] text-[#6b7280] tracking-[1.54px] w-full">추천 답변</p>
           <div className="flex flex-col gap-[10px] w-full">
             {(result.suggestions ?? []).map((s) => (
@@ -78,7 +141,7 @@ export function Hud({ result, question, answer = null, flow = null, mode = 'keyw
               </div>
             ))}
           </div>
-        </div>
+        </div>}
       </div>
     );
   }
@@ -125,55 +188,9 @@ export function Hud({ result, question, answer = null, flow = null, mode = 'keyw
 
       {!core && pendingNote}
 
-      {showFlow && (
-        <div className="flex flex-col gap-[12px] w-full">
-          <p className="font-bold text-[11px] text-[#6b7280] tracking-[1.54px] w-full">
-            말할 순서
-            {flow?.done && <span className="ml-[8px] font-medium text-[#999]">{Math.round(flow.latency_ms)}ms</span>}
-          </p>
-          {!flow?.steps.length ? (
-            <p className="font-medium text-[17px] text-[#999]">순서를 정리하고 있어요···</p>
-          ) : (
-            <FlowSteps steps={flow.steps} />
-          )}
-          {flow?.guide && (
-            <div className="bg-[#f9fafb] border-l-[4px] border-[#f26b1d] flex flex-col gap-[4px] px-[18px] py-[12px] rounded-[4px] w-full">
-              <p className="font-bold text-[12px] text-[#f26b1d]">이렇게 답해보세요</p>
-              <p className="font-medium text-[17px] text-[#1a1a1a] leading-[26px]">{flow.guide}</p>
-            </div>
-          )}
-          {flow?.status === 'blocked' && (
-            <p className="font-normal text-[13px] text-[#6b7280]">자료에 없는 숫자가 나와서 뒤 칸은 표시하지 않았습니다.</p>
-          )}
-        </div>
-      )}
+      {showFlow && flowSection}
 
-      {showAnswer && (
-        <div className="bg-[#fff3eb] border border-[#f26b1d] flex flex-col gap-[14px] px-[28px] py-[26px] rounded-[6px] w-full">
-          <p className="font-bold text-[12px] text-[#f26b1d] tracking-[1.2px] w-full">
-            추천 답변
-            {answer?.done && <span className="ml-[8px] font-medium text-[#999]">{Math.round(answer.latency_ms)}ms</span>}
-          </p>
-          <p
-            className={`font-bold text-[27px] tracking-[-0.675px] leading-[40px] w-full ${
-              answer?.text ? 'text-[#1a1a1a]' : 'text-[#999]'
-            }`}
-          >
-            {answer?.text ? (
-              <>
-                “<HighlightMany text={answer.text} words={result.keywords} />”
-              </>
-            ) : (
-              '답변을 만들고 있어요···'
-            )}
-          </p>
-          {answer?.status === 'blocked' && (
-            <p className="font-normal text-[13px] text-[#6b7280]">
-              자료에 없는 숫자가 나와서 뒷부분은 표시하지 않았습니다.
-            </p>
-          )}
-        </div>
-      )}
+      {showAnswer && answerSection}
 
       {isLimitation && !showAnswer && !showFlow && !core ? (
         <div className="bg-[#fff3eb] border border-[#f26b1d] flex flex-col gap-[14px] px-[28px] py-[26px] rounded-[6px] w-full">
@@ -401,4 +418,13 @@ function HighlightWords({ text, words, color, bold }: { text: string; words: str
   });
   if (pos < text.length) out.push(text.slice(pos));
   return <>{out}</>;
+}
+
+// 슬라이드 근거로 답하지 못해 보강 자료(대본, 설명 자료)와 논리 지도로 만든 답이라는 표시
+function NotesTag() {
+  return (
+    <span className="ml-[8px] px-[8px] py-[2px] rounded-full bg-[#e8f5ec] font-bold text-[11px] text-[#2f7a47] tracking-normal">
+      보강 자료로 만든 답
+    </span>
+  );
 }

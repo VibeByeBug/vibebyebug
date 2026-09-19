@@ -1,11 +1,13 @@
 import { useEffect, useMemo, useState } from 'react';
 import { API_URL } from '../api';
+import { SlideText } from './SlideText';
 
 interface GraphNode {
   page: number;
   role: string;
   title: string;
   text?: string;
+  refined?: string | null; // AI 가 읽기 좋게 정리한 슬라이드 글
   notes?: string[]; // 이 슬라이드에 붙은 발표자 설명
 }
 interface GraphEdge {
@@ -535,12 +537,12 @@ export function GraphScreen({
                     onClick={() => setShowText((v) => !v)}
                     className="self-start font-bold text-[12px] text-[#6b7280]"
                   >
-                    {showText ? '▾ 슬라이드 원문 접기' : '▸ 슬라이드 원문 보기'}
+                    {showText ? '▾ 슬라이드 내용 접기' : '▸ 슬라이드 내용 보기'}
                   </button>
                   {showText && (
-                    <p className="font-normal text-[13px] text-[#4b5563] leading-[20px] whitespace-pre-line max-h-[220px] overflow-auto bg-[#f9fafb] rounded-[6px] px-[10px] py-[8px]">
-                      {node.text}
-                    </p>
+                    <div className="max-h-[300px] overflow-auto bg-[#f9fafb] rounded-[6px] px-[12px] py-[10px]">
+                      <SlideText key={node.page} raw={node.text} refined={node.refined} />
+                    </div>
                   )}
                 </div>
               )}
