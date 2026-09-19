@@ -52,6 +52,18 @@ def _warm_worker_inner(pid: str, chunks_path: str, preset: str) -> None:
         # 키워드만 쓰는 연결은 rq.answer() 를 안 부르므로 영향이 없다.
         rq = ReadyQ(chunks_path, preset=preset, session=pid, mode="answer")
         took = rq.warm()
+        # 발표자료 논리 지도 (GraphRAG). 한 번 만들면 파일로 남겨서 서버를 다시 켜도 재사용한다.
+        # 만들기에 10~20초 걸리고, 실패해도 검색은 지금처럼 동작한다.
+        import deck_graph
+        graph_file = Path(chunks_path).parent / "graph" / f"{pid}.json"
+        graph = deck_graph.load(graph_file)
+        if graph is None:
+            import json as _json
+            rows = [_json.loads(l) for l in Path(chunks_path).open(encoding="utf-8")]
+            graph = deck_graph.build(rows)
+            if graph.get("ok"):
+                deck_graph.save(graph, graph_file)
+        rq.set_graph(graph if graph.get("ok") else None)
         # 연습에서 확정해둔 기본 질문 카드를 올린다 (서버가 재시작돼도 유지)
         core_file = Path(chunks_path).parent / "core" / f"{pid}.json"
         if core_file.exists():

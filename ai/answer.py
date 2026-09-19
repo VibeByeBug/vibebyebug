@@ -42,6 +42,7 @@ PROMPT = """발표자가 청중 질문에 바로 읽을 수 있는 답변을 2�
 
 지켜야 할 것:
 1. 아래 자료 내용만 근거로 써. 자료에 없는 사실, 숫자, 이름은 절대 지어내지 마.
+   여러 슬라이드를 이어서 답해도 된다. 발표 줄거리가 있으면 질문이 그 흐름의 어디에 해당하는지 보고 앞뒤 슬라이드를 연결해.
 2. 숫자는 자료에 적힌 그대로 옮겨. 반올림, 단위 변환, 재계산 금지.
 3. 자료가 보여주는 것보다 세게 단정하지 마. 확인하지 않은 것을 했다고 하지 말고, 한계가 있으면 인정해.
 4. 첫 문장에서 바로 답해. 인사말 금지. 문장은 짧게.
@@ -51,12 +52,19 @@ PROMPT = """발표자가 청중 질문에 바로 읽을 수 있는 답변을 2�
 7. 자료로 답할 수 없으면 "없음" 이라고만 써.
 
 질문: {question}
-
+{story}
 --- 자료 ---
 {slides}"""
 
 _NUM = re.compile(r"\d+(?:[.,]\d+)*")
 _SENT_END = re.compile(r"(?<=[.!?])\s+")
+
+
+def _story_block(story: str) -> str:
+    """논리 지도의 발표 줄거리. 없으면 빈 줄."""
+    if not story:
+        return ""
+    return f"\n--- 발표 줄거리 (어느 단계의 질문인지 볼 때만 쓴다. 근거는 아래 자료에서) ---\n{story}\n"
 
 
 def numbers_ok(text: str, source: str) -> bool:
@@ -100,7 +108,7 @@ class Answerer:
             pass          # 준비 실패로 발표를 막지 않는다. 실전 호출에서 다시 시도된다.
         return time.time() - t0
 
-    def stream(self, question: str, slides: list[tuple[int, str]]) -> Iterator[dict]:
+    def stream(self, question: str, slides: list[tuple[int, str]], story: str = "") -> Iterator[dict]:
         """검사를 통과한 문장이 나올 때마다 지금까지의 답변을 내보낸다.
 
         마지막 메시지는 done=True 이고 status 가 붙는다.
@@ -112,7 +120,7 @@ class Answerer:
         t0 = time.time()
         source = "\n\n".join(t for _, t in slides)
         prompt = PROMPT.format(
-            question=question,
+            question=question, story=_story_block(story),
             slides="\n\n".join(f"[{p}번 슬라이드]\n{t}" for p, t in slides))
 
         shown: list[str] = []
@@ -234,6 +242,7 @@ FLOW_PROMPT = """발표자가 청중 질문에 답할 때 말할 순서를 흐�
 지켜야 할 것:
 1. 한 칸은 {max_chars}자 이내. 조사와 어미를 빼고 명사형으로 끝내.
 2. 아래 자료 내용만 근거로 써. 자료에 없는 사실, 숫자, 이름은 절대 지어내지 마.
+   여러 슬라이드를 이어서 답해도 된다. 발표 줄거리가 있으면 질문이 그 흐름의 어디에 해당하는지 보고 앞뒤 슬라이드를 연결해.
 3. 숫자는 자료에 적힌 그대로. 반올림, 단위 변환, 재계산 금지.
 4. 칸마다 근거가 된 슬라이드 번호를 붙여.
 5. 칸마다 핵심 단어 하나를 골라. 칸 내용에 그대로 들어 있는 말이어야 한다 (수치가 있으면 수치).
@@ -253,7 +262,7 @@ FLOW_PROMPT = """발표자가 청중 질문에 답할 때 말할 순서를 흐�
 가이드 | 답변 가이드
 
 질문: {question}
-
+{story}
 --- 자료 ---
 {slides}"""
 
@@ -312,7 +321,7 @@ def _stream_text(self, prompt: str, t0: float) -> Iterator[tuple[str, str]]:
         cancel.set()
 
 
-def flow(self, question: str, qtype: str, slides: list[tuple[int, str]]) -> Iterator[dict]:
+def flow(self, question: str, qtype: str, slides: list[tuple[int, str]], story: str = "") -> Iterator[dict]:
     """칸이 완성될 때마다 지금까지의 흐름도를 내보낸다.
 
     {"type": "cue.flow", "steps": [{"text", "slide", "key", "link"}], "guide", "done", "latency_ms", "status"}
@@ -344,7 +353,7 @@ def flow(self, question: str, qtype: str, slides: list[tuple[int, str]]) -> Iter
         return
 
     prompt = FLOW_PROMPT.format(
-        n=FLOW_STEPS, max_chars=FLOW_MAX_CHARS, question=question,
+        n=FLOW_STEPS, max_chars=FLOW_MAX_CHARS, question=question, story=_story_block(story),
         shape=FLOW_SHAPE.get(qtype, FLOW_SHAPE["사실확인"]),
         links=", ".join(LINKS), guide_max=GUIDE_MAX, why_max=WHY_MAX,
         slides="\n\n".join(f"[{p}번 슬라이드]\n{t}" for p, t in slides))

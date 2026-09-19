@@ -6,6 +6,7 @@ import { Login } from './components/Login';
 import { MicConnectScreen } from './components/MicConnectScreen';
 import { MockPracticeScreen } from './components/MockPracticeScreen';
 import { CorePracticeScreen } from './components/CorePracticeScreen';
+import { GraphScreen } from './components/GraphScreen';
 import { MyHistoryScreen } from './components/MyHistoryScreen';
 import { PreparingScreen } from './components/PreparingScreen';
 import { RecognizedQuestion } from './components/RecognizedQuestion';
@@ -94,8 +95,23 @@ function App() {
 
   // 실전 화면을 벗어나면 마이크를 끈다 (설정, 리포트 등으로 가도 계속 듣고 있으면 안 된다)
   useEffect(() => {
-    if (!['recognized', 'hud', 'textInput', 'micConnect'].includes(screen)) stopRecognition();
+    if (!['recognized', 'hud', 'textInput', 'micConnect', 'graph'].includes(screen)) stopRecognition();
   }, [screen, stopRecognition]);
+
+  // 논리 지도 화면. 보고 나면 원래 화면으로 돌아간다.
+  const [graphBack, setGraphBack] = useState<ScreenName>('hud');
+  const graphButton = (
+    <button
+      type="button"
+      onClick={() => {
+        setGraphBack(screen);
+        setScreen('graph');
+      }}
+      className="border border-[#e5e7eb] h-[32px] px-[12px] rounded-[6px] font-bold text-[13px] text-[#6b7280] whitespace-nowrap"
+    >
+      논리 지도
+    </button>
+  );
 
   const micToggle = (
     <button
@@ -181,6 +197,13 @@ function App() {
         </>
       )}
 
+      {screen === 'graph' && upload && (
+        <>
+          <Header onNavigate={setScreen} label="논리 지도" showProfile={false} />
+          <GraphScreen presentationId={upload.presentation_id} onBack={() => setScreen(graphBack)} />
+        </>
+      )}
+
       {screen === 'mockPractice' && (
         <>
           <Header
@@ -202,6 +225,8 @@ function App() {
             compact
             rightText="대기 중"
             rightButtons={
+              <>
+              {graphButton}
               <button
                 type="button"
                 onClick={() => {
@@ -212,6 +237,7 @@ function App() {
               >
                 글로 질문하기
               </button>
+              </>
             }
           />
           <MicConnectScreen onConnect={handleConnectMic} />
@@ -269,6 +295,7 @@ function App() {
               <>
                 {micToggle}
                 {modeToggle}
+                {graphButton}
                 <button
                   type="button"
                   onClick={() => {

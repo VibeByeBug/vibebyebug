@@ -29,6 +29,7 @@ from qtype import classify
 from weak_profile import WeakProfile
 import qa_log
 import core_answers
+import deck_graph
 
 # 유형별로 슬라이드에서 '무엇을 보여줄지'가 다르다.
 # 검색에 유형을 쓰는 건 실패했지만(README 참고), 무엇을 띄울지 고르는 데는 맞다.
@@ -259,6 +260,9 @@ def _useful_number(w: str) -> bool:
 #   (1.5, 0.75) PotentiAI 10/18, 톰과젤리 29/45  /  (3, 1.5) 9/18, 30/45  /  순위만 따름 9/18, 27/45
 # 둘 다 크게 흔들지 않는 (3, 1.5). 문항 수가 적어서 더 잘게 맞추지 않았다.
 RANK_BONUS = (3.0, 1.5, 0.0, 0.0, 0.0)
+
+# 논리 지도로 더 붙일 슬라이드 수. 많을수록 흐름도와 추천 답변이 느려진다.
+GRAPH_EXTRA = 3
 
 HEADING = re.compile(r"^[\[\(<※★①-⑤]|^STEP\s|^\s*[-•]\s*$")
 
@@ -589,7 +593,8 @@ class ReadyQ:
             row = next((r for r in self.rows if r["page"] == s.slide and r["source"] == s.source), None)
             if row is not None:
                 by_page.setdefault(s.slide, row["text"])
-        yield from answerer.stream(question, list(by_page.items()))
+        slides, story = self._with_graph(by_page, question)
+        yield from answerer.stream(question, slides, story)
 
     def flow(self, question: str, cue: Cue) -> Iterator[dict]:
         """cue() 결과에 이어 말할 순서를 흐름도 칸으로 내보낸다. flow 모드에서만 부른다.
@@ -606,7 +611,51 @@ class ReadyQ:
             row = next((r for r in self.rows if r["page"] == s.slide and r["source"] == s.source), None)
             if row is not None:
                 by_page.setdefault(s.slide, row["text"])
-        yield from self._get_answerer().flow(question, cue.question_type, list(by_page.items()))
+        slides, story = self._with_graph(by_page, question)
+        yield from self._get_answerer().flow(question, cue.question_type, slides, story)
+
+    def set_graph(self, graph: dict | None) -> None:
+        """발표자료 논리 지도 (deck_graph). 없으면 지금처럼 검색한 슬라이드만 쓴다."""
+        self.graph = graph
+
+    def _with_graph(self, by_page: dict, question: str = "") -> tuple[list[tuple[int, str]], str]:
+        """검색한 슬라이드에 논리적으로 연결된 슬라이드를 붙인다. 그리고 발표 줄거리.
+
+        "왜 이 방법이 맞나요?" 처럼 문제, 방법, 검증이 여러 장에 흩어진 질문에서
+        검색이 한두 장만 찾아도 나머지를 논리 지도로 끌어온다.
+
+        처음엔 이웃을 전부 붙였더니 연결이 많은 슬라이드(문제 제기 3번 등)가 질문과 상관없이
+        매번 끼었다. 그래서 두 길로 후보를 모으고 질문 단어와 맞는 것만 남긴다.
+          이웃    검색한 슬라이드와 논리 지도로 이어진 슬라이드
+          줄거리  질문과 맞는 줄거리 단계의 슬라이드 (검색이 처음부터 놓친 슬라이드를 찾는 길)
+        """
+        graph = getattr(self, "graph", None)
+        if not graph:
+            return list(by_page.items()), ""
+        pages = list(by_page)
+        qwords = {w.lower() for w in self.nouns(question)} if question else set()
+
+        cands = deck_graph.neighbors(graph, pages, limit=10)
+        for line in graph.get("story", []):
+            lw = {w.lower() for w in self.nouns(line["text"])}
+            if qwords & lw:
+                cands += [p for p in line.get("pages", []) if p not in cands]
+
+        scored = []
+        for p in cands:
+            if p in by_page:
+                continue
+            i = next((k for k, r in enumerate(self.rows) if r["page"] == p), None)
+            if i is None:
+                continue
+            words = set().union(*(w for _, w in self.prepared[i])) if self.prepared[i] else set()
+            score, n = _match(words, qwords, self.idf)
+            if n:
+                scored.append((score, p, i))
+        scored.sort(key=lambda x: -x[0])
+        for _, p, i in scored[:GRAPH_EXTRA]:
+            by_page.setdefault(p, self.rows[i]["text"])
+        return list(by_page.items()), deck_graph.story_text(graph)
 
     def set_core(self, cards: dict) -> None:
         """연습에서 확정한 기본 질문 카드 {질문 종류 id: 카드}. 확정이 바뀔 때마다 다시 넣는다."""
