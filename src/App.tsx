@@ -72,9 +72,11 @@ function App() {
 
   // 답을 받은 뒤 모드를 바꾸면 새 모드의 답이 없으니 서버에 다시 요청한다.
   // 이미 받아둔 답이 있으면 다시 부르지 않는다 (흐름도 ↔ 추천 답변을 오가도 호출은 한 번씩).
+  // 슬라이드 근거가 0개인 질문도 요청한다. 서버가 대본, 설명 자료, 지식 지도로 답을 만든다.
+  // (전에는 근거 0개면 요청하지 않아서, 키워드 모드로 물은 뒤 흐름도로 바꾸면 "찾고 있어요" 에서 멈췄다)
   function changeMode(m: AnswerMode) {
     setMode(m);
-    if (screen !== 'hud' || !lastResult || lastResult.core || lastResult.sources.length === 0) return;
+    if (screen !== 'hud' || !lastResult || lastResult.core) return;
     if ((m === 'answer' && !lastAnswer) || (m === 'flow' && !lastFlow)) requestMode(m);
   }
 
