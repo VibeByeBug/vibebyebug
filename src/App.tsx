@@ -292,6 +292,7 @@ function App() {
         <>
           <Header
             onNavigate={setScreen}
+            dark
             compact
             listening={listening}
             label="마이크 꺼짐"
@@ -331,6 +332,7 @@ function App() {
         <>
           <Header
             onNavigate={setScreen}
+            dark
             cueKey={cueNo}
             compact
             listening={listening}

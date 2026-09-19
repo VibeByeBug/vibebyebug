@@ -64,6 +64,10 @@ body {
 .clapper-arm { transform-origin: 6px 100%; transform: rotate(-14deg); transition: transform 180ms cubic-bezier(0.3, 1.6, 0.5, 1); }
 .clapper:hover .clapper-arm, .clapper-arm.snap { transform: rotate(0deg); }
 
+/* 어두운 헤더(시작 화면, 실전 화면)의 오른쪽 버튼들. 버튼은 흰 화면과 같이 쓰므로 여기서 색만 바꾼다. */
+.hdr-dark button { color: rgba(255, 255, 255, 0.82); border-color: rgba(255, 255, 255, 0.22); }
+.hdr-dark div { border-color: rgba(255, 255, 255, 0.22); }
+
 /* 움직임 줄이기 설정이면 페이드만 남긴다 */
 @media (prefers-reduced-motion: reduce) {
   .slate-sweep, .tally-pulse, .wave-bar { animation: none; }

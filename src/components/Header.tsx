@@ -59,15 +59,17 @@ export function Header({
                 </span>
               </div>
             ) : (
-              <p className="font-medium text-[14px] text-[#6b7280] whitespace-nowrap">{label}</p>
+              <p className={`font-medium text-[14px] whitespace-nowrap ${dark ? 'text-white/55' : 'text-[#6b7280]'}`}>{label}</p>
             )}
           </>
         )}
       </div>
 
-      <div className="flex gap-[14px] items-center">
+      <div className={`flex gap-[14px] items-center ${dark ? 'hdr-dark' : ''}`}>
         {rightButtons}
-        {rightText && <p className="font-bold text-[13px] text-[#6b7280] whitespace-nowrap">{rightText}</p>}
+        {rightText && (
+          <p className={`font-bold text-[13px] whitespace-nowrap ${dark ? 'text-white/55' : 'text-[#6b7280]'}`}>{rightText}</p>
+        )}
         {showProfile && (
           <>
             {rightText && <div className="bg-[#e5e7eb] h-[18px] w-px" />}
