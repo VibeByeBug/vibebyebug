@@ -27,7 +27,6 @@ import { DownloadIcon } from './components/icons';
 import type { ScreenName } from './types/flow';
 import type { AnswerMode } from './types/qa';
 
-const MODE_LABEL: Record<AnswerMode, string> = { keywords: '키워드', flow: '흐름도', answer: '추천 답변' };
 
 function App() {
   // 처음 화면은 로그인 없이 보는 랜딩(슬레이트와 사용 방법). 발표를 시작할 때 로그인을 받는다.
@@ -40,9 +39,10 @@ function App() {
   const [mockProgress, setMockProgress] = useState({ index: 0, total: 7 });
   const [upload, setUpload] = useState<UploadResult | null>(null);
   const [uploadError, setUploadError] = useState<{ fileName: string; message: string } | null>(null);
-  const [mode, setMode] = useState<AnswerMode>('keywords');
+  // 실전 화면은 추천 답변(위)과 흐름도(아래)를 항상 같이 본다. 키워드, 흐름도, 추천 답변 중 고르던 버튼은 없앴다.
+  const mode: AnswerMode = 'both';
   const [textFromError, setTextFromError] = useState(true); // 음성 인식 실패로 온 입력인지
-  const { lastResult, lastAnswer, lastFlow, notice, ask, requestMode } = useQaSocket();
+  const { lastResult, lastAnswer, lastFlow, notice, ask } = useQaSocket();
 
   // 음성 인식 콜백은 인식을 시작한 순간의 값을 붙잡고 있어서, 최신 발표와 모드는 ref 로 읽는다
   const uploadRef = useRef(upload);
@@ -72,33 +72,6 @@ function App() {
     setScreen('recognized');
     setTimeout(() => setScreen('hud'), 1200);
   }
-
-  // 답을 받은 뒤 모드를 바꾸면 새 모드의 답이 없으니 서버에 다시 요청한다.
-  // 이미 받아둔 답이 있으면 다시 부르지 않는다 (흐름도 ↔ 추천 답변을 오가도 호출은 한 번씩).
-  // 슬라이드 근거가 0개인 질문도 요청한다. 서버가 대본, 설명 자료, 지식 지도로 답을 만든다.
-  // (전에는 근거 0개면 요청하지 않아서, 키워드 모드로 물은 뒤 흐름도로 바꾸면 "찾고 있어요" 에서 멈췄다)
-  function changeMode(m: AnswerMode) {
-    setMode(m);
-    if (screen !== 'hud' || !lastResult || lastResult.core) return;
-    if ((m === 'answer' && !lastAnswer) || (m === 'flow' && !lastFlow)) requestMode(m);
-  }
-
-  const modeToggle = (
-    <div className="border border-[#e5e7eb] flex p-[3px] rounded-[6px]">
-      {(['keywords', 'flow', 'answer'] as const).map((m) => (
-        <button
-          key={m}
-          type="button"
-          onClick={() => changeMode(m)}
-          className={`h-[28px] px-[10px] rounded-[4px] text-[12px] whitespace-nowrap ${
-            mode === m ? 'bg-[#f26b1d] font-bold text-white' : 'font-medium text-[#6b7280]'
-          }`}
-        >
-          {MODE_LABEL[m]}
-        </button>
-      ))}
-    </div>
-  );
 
   const { start: startRecognition, stop: stopRecognition, listening } = useSpeechRecognition({
     onPartialResult: handlePartialResult,
@@ -428,7 +401,6 @@ function App() {
             rightButtons={
               <>
                 {micToggle}
-                {modeToggle}
               </>
             }
             showProfile={false}
@@ -450,7 +422,6 @@ function App() {
             rightButtons={
               <>
                 {micToggle}
-                {modeToggle}
                 {graphButton}
                 {materialButton}
               </>
@@ -519,7 +490,7 @@ function App() {
       {screen === 'settings' && (
         <>
           <Header onNavigate={navigate} label="설정" activeMenu="settings" />
-          <SettingsScreen mode={mode} onModeChange={changeMode} />
+          <SettingsScreen />
         </>
       )}
     </div>

@@ -83,23 +83,38 @@ def _parse(raw: str) -> dict:
     return {"type": "stt.final", "text": raw}
 
 
-async def _send_extra(websocket: WebSocket, rq, text: str, cue, mode: str) -> None:
+async def _send_extra(websocket: WebSocket, rq, text: str, cue, mode: str, lock: asyncio.Lock | None = None) -> None:
     it = rq.answer(text, cue) if mode == "answer" else rq.flow(text, cue)
     while True:
         part = await asyncio.to_thread(next, it, None)
         if part is None:
             break
-        await websocket.send_json(part)
+        if lock is None:
+            await websocket.send_json(part)
+        else:
+            async with lock:
+                await websocket.send_json(part)
         if part.get("done"):
             print(f"💬 [{mode}] status={part.get('status')} "
                   f"첫 칸 {part.get('first_ms')}ms / 끝 {part.get('latency_ms')}ms")
+
+
+async def _send_both(websocket: WebSocket, rq, text: str, cue) -> None:
+    """추천 답변(위)과 흐름도(아래)를 같이 만든다. 따로 기다리지 않게 동시에 돌린다.
+
+    화면은 추천 답변을 크게, 그 아래 흐름도를 띄운다(키워드만 보는 모드는 없앴다).
+    두 흐름이 같은 연결로 메시지를 보내므로 한 번에 하나씩 보내도록 잠근다.
+    """
+    lock = asyncio.Lock()
+    await asyncio.gather(_send_extra(websocket, rq, text, cue, "answer", lock),
+                         _send_extra(websocket, rq, text, cue, "flow", lock))
 
 
 @app.websocket("/ws")
 async def websocket_endpoint(websocket: WebSocket):
     await manager.connect(websocket)
     presentation_id = None      # 이 연결이 다루는 발표. session.start 로 정한다.
-    session_mode = "keywords"   # keywords | answer | flow
+    session_mode = "both"       # both(추천 답변 + 흐름도) | answer | flow | keywords(옛 화면)
     last = None                 # (질문, cue, 엔진) — 답을 받은 뒤 모드를 바꾸면 이걸로 다시 만든다
     try:
         while True:
@@ -167,7 +182,9 @@ async def websocket_endpoint(websocket: WebSocket):
 
             # ── 추천 답변, 흐름도 모드면 키워드를 보낸 뒤에 이어서 보낸다
             mode = msg.get("mode") or session_mode
-            if mode in ("answer", "flow"):
+            if mode == "both":
+                await _send_both(websocket, rq, text, cue)
+            elif mode in ("answer", "flow"):
                 await _send_extra(websocket, rq, text, cue, mode)
             elif not cue.sources and not cue.core and cue.status != "ignored":
                 # 키워드 모드인데 슬라이드 근거 카드가 없다. 키워드만으로는 할 말이 없으니
