@@ -15,6 +15,7 @@ import { Report } from './components/Report';
 import { SettingsScreen } from './components/SettingsScreen';
 import { StartScreen } from './components/StartScreen';
 import { TextInputFallback } from './components/TextInputFallback';
+import { AskBar } from './components/AskBar';
 import { UploadFailedScreen } from './components/UploadFailedScreen';
 import { UploadScreen } from './components/UploadScreen';
 import { useQaSocket } from './hooks/useQaSocket';
@@ -166,6 +167,13 @@ function App() {
   function handleUploadFail(fileName: string, message: string) {
     setUploadError({ fileName, message });
     setScreen('uploadFailed');
+  }
+
+  // 글로 묻기 (실전 화면 아래 입력줄, 글로 질문하기 화면). 마이크는 켜둔 채로 둔다.
+  function askByText(text: string) {
+    setQuestion({ partialText: text, finalText: text, isConfirmed: true });
+    sendQuestion(text);
+    setScreen('hud');
   }
 
   function beginPresentation(title: string) {
@@ -345,6 +353,7 @@ function App() {
             finalText={question.finalText}
             isConfirmed={question.isConfirmed}
           />
+          <AskBar onAsk={askByText} />
         </>
       )}
 
@@ -354,17 +363,15 @@ function App() {
             onNavigate={navigate}
             compact
             rightText="음성 인식 대체"
-            rightButtons={modeToggle}
+            rightButtons={
+              <>
+                {micToggle}
+                {modeToggle}
+              </>
+            }
             showProfile={false}
           />
-          <TextInputFallback
-            sttError={textFromError}
-            onSubmit={(text) => {
-              setQuestion({ partialText: text, finalText: text, isConfirmed: true });
-              sendQuestion(text);
-              setScreen('hud');
-            }}
-          />
+          <TextInputFallback sttError={textFromError} onSubmit={askByText} />
         </>
       )}
 
@@ -407,6 +414,7 @@ function App() {
             question={question.finalText}
             cueNo={cueNo}
           />
+          <AskBar onAsk={askByText} />
         </>
       )}
 
