@@ -80,6 +80,15 @@ def _warm_worker_inner(pid: str, chunks_path: str, preset: str) -> None:
                 slide_refine.save(refined, refined_file)
         # 정리본의 묶음 단위로 슬라이드 지식 조각을 나눈다 (통합 지식 검색)
         rq.set_refined(refined or {})
+        # 지식 그래프 (조각 사이의 관계). 조각이 많이 바뀌었으면 다시 만든다. 조각 60개 기준 12초 안팎.
+        import knowledge_graph
+        kg_file = Path(chunks_path).parent / "kgraph" / f"{pid}.json"
+        kg = knowledge_graph.load(kg_file)
+        if kg is None or knowledge_graph.coverage(kg, [c["id"] for c in rq.kb]) < 0.8:
+            kg = knowledge_graph.build(rq.kb)
+            if kg.get("ok"):
+                knowledge_graph.save(kg, kg_file)
+        rq.set_kgraph(kg)
         # 연습에서 확정해둔 기본 질문 카드를 올린다 (서버가 재시작돼도 유지)
         core_file = Path(chunks_path).parent / "core" / f"{pid}.json"
         if core_file.exists():

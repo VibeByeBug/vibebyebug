@@ -14,6 +14,7 @@
 
 from __future__ import annotations
 
+import hashlib
 import re
 from collections import Counter
 
@@ -105,15 +106,24 @@ def _note_chunks(notes: list[dict]) -> list[dict]:
 
 def build(rows: list[dict], notes: list[dict] | None = None,
           refined: dict[int, str] | None = None) -> list[dict]:
-    """지식 조각 목록. [{"id", "kind", "page", "text"}]"""
+    """지식 조각 목록. [{"id", "kind", "page", "text"}]  id 는 내용에서 만든 고정 번호"""
     refined = refined or {}
     chunks = []
     for r in rows:
         chunks += _slide_chunks(r["page"], r["text"], refined.get(r["page"]))
     chunks += _note_chunks(notes or [])
-    for i, c in enumerate(chunks):
-        c["id"] = i
-    return chunks
+    # 번호는 내용으로 정한다. 설명을 더하거나 지워도 나머지 조각의 번호가 그대로라
+    # 지식 그래프(knowledge_graph.py)를 통째로 다시 만들지 않아도 된다.
+    seen = set()
+    out = []
+    for c in chunks:
+        cid = hashlib.sha1(f"{c['kind']}|{c['page']}|{c['text']}".encode("utf-8")).hexdigest()[:10]
+        if cid in seen:
+            continue
+        seen.add(cid)
+        c["id"] = cid
+        out.append(c)
+    return out
 
 
 def to_context(chunks: list[dict]) -> list[tuple[int, str]]:

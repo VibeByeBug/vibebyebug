@@ -32,6 +32,7 @@ import core_answers
 import deck_graph
 import notes as notes_mod
 import knowledge
+import knowledge_graph
 
 # 유형별로 슬라이드에서 '무엇을 보여줄지'가 다르다.
 # 검색에 유형을 쓰는 건 실패했지만(README 참고), 무엇을 띄울지 고르는 데는 맞다.
@@ -268,6 +269,9 @@ GRAPH_EXTRA = 3
 # 통합 지식 조각 검색 (knowledge.py). 답변과 흐름도에 넘길 조각 수.
 # 조각 하나가 슬라이드 묶음이나 이어진 문장 3개 정도라, 8개면 슬라이드 서너 장 분량이다.
 KB_K = 8
+# 지식 그래프로 더할 이웃 조각 수. 검색 상위 몇 개의 이웃에서 고를지.
+KG_EXTRA = 3
+KG_SEED = 4
 # 슬라이드에서 근거를 못 찾았을 때 대신 넘길 발표자 설명 수와 슬라이드 수 (_fallback)
 FALLBACK_NOTES = 10
 FALLBACK_SLIDES = 4
@@ -454,6 +458,12 @@ class ReadyQ:
         self.refined: dict[int, str] = {}
         self.kb: list[dict] = []
         self.kb_index = None
+        self.kgraph: dict | None = None      # set_kgraph() 로 넣는다 (knowledge_graph.py)
+        # 지식 그래프 이웃을 답변 근거에 더할지. 지금은 끈다 (2026-09-19 측정):
+        #   여러 조각을 엮어야 하는 질문 8개 x 2회에서 근거에 든 사실 88% -> 88%, 답변 69% -> 71%.
+        #   조각 60개 중 8개를 검색하면 이미 필요한 사실의 88% 가 들어왔다. 병목은 검색이 아니라
+        #   답변 길이(2문장)였다. 그래프는 화면의 지식 지도에 쓰고, 자료가 커지면 다시 잰다.
+        self.use_kg = False
         self._build_kb()
 
     def warm(self) -> float:
@@ -722,6 +732,8 @@ class ReadyQ:
     def _build_kb(self) -> None:
         """지식 조각을 다시 만들고 색인한다. 설명이나 정리본이 바뀔 때마다 부른다(19장 기준 1초 안팎)."""
         self.kb = knowledge.build(self.rows, getattr(self, "notes", []), getattr(self, "refined", {}))
+        self._kb_by_id = {c["id"]: c for c in self.kb}
+        self._kb_words = {c["id"]: {w.lower() for w in self.nouns(c["text"])} for c in self.kb}
         docs = [c["text"] for c in self.kb]
         if self.slow is not None and self._slow_ready:
             # 임베딩 모델은 슬라이드 검색과 같이 쓴다 (다시 올리면 메모리와 시간이 두 배)
@@ -736,10 +748,45 @@ class ReadyQ:
         """질문에 맞는 지식 조각 -> (답변 자료, 발표 줄거리, 슬라이드 조각이 하나라도 있었나)."""
         hits = self.kb_index.search([question], KB_K)[0] if self.kb else []
         picked = [self.kb[i] for i, _ in hits]
+        if self.use_kg and self.kgraph:
+            picked = self._with_kgraph(picked, question)
         slides = knowledge.to_context(picked)
         graph = getattr(self, "graph", None)
         story = deck_graph.story_text(graph) if graph else ""
         return slides, story, any(c["kind"] == "slide" for c in picked)
+
+    def set_kgraph(self, graph: dict | None) -> None:
+        """지식 그래프 (knowledge_graph.py). 없으면 검색한 조각만 쓴다."""
+        self.kgraph = graph if graph and graph.get("ok") else None
+
+    def _with_kgraph(self, picked: list[dict], question: str) -> list[dict]:
+        """검색한 조각에 지식 그래프의 이웃을 더하고, 같은 내용이 겹치면 하나만 남긴다.
+
+        이웃을 다 붙이면 연결이 많은 조각(서비스 소개 등)이 질문과 상관없이 매번 끼었다
+        (슬라이드 논리 지도에서 겪은 것과 같다). 질문 낱말과 맞는 이웃만 더한다.
+        """
+        qwords = {w.lower() for w in self.nouns(question)}
+        ids = [c["id"] for c in picked]
+        scored = []
+        for cid, _ in knowledge_graph.neighbors(self.kgraph, ids[:KG_SEED]):
+            c = self._kb_by_id.get(cid)
+            if c is None:
+                continue
+            score, n = _match(self._kb_words.get(cid, set()), qwords, self.idf)
+            if n:
+                scored.append((score, c))
+        scored.sort(key=lambda x: -x[0])
+        out = picked + [c for _, c in scored[:KG_EXTRA]]
+        # 같은 내용: 슬라이드 조각을 남긴다 (화면에 슬라이드 번호를 보여줄 수 있다)
+        same = knowledge_graph.same_pairs(self.kgraph)
+        keep = []
+        for c in out:
+            twin = next((k for k in keep if (k["id"], c["id"]) in same), None)
+            if twin is None:
+                keep.append(c)
+            elif c["kind"] == "slide" and twin["kind"] != "slide":
+                keep[keep.index(twin)] = c
+        return keep
 
     def set_notes(self, notes: list[dict] | None) -> None:
         """발표자 설명(리허설, 대본, 설명 자료)을 넣는다. 검색 색인을 다시 만든다.

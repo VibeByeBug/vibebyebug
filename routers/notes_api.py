@@ -162,4 +162,10 @@ async def rebuild_graph(pid: str):
     rq = engine_store.get_engine(pid)
     if rq is not None:
         rq.set_graph(graph)
+        # 지식 그래프도 지금 조각(설명 포함)으로 다시 만든다
+        import knowledge_graph
+        kg = await asyncio.to_thread(knowledge_graph.build, rq.kb)
+        if kg.get("ok"):
+            knowledge_graph.save(kg, DATA_DIR / "kgraph" / f"{pid}.json")
+            rq.set_kgraph(kg)
     return {"edges": len(graph["edges"]), "notes_used": graph.get("notes_used", 0)}
