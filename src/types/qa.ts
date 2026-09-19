@@ -21,6 +21,8 @@ export interface QaResult {
 export interface FlowStep {
   text: string;
   slide: number | null;
+  key?: string; // 칸 안에서 글자 색으로 강조할 핵심 단어
+  link?: string; // 다음 칸으로 넘어갈 때 말할 연결어 ("그래서", "근거는")
 }
 
 // 연습에서 발표자가 확정한 기본 질문 답
@@ -40,6 +42,7 @@ export type AnswerMode = 'keywords' | 'answer' | 'flow';
 // 서버 cue.flow. 말할 순서를 짧은 칸으로. 칸이 완성될 때마다 steps 가 늘어난다.
 export interface QaFlow {
   steps: FlowStep[];
+  guide?: string; // 답변 가이드: 어떤 순서로, 어느 슬라이드를 근거로 말하면 되는지
   done: boolean;
   latency_ms: number;
   status?: 'ok' | 'no_answer' | 'blocked' | 'error' | 'skipped';

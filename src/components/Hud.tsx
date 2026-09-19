@@ -137,6 +137,12 @@ export function Hud({ result, question, answer = null, flow = null, mode = 'keyw
           ) : (
             <FlowSteps steps={flow.steps} />
           )}
+          {flow?.guide && (
+            <div className="bg-[#f9fafb] border-l-[4px] border-[#f26b1d] flex flex-col gap-[4px] px-[18px] py-[12px] rounded-[4px] w-full">
+              <p className="font-bold text-[12px] text-[#f26b1d]">이렇게 답해보세요</p>
+              <p className="font-medium text-[17px] text-[#1a1a1a] leading-[26px]">{flow.guide}</p>
+            </div>
+          )}
           {flow?.status === 'blocked' && (
             <p className="font-normal text-[13px] text-[#6b7280]">자료에 없는 숫자가 나와서 뒤 칸은 표시하지 않았습니다.</p>
           )}
@@ -239,11 +245,24 @@ export function Hud({ result, question, answer = null, flow = null, mode = 'keyw
   );
 }
 
+// 핵심 단어만 글자 색을 바꾼다. 칸 전체를 다 읽지 않아도 숫자와 요점이 먼저 눈에 들어오게.
+function Highlight({ text, word, color }: { text: string; word?: string; color: string }) {
+  if (!word || !text.includes(word)) return <>{text}</>;
+  const at = text.indexOf(word);
+  return (
+    <>
+      {text.slice(0, at)}
+      <span style={{ color }}>{word}</span>
+      {text.slice(at + word.length)}
+    </>
+  );
+}
+
 function FlowSteps({ steps }: { steps: FlowStep[] }) {
   return (
-    <div className="flex items-stretch gap-[10px] w-full">
+    <div className="flex items-stretch w-full">
       {steps.map((step, i) => (
-        <div key={i} className="flex flex-1 items-center gap-[10px] min-w-0">
+        <div key={i} className="flex flex-1 items-center min-w-0">
           <div
             className={`flex flex-1 flex-col gap-[8px] justify-between self-stretch px-[20px] py-[18px] rounded-[6px] min-w-0 ${
               i === 0 ? 'bg-[#f26b1d]' : 'bg-[#fff3eb] border border-[#f26b1d]'
@@ -255,13 +274,21 @@ function FlowSteps({ steps }: { steps: FlowStep[] }) {
                 i === 0 ? 'text-white' : 'text-[#1a1a1a]'
               }`}
             >
-              {step.text}
+              <Highlight text={step.text} word={step.key} color={i === 0 ? '#ffe45c' : '#e0470f'} />
             </p>
             <span className={`font-bold text-[13px] ${i === 0 ? 'text-white/80' : 'text-[#6b7280]'}`}>
               {step.slide ? `p.${step.slide}` : '발표자 작성'}
             </span>
           </div>
-          {i < steps.length - 1 && <span className="font-black text-[22px] text-[#f26b1d] shrink-0">→</span>}
+          {i < steps.length - 1 && (
+            // 화살표 위 연결어. 이 말을 그대로 말하면 칸과 칸이 문장으로 이어진다.
+            <div className="flex flex-col items-center justify-center shrink-0 w-[74px] gap-[2px]">
+              {step.link && (
+                <span className="font-bold text-[13px] text-[#f26b1d] whitespace-nowrap">{step.link}</span>
+              )}
+              <span className="font-black text-[22px] text-[#f26b1d] leading-none">→</span>
+            </div>
+          )}
         </div>
       ))}
     </div>

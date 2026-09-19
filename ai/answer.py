@@ -213,6 +213,18 @@ FLOW_SHAPE = {
     "한계반론": "1칸 한계를 인정하는 말 → 2칸 이 분석이 다루는 범위 → 3칸 그래도 결론이 유효한 이유",
 }
 
+# 화살표에 붙일 연결어. 모델이 매번 다른 말을 지어내면 발표자가 읽고 해석해야 해서 목록에서만 고른다.
+# 이 말을 그대로 입으로 말하면 칸과 칸이 문장으로 이어진다.
+LINKS = ("그래서", "근거는", "즉", "예를 들어", "다만", "그럼에도", "덧붙이면",
+         "그 결과", "다음으로", "마지막으로", "왜냐하면", "검증은")
+DEFAULT_LINKS = {
+    "사실확인": ("근거는", "덧붙이면"),
+    "절차":     ("다음으로", "마지막으로"),
+    "근거":     ("근거는", "검증은"),
+    "한계반론": ("다만", "그럼에도"),
+}
+GUIDE_MAX = 90
+
 FLOW_PROMPT = """발표자가 청중 질문에 답할 때 말할 순서를 흐름도 칸 {n}개로 만들어줘.
 발표자는 이걸 한 번 보고 자기 말로 풀어서 답한다. 문장이 아니라 짧은 메모다.
 
@@ -223,11 +235,19 @@ FLOW_PROMPT = """발표자가 청중 질문에 답할 때 말할 순서를 흐�
 2. 아래 자료 내용만 근거로 써. 자료에 없는 사실, 숫자, 이름은 절대 지어내지 마.
 3. 숫자는 자료에 적힌 그대로. 반올림, 단위 변환, 재계산 금지.
 4. 칸마다 근거가 된 슬라이드 번호를 붙여.
-5. 자료로 답할 수 없으면 "없음" 한 줄만 써.
+5. 칸마다 핵심 단어 하나를 골라. 칸 내용에 그대로 들어 있는 말이어야 한다 (수치가 있으면 수치).
+6. 칸마다 다음 칸으로 넘어갈 때 말할 연결어를 이 중에서 하나 골라: {links}. 마지막 칸은 "-".
+7. 마지막 줄에 답변 가이드를 한 줄 써. 답변 문장이 아니라 "어떤 순서로, 어느 슬라이드를 근거로 말하면 되는지" 알려주는 코칭이다.
+   예: "결론인 구독자 수부터 말하고, 12번 슬라이드 매출 계산으로 근거를 댄 뒤 2년 차 목표라는 조건을 덧붙이세요"
+   {guide_max}자 이내. 자료에 없는 숫자는 쓰지 마.
+8. 자료로 답할 수 없으면 "없음" 한 줄만 써.
 
-출력 형식 (다른 말 붙이지 말고 이것만, 한 줄에 한 칸, 숫자는 슬라이드 번호):
-12 | 구독 500명 기준
-12 | 월 매출 495만원
+출력 형식 (다른 말 붙이지 말고 이것만):
+슬라이드번호 | 칸 내용 | 핵심 단어 | 연결어
+12 | 구독 500명 기준 | 500명 | 그래서
+12 | 월 매출 495만원 | 495만원 | 즉
+18 | 2년 차 흑자 전환 | 흑자 전환 | -
+가이드 | 답변 가이드
 
 질문: {question}
 
@@ -286,16 +306,22 @@ def _stream_text(self, prompt: str, t0: float) -> Iterator[tuple[str, str]]:
 def flow(self, question: str, qtype: str, slides: list[tuple[int, str]]) -> Iterator[dict]:
     """칸이 완성될 때마다 지금까지의 흐름도를 내보낸다.
 
-    {"type": "cue.flow", "steps": [{"text", "slide"}], "done", "latency_ms", "status"}
+    {"type": "cue.flow", "steps": [{"text", "slide", "key", "link"}], "guide", "done", "latency_ms", "status"}
+    key 는 칸에서 색으로 강조할 핵심 단어, link 는 다음 칸으로 넘어가는 연결어, guide 는 답변 가이드
     status: ok | no_answer | blocked | error  (blocked 는 자료에 없는 숫자가 나온 칸부터 버림)
     """
     t0 = time.time()
     by_slide = dict(slides)
+    all_text = "\n".join(by_slide.values())
     steps: list[dict] = []
+    guide = ""
     first_ms = None
+    defaults = DEFAULT_LINKS.get(qtype, DEFAULT_LINKS["사실확인"])
 
     def msg(done: bool, status: str = "", note: str = "") -> dict:
-        m = {"type": "cue.flow", "steps": list(steps), "done": done,
+        # 연결어는 칸 사이에만 있다. 마지막 칸의 연결어는 비운다.
+        out = [dict(st, link=st["link"] if i < len(steps) - 1 else "") for i, st in enumerate(steps)]
+        m = {"type": "cue.flow", "steps": out, "guide": guide, "done": done,
              "latency_ms": round((time.time() - t0) * 1000, 1)}
         if done:
             m.update(status=status, first_ms=first_ms)
@@ -310,6 +336,7 @@ def flow(self, question: str, qtype: str, slides: list[tuple[int, str]]) -> Iter
     prompt = FLOW_PROMPT.format(
         n=FLOW_STEPS, max_chars=FLOW_MAX_CHARS, question=question,
         shape=FLOW_SHAPE.get(qtype, FLOW_SHAPE["사실확인"]),
+        links=", ".join(LINKS), guide_max=GUIDE_MAX,
         slides="\n\n".join(f"[{p}번 슬라이드]\n{t}" for p, t in slides))
 
     def take(line: str):
@@ -317,10 +344,17 @@ def flow(self, question: str, qtype: str, slides: list[tuple[int, str]]) -> Iter
         s = _clean(line)
         if s.strip("\"' .") == "없음":
             return "none"
+        g = re.match(r"^\W*가이드\s*[|:]\s*(.+)$", s)
+        if g:
+            return {"guide": g.group(1).strip().strip("\"'")}
         m = _FLOW_LINE.match(s)
         if not m:
             return "skip"
-        slide, text = int(m.group(1)), m.group(2).strip().strip("\"'")
+        slide, rest = int(m.group(1)), m.group(2)
+        parts = [x.strip().strip("\"'") for x in rest.split("|")]
+        text = parts[0]
+        key = parts[1] if len(parts) > 1 else ""
+        link = parts[2] if len(parts) > 2 else ""
         # 형식 지시어가 칸에 섞여 나오는 경우가 있었다 ("슬라이드	과정 채점", "<TAB>문제마다...")
         text = re.sub(r"^(?:슬라이드|<?TAB>?|\||\s)+", "", text).strip()
         if not text:
@@ -330,7 +364,12 @@ def flow(self, question: str, qtype: str, slides: list[tuple[int, str]]) -> Iter
             return "skip"
         if not numbers_ok(text, by_slide[slide]):
             return "blocked"
-        return {"text": text[:FLOW_MAX_CHARS + 8], "slide": slide}
+        text = text[:FLOW_MAX_CHARS + 8]
+        # 핵심 단어는 칸 안에 그대로 있어야 색을 칠할 수 있다. 없으면 칸의 수치로 대신한다.
+        if not key or key not in text:
+            num = re.search(r"\d[\d,.~]*\s*(?:%|[가-힣]{1,2})?", text)
+            key = num.group(0).strip() if num else ""
+        return {"text": text, "slide": slide, "key": key, "link": link if link in LINKS else ""}
 
     for kind, val in _stream_text(self, prompt, t0):
         if kind == "error":
@@ -345,7 +384,16 @@ def flow(self, question: str, qtype: str, slides: list[tuple[int, str]]) -> Iter
             if got == "blocked":
                 yield msg(True, "blocked", line)
                 return
+            if isinstance(got, dict) and "guide" in got:
+                # 가이드도 숫자를 자료와 대조한다. 틀린 숫자가 있으면 가이드만 버린다.
+                if numbers_ok(got["guide"], all_text):
+                    guide = got["guide"][:GUIDE_MAX + 10]
+                    yield msg(False)
+                continue
             if isinstance(got, dict) and len(steps) < FLOW_STEPS:
+                # 모델이 목록 밖 연결어를 쓰면 유형별 기본값으로 채운다
+                if not got["link"] and len(steps) < len(defaults):
+                    got["link"] = defaults[len(steps)]
                 steps.append(got)
                 if first_ms is None:
                     first_ms = round((time.time() - t0) * 1000, 1)
