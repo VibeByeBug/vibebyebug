@@ -146,7 +146,7 @@ function App() {
             onUploaded={setUpload}
             onUploadFail={handleUploadFail}
             onSkip={() => setScreen('preparing')}
-            onStartMock={() => setScreen('corePractice')}
+            onStartMock={() => setScreen('mockPractice')}
           />
         </>
       )}

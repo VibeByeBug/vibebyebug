@@ -42,11 +42,8 @@ export function Hud({ result, question, answer = null, flow = null, mode = 'keyw
   const showAnswer = !core && mode === 'answer' && !(answer?.done && !answer.text);
   // 흐름도가 실패하면(자료로 답할 수 없음, 오류) 칸 대신 키워드를 보여준다
   const showFlow = !core && mode === 'flow' && !(flow?.done && flow.steps.length === 0);
-  const pendingNote = result.corePending ? (
-    <p className="font-medium text-[14px] text-[#6b7280]">
-      ‘{result.corePending}’은 연습에서 확정한 답이 없어요. 연습 화면에서 확정하면 다음부터 바로 뜹니다.
-    </p>
-  ) : null;
+  // 답변 확정 화면을 뺐으므로 "연습에서 확정한 답이 없어요" 안내도 띄우지 않는다
+  const pendingNote = null;
 
   const sources = result.sources.slice(0, MAX_SOURCES);
   const visibleSources = expanded ? sources : sources.slice(0, DEFAULT_VISIBLE_SOURCES);
