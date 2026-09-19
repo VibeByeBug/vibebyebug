@@ -15,7 +15,7 @@ export function RecognizedQuestion({ partialText, finalText, isConfirmed }: Reco
         style={{ background: 'radial-gradient(1100px 520px at 50% -120px, rgba(255,181,71,0.13), transparent 70%)' }}
       />
       <div className="relative flex flex-col gap-[16px] items-center text-center w-full max-w-[1100px]">
-        <p className="font-mono font-bold text-[12px] text-[#f26b1d] tracking-[3px]">ROLLING  /  질문 인식 중</p>
+        <p className="font-bold text-[15px] text-white/55">질문을 듣고 있어요</p>
         <p
           className={`font-black text-[44px] tracking-[-1.6px] leading-[57px] w-full break-keep ${
             isConfirmed ? 'text-white' : 'text-white/45'

@@ -27,7 +27,11 @@ import type { AnswerMode } from './types/qa';
 const MODE_LABEL: Record<AnswerMode, string> = { keywords: '키워드', flow: '흐름도', answer: '추천 답변' };
 
 function App() {
-  const [screen, setScreen] = useState<ScreenName>('login');
+  // 처음 화면은 로그인 없이 보는 랜딩(슬레이트와 사용 방법). 발표를 시작할 때 로그인을 받는다.
+  const [screen, setScreen] = useState<ScreenName>('start');
+  const [loggedIn, setLoggedIn] = useState(false);
+  // 로그인 전에 슬레이트에 적어둔 발표 이름. 로그인하고 나면 이 이름으로 업로드를 이어간다.
+  const [pendingTitle, setPendingTitle] = useState<string | null>(null);
   const [presentationName, setPresentationName] = useState('캡스톤 디자인 최종 발표');
   const [question, setQuestion] = useState(mockRecognizedQuestion);
   const [mockProgress, setMockProgress] = useState({ index: 0, total: 7 });
@@ -162,18 +166,52 @@ function App() {
     setScreen('uploadFailed');
   }
 
+  function beginPresentation(title: string) {
+    setPresentationName(title);
+    setUpload(null);
+    setScreen('upload');
+  }
+
+  // 헤더의 이동. 로그인한 상태에서 'login' 으로 가는 건 로그아웃이다(랜딩으로 돌아간다).
+  function navigate(target: ScreenName) {
+    if (target === 'login' && loggedIn) {
+      setLoggedIn(false);
+      setScreen('start');
+      return;
+    }
+    setScreen(target);
+  }
+
   return (
-    <div className="flex flex-col min-h-screen w-full bg-white">
-      {screen === 'login' && <Login onLogin={() => setScreen('start')} />}
+    <div className="theme-dark flex flex-col min-h-screen w-full bg-[#15110d] text-[#f5f5f4]">
+      {screen === 'login' && (
+        <Login
+          onLogin={() => {
+            setLoggedIn(true);
+            if (pendingTitle !== null) {
+              beginPresentation(pendingTitle);
+              setPendingTitle(null);
+            } else {
+              setScreen('start');
+            }
+          }}
+          onBack={() => setScreen('start')}
+          pendingTitle={pendingTitle}
+        />
+      )}
 
       {screen === 'start' && (
         <>
-          <Header onNavigate={setScreen} dark />
+          <Header onNavigate={navigate} guest={!loggedIn} />
           <StartScreen
+            loggedIn={loggedIn}
             onStart={(title) => {
-              setPresentationName(title);
-              setUpload(null);
-              setScreen('upload');
+              if (loggedIn) {
+                beginPresentation(title);
+              } else {
+                setPendingTitle(title);
+                setScreen('login');
+              }
             }}
             onOpenReport={() => setScreen('report')}
           />
@@ -182,7 +220,7 @@ function App() {
 
       {screen === 'upload' && (
         <>
-          <Header onNavigate={setScreen} label={presentationName} rightText="2 / 3 준비" />
+          <Header onNavigate={navigate} label={presentationName} rightText="2 / 3 준비" />
           <UploadScreen
             onUploaded={setUpload}
             onUploadFail={handleUploadFail}
@@ -196,7 +234,7 @@ function App() {
 
       {screen === 'uploadFailed' && (
         <>
-          <Header onNavigate={setScreen} label={presentationName} rightText="2 / 3 준비" />
+          <Header onNavigate={navigate} label={presentationName} rightText="2 / 3 준비" />
           <UploadFailedScreen
             fileName={uploadError?.fileName}
             message={uploadError?.message}
@@ -208,7 +246,7 @@ function App() {
 
       {screen === 'preparing' && upload && (
         <>
-          <Header onNavigate={setScreen} label={presentationName} showProfile rightButtons={materialButton} />
+          <Header onNavigate={navigate} label={presentationName} showProfile rightButtons={materialButton} />
           <PreparingScreen
             presentationId={upload.presentation_id}
             onReady={() => setScreen('micConnect')}
@@ -219,14 +257,14 @@ function App() {
 
       {screen === 'corePractice' && upload && (
         <>
-          <Header onNavigate={setScreen} label="기본 질문 연습" />
+          <Header onNavigate={navigate} label="기본 질문 연습" />
           <CorePracticeScreen presentationId={upload.presentation_id} onFinish={() => setScreen('preparing')} />
         </>
       )}
 
       {screen === 'material' && upload && (
         <>
-          <Header onNavigate={setScreen} label="자료 보강" showProfile={false} />
+          <Header onNavigate={navigate} label="자료 보강" showProfile={false} />
           <MaterialScreen
             key={materialPage ?? 'all'}
             presentationId={upload.presentation_id}
@@ -238,7 +276,7 @@ function App() {
 
       {screen === 'graph' && upload && (
         <>
-          <Header onNavigate={setScreen} label="지식 지도" showProfile={false} />
+          <Header onNavigate={navigate} label="지식 지도" showProfile={false} />
           <GraphScreen
             presentationId={upload.presentation_id}
             onBack={() => setScreen(graphBack)}
@@ -250,7 +288,7 @@ function App() {
       {screen === 'mockPractice' && (
         <>
           <Header
-            onNavigate={setScreen}
+            onNavigate={navigate}
             label="모의 연습"
             rightText={`${mockProgress.index + 1} / ${mockProgress.total} 문항`}
           />
@@ -264,7 +302,7 @@ function App() {
       {screen === 'micConnect' && (
         <>
           <Header
-            onNavigate={setScreen}
+            onNavigate={navigate}
             compact
             rightText="대기 중"
             rightButtons={
@@ -291,7 +329,7 @@ function App() {
       {screen === 'recognized' && (
         <>
           <Header
-            onNavigate={setScreen}
+            onNavigate={navigate}
             dark
             compact
             listening={listening}
@@ -311,7 +349,7 @@ function App() {
       {screen === 'textInput' && (
         <>
           <Header
-            onNavigate={setScreen}
+            onNavigate={navigate}
             compact
             rightText="음성 인식 대체"
             rightButtons={modeToggle}
@@ -331,7 +369,7 @@ function App() {
       {screen === 'hud' && (
         <>
           <Header
-            onNavigate={setScreen}
+            onNavigate={navigate}
             dark
             cueKey={cueNo}
             compact
@@ -373,7 +411,7 @@ function App() {
       {screen === 'report' && (
         <>
           <Header
-            onNavigate={setScreen}
+            onNavigate={navigate}
             label="사후 리포트"
             showProfile={false}
             rightButtons={
@@ -403,14 +441,14 @@ function App() {
 
       {screen === 'myHistory' && (
         <>
-          <Header onNavigate={setScreen} label="내 기록" activeMenu="history" />
+          <Header onNavigate={navigate} label="내 기록" activeMenu="history" />
           <MyHistoryScreen onOpenReport={() => setScreen('report')} />
         </>
       )}
 
       {screen === 'settings' && (
         <>
-          <Header onNavigate={setScreen} label="설정" activeMenu="settings" />
+          <Header onNavigate={navigate} label="설정" activeMenu="settings" />
           <SettingsScreen mode={mode} onModeChange={changeMode} />
         </>
       )}

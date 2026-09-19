@@ -7,8 +7,8 @@ interface ReportProps {
 export function Report({ presentationName }: ReportProps) {
   return (
     <div className="flex flex-1 flex-col gap-[26px] items-start px-[44px] py-[34px] w-full">
-      <div className="flex flex-col gap-[6px] w-full">
-        <p className="font-bold text-[28px] text-[#1a1a1a] tracking-[-0.84px] leading-[34px] w-full">
+      <div className="flex flex-col gap-[6px] items-center text-center w-full">
+        <p className="font-black text-[30px] text-[#1a1a1a] tracking-[-0.84px] leading-[38px] w-full">
           {presentationName}
         </p>
         <p className="font-normal text-[14px] text-[#6b7280] w-full">9월 15일, Q&amp;A 14분, 질문 12건, 평균 응답 417ms</p>

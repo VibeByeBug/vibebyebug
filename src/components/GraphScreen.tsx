@@ -218,7 +218,6 @@ export function GraphScreen({
       {/* 머리말 */}
       <div className="flex flex-col items-center text-center gap-[14px]">
         <div className="flex flex-col gap-[8px] items-center">
-          <p className="font-mono font-bold text-[12px] tracking-[3px] text-[#f26b1d]">BOARD  /  발표 콘티 보드</p>
           <p className="font-black text-[30px] text-[#111111] tracking-[-0.8px]">지식 지도</p>
           <p className="font-normal text-[14px] text-[#6b7280] leading-[21px] max-w-[720px]">
             {view === 'knowledge'
@@ -616,7 +615,7 @@ export function GraphScreen({
 }
 
 function SectionTitle({ children }: { children: React.ReactNode }) {
-  return <p className="font-mono font-bold text-[12px] text-[#6b7280] tracking-[3px] text-center">{children}</p>;
+  return <p className="font-bold text-[14px] text-[#6b7280] text-center">{children}</p>;
 }
 
 function Stat({ label, value, tone = 'gray' }: { label: string; value: string; tone?: 'gray' | 'green' }) {

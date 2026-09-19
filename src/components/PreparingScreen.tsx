@@ -73,7 +73,7 @@ export function PreparingScreen({ presentationId, onReady, onRetry }: PreparingS
           </button>
         </div>
       ) : (
-        <div className="flex flex-col gap-[48px] items-center w-[880px]">
+        <div className="flex flex-col gap-[48px] items-center w-full max-w-[880px] px-[16px]">
           <div className="flex flex-col gap-[7px] items-center text-center w-full">
             <p className="font-bold text-[26px] text-[#1a1a1a] tracking-[-0.78px] leading-[34px]">
               AI가 발표를 준비하고 있어요

@@ -16,7 +16,7 @@ export function SettingsScreen({ mode, onModeChange }: SettingsScreenProps) {
   return (
     <div className="flex flex-col pb-[44px] pt-[34px] px-[44px] w-full">
       <div className="flex flex-col gap-[12px] items-start w-full">
-        <p className="font-bold text-[17px] text-[#1a1a1a] w-full">설정</p>
+        <p className="font-black text-[30px] text-[#1a1a1a] tracking-[-0.8px] w-full text-center">설정</p>
         <div className="flex flex-col items-start w-full">
           <div className="border-t border-[#e5e7eb] flex gap-[20px] items-center px-[4px] py-[16px] w-full">
             <div className="flex flex-col gap-[4px] w-[280px]">

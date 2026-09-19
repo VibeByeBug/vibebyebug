@@ -13,6 +13,7 @@ interface HeaderProps {
   onNavigate: (screen: ScreenName) => void;
   cueKey?: number; // 바뀔 때마다 아래 슬레이트 줄무늬가 한 칸 밀린다 (새 질문 신호)
   dark?: boolean; // 시작 화면(검은 무대)용
+  guest?: boolean; // 로그인 전(랜딩). 프로필 대신 로그인 버튼을 보여준다
 }
 
 export function Header({
@@ -25,7 +26,8 @@ export function Header({
   activeMenu,
   onNavigate,
   cueKey,
-  dark = false,
+  dark = true, // 전체 검은 무대 테마. 모든 화면의 헤더가 어둡다.
+  guest = false,
 }: HeaderProps) {
   const [menuOpen, setMenuOpen] = useState(false);
 
@@ -70,7 +72,16 @@ export function Header({
         {rightText && (
           <p className={`font-bold text-[13px] whitespace-nowrap ${dark ? 'text-white/55' : 'text-[#6b7280]'}`}>{rightText}</p>
         )}
-        {showProfile && (
+        {guest && (
+          <button
+            type="button"
+            onClick={() => onNavigate('login')}
+            className="bg-[#f26b1d] hover:bg-[#e25c10] transition-colors h-[36px] px-[16px] rounded-[8px] font-bold text-[14px] text-white"
+          >
+            로그인
+          </button>
+        )}
+        {showProfile && !guest && (
           <>
             {rightText && <div className="bg-[#e5e7eb] h-[18px] w-px" />}
             <div className="relative">
