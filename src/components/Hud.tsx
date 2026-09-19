@@ -162,7 +162,7 @@ export function Hud({
             </p>
             {fromNotes && (
               <p className="font-medium text-[14px] text-white/55 leading-[20px]">
-                {inferred ? '사실인지 확인하고 말해주세요.' : '슬라이드, 대본, 설명 자료, 논리 지도를 함께 봤어요. 한 번 더 확인하고 말해주세요.'}
+                {inferred ? '사실인지 확인하고 말해주세요.' : '슬라이드, 대본, 설명 자료, 지식 지도를 함께 봤어요. 한 번 더 확인하고 말해주세요.'}
               </p>
             )}
           </div>

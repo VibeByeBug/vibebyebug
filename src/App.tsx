@@ -116,7 +116,7 @@ function App() {
       }}
       className="border border-[#e5e7eb] h-[32px] px-[12px] rounded-[6px] font-bold text-[13px] text-[#6b7280] whitespace-nowrap"
     >
-      논리 지도
+      지식 지도
     </button>
   );
 
@@ -238,7 +238,7 @@ function App() {
 
       {screen === 'graph' && upload && (
         <>
-          <Header onNavigate={setScreen} label="논리 지도" showProfile={false} />
+          <Header onNavigate={setScreen} label="지식 지도" showProfile={false} />
           <GraphScreen
             presentationId={upload.presentation_id}
             onBack={() => setScreen(graphBack)}

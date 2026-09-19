@@ -98,10 +98,10 @@ export function MaterialScreen({
     setGraphMsg(null);
     try {
       const r = await post(`${API_URL}/api/notes/${presentationId}/rebuild-graph`, {});
-      setGraphMsg(`논리 지도를 다시 만들었어요. 연결 ${r.edges}개, 발표자 설명 ${r.notes_used}개 반영`);
+      setGraphMsg(`지식 지도를 다시 만들었어요. 슬라이드 연결 ${r.edges}개, 발표자 설명 ${r.notes_used}개 반영`);
       setDirty(false);
     } catch (e) {
-      setGraphMsg(e instanceof Error ? e.message : '논리 지도를 만들지 못했습니다');
+      setGraphMsg(e instanceof Error ? e.message : '지식 지도를 만들지 못했습니다');
     } finally {
       setGraphBusy(false);
     }
@@ -134,7 +134,7 @@ export function MaterialScreen({
               dirty ? 'bg-[#f26b1d] text-white' : 'border border-[#e5e7eb] text-[#6b7280]'
             }`}
           >
-            {graphBusy ? '지도 만드는 중... (30초 안팎)' : '논리 지도 다시 만들기'}
+            {graphBusy ? '지도 만드는 중... (30초 안팎)' : '지식 지도 다시 만들기'}
           </button>
           <button
             type="button"
@@ -148,7 +148,7 @@ export function MaterialScreen({
       {graphMsg && <p className="font-medium text-[13px] text-[#409959] text-center">{graphMsg}</p>}
       {dirty && !graphMsg && (
         <p className="font-medium text-[13px] text-[#f26b1d] text-center">
-          설명이 바뀌었어요. 검색과 답변에는 바로 반영됐고, 논리 지도에도 넣으려면 "논리 지도 다시 만들기"를 눌러주세요.
+          설명이 바뀌었어요. 검색과 답변에는 바로 반영됐고, 지식 지도에도 넣으려면 "지식 지도 다시 만들기"를 눌러주세요.
         </p>
       )}
 

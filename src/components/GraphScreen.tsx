@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { API_URL } from '../api';
 import { SlideText } from './SlideText';
+import { KnowledgeMap } from './KnowledgeMap';
 
 interface GraphNode {
   page: number;
@@ -79,15 +80,17 @@ export function GraphScreen({
   const [storyAt, setStoryAt] = useState<number | null>(null);
   const [relFilter, setRelFilter] = useState<string | null>(null);
   const [showText, setShowText] = useState(false);
+  // 프로젝트 지식 지도(기본) | 슬라이드 순서로 보기
+  const [view, setView] = useState<'knowledge' | 'slides'>('knowledge');
 
   useEffect(() => {
     fetch(`${API_URL}/api/graph/${presentationId}`)
       .then(async (r) => {
-        if (!r.ok) throw new Error((await r.json()).detail ?? '논리 지도를 불러오지 못했습니다');
+        if (!r.ok) throw new Error((await r.json()).detail ?? '지식 지도를 불러오지 못했습니다');
         return r.json();
       })
       .then(setGraph)
-      .catch((e) => setError(e instanceof Error ? e.message : '논리 지도를 불러오지 못했습니다'));
+      .catch((e) => setError(e instanceof Error ? e.message : '지식 지도를 불러오지 못했습니다'));
   }, [presentationId]);
 
   // 연결이 하나도 없는 슬라이드(표지, 목차, 감사 인사)는 지도에서 빼고 아래에 따로 적는다
@@ -131,7 +134,7 @@ export function GraphScreen({
         </button>
       </div>
     );
-  if (!graph) return <p className="p-[44px] font-medium text-[15px] text-[#6b7280]">논리 지도를 불러오는 중···</p>;
+  if (!graph) return <p className="p-[44px] font-medium text-[15px] text-[#6b7280]">지식 지도를 불러오는 중···</p>;
 
   const byPage = new Map(graph.nodes.map((n) => [n.page, n]));
   const focus = hovered ?? selected;
@@ -216,12 +219,32 @@ export function GraphScreen({
       <div className="flex flex-col items-center text-center gap-[14px]">
         <div className="flex flex-col gap-[8px] items-center">
           <p className="font-mono font-bold text-[12px] tracking-[3px] text-[#f26b1d]">BOARD  /  발표 콘티 보드</p>
-          <p className="font-black text-[30px] text-[#111111] tracking-[-0.8px]">발표 논리 지도</p>
+          <p className="font-black text-[30px] text-[#111111] tracking-[-0.8px]">지식 지도</p>
           <p className="font-normal text-[14px] text-[#6b7280] leading-[21px] max-w-[720px]">
-            슬라이드 사이의 주장과 근거를 이은 지도입니다. 질문이 들어오면 실전 답변은 이 연결을 따라 여러 슬라이드를 함께
-            봅니다. 슬라이드를 누르면 어떤 슬라이드와 엮어 답하면 되는지 보여줍니다.
+            {view === 'knowledge'
+              ? '슬라이드, 대본, 설명 자료, 리허설에서 모은 프로젝트 지식을 주제별로 이은 지도입니다. 실전 답변도 이 전체 자료에서 근거를 찾습니다.'
+              : '슬라이드 사이의 주장과 근거를 발표 순서대로 이은 지도입니다. 슬라이드를 누르면 어떤 슬라이드와 엮어 답하면 되는지 보여줍니다.'}
           </p>
-          <div className="flex flex-wrap justify-center gap-[8px] pt-[2px]">
+          <div className="flex p-[3px] rounded-full bg-[#f3f4f6] mt-[4px]">
+            {(
+              [
+                ['knowledge', '프로젝트 지식 지도'],
+                ['slides', '슬라이드 순서로 보기'],
+              ] as const
+            ).map(([k, label]) => (
+              <button
+                key={k}
+                type="button"
+                onClick={() => setView(k)}
+                className={`h-[32px] px-[16px] rounded-full font-bold text-[13px] transition-colors ${
+                  view === k ? 'bg-[#111111] text-white' : 'text-[#6b7280]'
+                }`}
+              >
+                {label}
+              </button>
+            ))}
+          </div>
+          <div className={`flex flex-wrap justify-center gap-[8px] pt-[2px] ${view === 'slides' ? '' : 'hidden'}`}>
             <Stat label="슬라이드" value={`${graph.nodes.length}장`} />
             <Stat label="연결" value={`${graph.edges.length}개`} />
             <Stat
@@ -252,6 +275,10 @@ export function GraphScreen({
         </div>
       </div>
 
+      {view === 'knowledge' && <KnowledgeMap presentationId={presentationId} onAddNote={onAddNote} />}
+
+      {view === 'slides' && (
+      <>
       {/* 발표 줄거리: 번호를 이은 단계. 누르면 그 단계의 슬라이드가 지도에서 강조된다 */}
       <div className="flex flex-col gap-[10px]">
         <SectionTitle>발표 줄거리</SectionTitle>
@@ -582,6 +609,8 @@ export function GraphScreen({
           )}
         </div>
       </div>
+      </>
+      )}
     </div>
   );
 }
