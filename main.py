@@ -189,7 +189,7 @@ async def websocket_endpoint(websocket: WebSocket):
                 await _send_extra(websocket, rq, text, cue, mode)
             elif not cue.sources and not cue.core and cue.status != "ignored":
                 # 키워드 모드인데 슬라이드 근거 카드가 없다. 키워드만으로는 할 말이 없으니
-                # 전체 자료(슬라이드, 대본, 설명 자료, 논리 지도)로 추천 답변을 한 번 만들어 보낸다.
+                # 전체 자료(슬라이드, 대본, 설명 자료, 슬라이드 지도)로 추천 답변을 한 번 만들어 보낸다.
                 await _send_extra(websocket, rq, text, cue, "answer")
 
     except WebSocketDisconnect:

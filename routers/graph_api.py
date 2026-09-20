@@ -43,7 +43,7 @@ async def get_graph(presentation_id: str):
                 saved_notes = notes_mod.NoteStore(DATA_DIR / "notes" / f"{presentation_id}.json").notes
                 graph = await asyncio.to_thread(deck_graph.build, _rows(presentation_id), saved_notes)
                 if not graph.get("ok"):
-                    raise HTTPException(status_code=502, detail="논리 지도를 만들지 못했습니다. 잠시 뒤에 다시 열어주세요.")
+                    raise HTTPException(status_code=502, detail="슬라이드 지도를 만들지 못했습니다. 잠시 뒤에 다시 열어주세요.")
                 deck_graph.save(graph, graph_file)
     # 점을 눌렀을 때 보여줄 슬라이드 원문 앞부분
     texts = {}

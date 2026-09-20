@@ -57,7 +57,7 @@ def _warm_worker_inner(pid: str, chunks_path: str, preset: str) -> None:
         notes = notes_mod.NoteStore(Path(chunks_path).parent / "notes" / f"{pid}.json").notes
         if notes:
             rq.set_notes(notes)
-        # 지도(발표자료 논리 지도, 지식 그래프)는 여기서 만들지 않는다. 지도 화면을 열 때 만든다.
+        # 지도(발표자료 슬라이드 지도, 지식 지도)는 여기서 만들지 않는다. 지도 화면을 열 때 만든다.
         #   답변 경로에서 재봤더니 지도가 있으나 없으나 근거 슬라이드가 12문항 모두 같았고,
         #   답변에 든 사실도 잡음 범위 안이었다(2026-09-20, ai/README.md).
         #   지도를 안 보는 발표자에게 준비 시간 20초와 모델 호출 2회를 물리지 않는다.

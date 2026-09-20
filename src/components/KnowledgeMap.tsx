@@ -213,7 +213,7 @@ export function KnowledgeMap({
           <Pill label="주제 묶음" value={`${layout.cols.length}개`} />
           {data.coverage < 0.8 && (
             <span className="inline-flex items-center h-[28px] px-[10px] rounded-full text-[12px] font-bold bg-[#fff3eb] text-[#c2410c]">
-              새로 더한 자료가 많아요. 자료 보강 화면에서 "지식 지도 다시 만들기"를 눌러주세요
+              새로 더한 자료가 많아요. "지도 다시 그리기" 를 누르면 새 자료까지 이어집니다
             </span>
           )}
         </div>

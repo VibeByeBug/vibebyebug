@@ -5,7 +5,7 @@
   POST   /api/notes/{id}/classify-file  파일(txt, md, pdf)에서 글을 꺼내 분류
   POST   /api/notes/{id}/save           확인한 문장 저장 → 검색 색인에 바로 반영
   DELETE /api/notes/{id}/{note_id}      설명 하나 지우기
-  POST   /api/notes/{id}/rebuild-graph  설명까지 넣어 논리 지도 다시 만들기
+  POST   /api/notes/{id}/rebuild-graph  설명까지 넣어 슬라이드 지도 다시 만들기
   GET    /api/notes/{id}/refined        읽기 좋게 정리한 슬라이드 글 (없으면 만든다, 20초 안팎)
 """
 
@@ -157,7 +157,7 @@ async def rebuild_graph(pid: str):
     store = notes_mod.NoteStore(notes_path(pid))
     graph = await asyncio.to_thread(deck_graph.build, rows, store.notes)
     if not graph.get("ok"):
-        raise HTTPException(status_code=502, detail="논리 지도를 만들지 못했습니다. 잠시 뒤 다시 시도해주세요.")
+        raise HTTPException(status_code=502, detail="슬라이드 지도를 만들지 못했습니다. 잠시 뒤 다시 시도해주세요.")
     deck_graph.save(graph, graph_path(pid))
     # 지도는 화면에서만 쓴다. 답변 엔진에는 넣지 않는다(2026-09-20 측정, ai/README.md).
     rq = engine_store.get_engine(pid)
