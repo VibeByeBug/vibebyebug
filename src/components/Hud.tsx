@@ -3,7 +3,6 @@ import type { AnswerMode, FlowStep, QaAnswer, QaFlow, QaResult } from '../types/
 import type { QuestionType } from '../types/mockPractice';
 import { ChevronDownIcon, MinusCircleIcon } from './icons';
 
-const DEFAULT_VISIBLE_SOURCES = 3;
 const MAX_SOURCES = 5;
 const QUESTION_TYPES: QuestionType[] = ['사실확인', '절차', '근거', '한계/반론'];
 
@@ -15,6 +14,7 @@ interface HudProps {
   mode?: AnswerMode;
   notice?: string | null;
   cueNo?: number; // 몇 번째 질문인지 (슬레이트의 CUE 번호)
+  sourceCount?: number; // 한 번에 보여줄 근거 카드 수 (설정 화면에서 고른다)
 }
 
 export function Hud({
@@ -25,6 +25,7 @@ export function Hud({
   mode = 'both',
   notice = null,
   cueNo,
+  sourceCount = 3,
 }: HudProps) {
   // 질문 머리: CUE 번호와 질문. 가운데 정렬, 새 질문이면 아래에서 올라온다.
   const cueLabel = `CUE ${String(cueNo ?? 1).padStart(2, '0')}`;
@@ -72,8 +73,8 @@ export function Hud({
   const pendingNote = null;
 
   const sources = result.sources.slice(0, MAX_SOURCES);
-  const visibleSources = expanded ? sources : sources.slice(0, DEFAULT_VISIBLE_SOURCES);
-  const canExpand = sources.length > DEFAULT_VISIBLE_SOURCES;
+  const visibleSources = expanded ? sources : sources.slice(0, sourceCount);
+  const canExpand = sources.length > sourceCount;
   const isLimitation = result.type === '한계/반론';
 
   // 흐름도와 추천 답변 칸. 슬라이드 근거가 없을 때(보강 자료로 만든 답)도 같은 모양으로 보여준다.

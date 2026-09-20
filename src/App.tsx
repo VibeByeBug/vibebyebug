@@ -22,6 +22,7 @@ import { UploadFailedScreen } from './components/UploadFailedScreen';
 import { UploadScreen } from './components/UploadScreen';
 import { useQaSocket } from './hooks/useQaSocket';
 import { cleanQuestion } from './cleanQuestion';
+import { loadSourceCount, saveSourceCount, type SourceCount } from './settings';
 import { useSpeechRecognition } from './hooks/useSpeechRecognition';
 import { mockRecognizedQuestion } from './mocks/questionMock';
 import { DownloadIcon } from './components/icons';
@@ -43,6 +44,8 @@ function App() {
   // 실전 화면은 추천 답변(위)과 흐름도(아래)를 항상 같이 본다. 키워드, 흐름도, 추천 답변 중 고르던 버튼은 없앴다.
   const mode: AnswerMode = 'both';
   const [textFromError, setTextFromError] = useState(true); // 음성 인식 실패로 온 입력인지
+  // 실전 화면에 한 번에 보여줄 근거 카드 수. 이 브라우저에 저장해 두고 다음 발표에도 쓴다.
+  const [sourceCount, setSourceCount] = useState<SourceCount>(loadSourceCount);
   const { lastResult, lastAnswer, lastFlow, notice, ask } = useQaSocket();
 
   // 음성 인식 콜백은 인식을 시작한 순간의 값을 붙잡고 있어서, 최신 발표와 모드는 ref 로 읽는다
@@ -541,6 +544,7 @@ function App() {
             notice={notice}
             question={question.finalText}
             cueNo={cueNo}
+            sourceCount={sourceCount}
           />
           <AskBar onAsk={askByText} />
         </>
@@ -594,7 +598,13 @@ function App() {
       {screen === 'settings' && (
         <>
           <Header onNavigate={navigate} label="설정" activeMenu="settings" />
-          <SettingsScreen />
+          <SettingsScreen
+            sourceCount={sourceCount}
+            onSourceCountChange={(n) => {
+              setSourceCount(n);
+              saveSourceCount(n);
+            }}
+          />
         </>
       )}
     </div>
