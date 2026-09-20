@@ -14,7 +14,6 @@ interface HudProps {
   flow?: QaFlow | null;
   mode?: AnswerMode;
   notice?: string | null;
-  onChangeType?: (type: QuestionType) => void;
   cueNo?: number; // 몇 번째 질문인지 (슬레이트의 CUE 번호)
 }
 
@@ -25,7 +24,6 @@ export function Hud({
   flow = null,
   mode = 'both',
   notice = null,
-  onChangeType,
   cueNo,
 }: HudProps) {
   // 질문 머리: CUE 번호와 질문. 가운데 정렬, 새 질문이면 아래에서 올라온다.
@@ -205,22 +203,22 @@ export function Hud({
       <div className="relative flex flex-1 flex-col gap-[26px] items-center pb-[36px] pt-[34px] px-[44px] w-full max-w-[1320px] mx-auto">
       <div className="flex flex-col gap-[16px] items-center w-full">
         {questionHead}
-        <div className="flex gap-[8px] items-start justify-center w-full">
+        {/* 질문 유형 표시. 누르는 버튼이 아니다 - 유형을 바꾸면 답을 다시 만드느라 몇 초가 더 걸려서,
+            지금 어떤 유형으로 읽었는지만 보여준다. */}
+        <div className="flex gap-[8px] items-center justify-center w-full">
           {QUESTION_TYPES.map((type) => {
             const active = type === result.type;
             return (
-              <button
+              <span
                 key={type}
-                type="button"
-                onClick={() => onChangeType?.(type)}
-                className={`flex flex-col items-center px-[16px] py-[7px] rounded-full self-stretch transition-colors ${
-                  active ? 'bg-[#f26b1d]' : 'border border-white/20 hover:border-white/60'
+                className={`flex items-center px-[16px] py-[7px] rounded-full ${
+                  active ? 'bg-[#f26b1d]' : 'border border-white/12'
                 }`}
               >
-                <span className={`text-[15px] whitespace-nowrap ${active ? 'font-bold text-white' : 'font-medium text-white/60'}`}>
+                <span className={`text-[15px] whitespace-nowrap ${active ? 'font-bold text-white' : 'font-medium text-white/35'}`}>
                   {type}
                 </span>
-              </button>
+              </span>
             );
           })}
         </div>

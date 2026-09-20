@@ -9,7 +9,7 @@ const SCENES = [
   {
     no: '01',
     title: '대본 입고',
-    what: '발표자료(PDF, PPTX)를 올려요.',
+    what: '발표자료(PDF)를 올려요.',
     detail: '글자가 없는 이미지 슬라이드도 읽고, 흩어진 표와 카드를 읽기 좋게 정리해요.',
   },
   {
@@ -22,7 +22,7 @@ const SCENES = [
     no: '03',
     title: 'ON AIR',
     what: '청중 질문을 들으면 바로 띄워요.',
-    detail: '근거 슬라이드, 말할 순서(샷 카드), 추천 답변이 발화가 끝나고 1~3초 안에 떠요.',
+    detail: '근거 슬라이드는 1초 안에 뜨고, 추천 답변은 2~4초, 말할 순서는 그 뒤에 이어서 떠요.',
   },
   {
     no: '04',
@@ -35,26 +35,26 @@ const SCENES = [
 // 실전 화면 예시에 쓸 샷 카드 (Ready-Q 발표자료와 설명 자료로 실제로 만든 답을 옮겼다)
 const DEMO_STEPS: FlowStep[] = [
   {
-    text: '1초 응답 목표',
+    text: '근거부터 1초 안에',
     slide: 6,
-    keys: ['1초', '응답 목표'],
-    detail: '질문을 듣고 화면으로 눈을 돌리는 시간이라 발화 종료 후 1초를 목표로 잡았습니다.',
+    keys: ['근거 슬라이드', '1초'],
+    detail: '질문을 듣고 화면으로 눈을 돌리는 시간이 1초라, 근거 슬라이드를 먼저 띄우고 답변은 이어서 채웁니다.',
     link: '그래서',
-    why: '목표를 지키는 선택',
+    why: '먼저 띄울 것을 고른 기준',
   },
   {
     text: '빠른 하이브리드 검색',
     slide: 8,
     keys: ['하이브리드', 'e5-small'],
-    detail: '더 정확한 모델은 느릴 때 2초가 넘어서, 정확도를 조금 내주고 e5-small 하이브리드를 골랐습니다.',
+    detail: '더 정확한 모델은 느릴 때 2초가 넘어서, 정확도를 조금 내주고 e5-small 하이브리드를 골랐습니다. 근거 검색은 1초 안에 끝납니다.',
     link: '덧붙이면',
     why: '화면 흔들림 제거',
   },
   {
-    text: '한 번에 띄우기',
+    text: '답변과 순서는 같이',
     slide: 6,
-    keys: ['한 번에'],
-    detail: '결과를 두 번에 나눠 바꾸면 눈이 닿는 순간 카드가 바뀌어서 한 번에 띄웁니다.',
+    keys: ['추천 답변 2~4초', '동시 생성'],
+    detail: '추천 답변과 말할 순서를 동시에 만들어서, 답변이 뜬 뒤 순서를 따로 기다리지 않습니다.',
   },
 ];
 
@@ -137,7 +137,7 @@ export function StartGuide({ onStart }: { onStart: () => void }) {
           <div className="flex flex-col items-center gap-[10px] text-center">
             <p className="font-black text-[34px] tracking-[-1px] break-keep">실전에서는 이렇게 떠요</p>
             <p className="font-normal text-[16px] text-white/60 break-keep">
-              청중이 “1초 목표를 지키려고 어떤 선택을 했나요?” 라고 물으면, 질문이 끝나고 말할 순서가 칸으로 떠요.
+              청중이 “응답 시간을 지키려고 어떤 선택을 했나요?” 라고 물으면, 질문이 끝나고 말할 순서가 칸으로 떠요.
             </p>
           </div>
           <FlowSteps steps={DEMO_STEPS} dark />

@@ -20,6 +20,32 @@ router = APIRouter(
 )
 
 
+@router.get("")
+async def sessions():
+    """발표별 Q&A 기록 요약. '내 기록' 화면이 쓴다. 최근에 한 발표부터."""
+    by_pid: dict[str, list] = {}
+    for r in qa_log.load():
+        pid = r.get("session")
+        if pid:
+            by_pid.setdefault(pid, []).append(r)
+
+    out = []
+    for pid, rows in by_pid.items():
+        answered = [r for r in rows if r.get("status") == "ok"]
+        lat = [r["latency_ms"] for r in answered if r.get("latency_ms") is not None]
+        out.append({
+            "presentation_id": pid,
+            "total": len(rows),
+            "answered": len(answered),
+            "no_evidence": sum(1 for r in rows if r.get("status") == "no_evidence"),
+            "ignored": sum(1 for r in rows if r.get("status") == "ignored"),
+            "avg_latency_ms": round(sum(lat) / len(lat), 1) if lat else None,
+            "last_at": max((r.get("at") or "") for r in rows),
+        })
+    out.sort(key=lambda s: s["last_at"], reverse=True)
+    return {"status": "success", "sessions": out}
+
+
 @router.get("/{presentation_id}")
 async def get_presentation_logs(presentation_id: str):
     """특정 발표의 Q&A 기록. 프론트의 '이전 질문 목록' 화면이 쓴다."""

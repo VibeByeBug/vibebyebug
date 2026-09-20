@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import type { UploadResult } from './api';
+import type { SavedPresentation, UploadResult } from './api';
 import { Header } from './components/Header';
 import { Hud } from './components/Hud';
 import { Login } from './components/Login';
@@ -37,7 +37,7 @@ function App() {
   const [pendingTitle, setPendingTitle] = useState<string | null>(null);
   const [presentationName, setPresentationName] = useState('캡스톤 디자인 최종 발표');
   const [question, setQuestion] = useState(mockRecognizedQuestion);
-  const [mockProgress, setMockProgress] = useState({ index: 0, total: 7 });
+  const [mockProgress, setMockProgress] = useState({ index: 0, total: 0 });
   const [upload, setUpload] = useState<UploadResult | null>(null);
   const [uploadError, setUploadError] = useState<{ fileName: string; message: string } | null>(null);
   // 실전 화면은 추천 답변(위)과 흐름도(아래)를 항상 같이 본다. 키워드, 흐름도, 추천 답변 중 고르던 버튼은 없앴다.
@@ -50,6 +50,9 @@ function App() {
   const modeRef = useRef(mode);
   uploadRef.current = upload;
   modeRef.current = mode;
+
+  // 리포트로 열어 볼 발표. 내 기록에서 고르면 그 발표, 아니면 지금 하는 발표.
+  const [reportTarget, setReportTarget] = useState<{ pid: string; title: string } | null>(null);
 
   // 몇 번째 질문인지. 실전 화면의 CUE 번호와 슬레이트 줄무늬 신호에 쓴다.
   const [cueNo, setCueNo] = useState(0);
@@ -207,6 +210,7 @@ function App() {
   // ── 청중 화면 (프로젝터에 띄운 두 번째 창) ──────────────────────────────
   // 발표자가 고른 근거 슬라이드 원본만 보낸다. 자동으로 보내지 않는다.
   const [audienceOpen, setAudienceOpen] = useState(false);
+  const [audienceBlocked, setAudienceBlocked] = useState(false); // 팝업 차단에 막혔다
   const [audienceSlide, setAudienceSlide] = useState<AudienceSlide | null>(null);
   const audienceSlideRef = useRef<AudienceSlide | null>(null);
   audienceSlideRef.current = audienceSlide;
@@ -214,6 +218,7 @@ function App() {
   useEffect(() => {
     const ch = audienceChannel((m) => {
       if (m.type === 'hello') {
+        setAudienceBlocked(false);
         // 청중 화면이 새로 열렸거나 새로고침됐다. 지금 띄워야 할 것을 다시 보낸다.
         setAudienceOpen(true);
         const cur = audienceSlideRef.current;
@@ -286,6 +291,14 @@ function App() {
     setScreen('hud');
   }
 
+  // 서버에 남아 있는 발표를 다시 연다. 파일을 또 올리지 않고 준비 화면으로 바로 간다.
+  // (준비 상태를 물으면 서버가 알아서 다시 준비를 시작한다)
+  function resumePresentation(p: SavedPresentation) {
+    setPresentationName(p.title);
+    setUpload({ presentation_id: p.presentation_id, filename: p.title, slides: 0, sizeMb: p.size_mb });
+    setScreen('preparing');
+  }
+
   function beginPresentation(title: string) {
     setPresentationName(title);
     setUpload(null);
@@ -333,7 +346,11 @@ function App() {
                 setScreen('login');
               }
             }}
-            onOpenReport={() => setScreen('report')}
+            onOpenReport={() => {
+              setReportTarget(null);
+              setScreen('myHistory');
+            }}
+            onResume={resumePresentation}
           />
         </>
       )}
@@ -405,14 +422,15 @@ function App() {
         </>
       )}
 
-      {screen === 'mockPractice' && (
+      {screen === 'mockPractice' && upload && (
         <>
           <Header
             onNavigate={navigate}
             label="모의 연습"
-            rightText={`${mockProgress.index + 1} / ${mockProgress.total} 문항`}
+            rightText={mockProgress.total ? `${mockProgress.index + 1} / ${mockProgress.total} 문항` : undefined}
           />
           <MockPracticeScreen
+            presentationId={upload.presentation_id}
             onFinish={() => setScreen('micConnect')}
             onIndexChange={(index, total) => setMockProgress({ index, total })}
           />
@@ -510,7 +528,8 @@ function App() {
             candidates={audienceCandidates}
             current={audienceSlide?.page ?? null}
             open={audienceOpen}
-            onOpen={openAudienceWindow}
+            blocked={audienceBlocked}
+            onOpen={() => setAudienceBlocked(!openAudienceWindow())}
             onSend={sendToAudience}
             onClear={clearAudience}
           />
@@ -537,6 +556,8 @@ function App() {
               <div className="flex gap-[10px]">
                 <button
                   type="button"
+                  onClick={() => window.print()}
+                  title="브라우저 인쇄 창에서 PDF 로 저장할 수 있어요"
                   className="border border-[#e5e7eb] flex gap-[7px] h-[40px] items-center px-[14px] rounded-[6px]"
                 >
                   <span className="size-[16px] text-[#1a1a1a]">
@@ -554,14 +575,19 @@ function App() {
               </div>
             }
           />
-          <Report presentationName={presentationName} />
+          <Report presentationName={reportTarget?.title ?? presentationName} presentationId={reportTarget?.pid ?? upload?.presentation_id} />
         </>
       )}
 
       {screen === 'myHistory' && (
         <>
           <Header onNavigate={navigate} label="내 기록" activeMenu="history" />
-          <MyHistoryScreen onOpenReport={() => setScreen('report')} />
+          <MyHistoryScreen
+            onOpenReport={(pid, title) => {
+              setReportTarget({ pid, title });
+              setScreen('report');
+            }}
+          />
         </>
       )}
 

@@ -263,3 +263,16 @@ body { background-color: #15110d; }
 @media (prefers-reduced-motion: reduce) {
   .highlight-sweep { animation: none; }
 }
+
+/* 사후 리포트를 PDF 로 저장할 때. 무대 색을 그대로 인쇄하면 잉크만 먹고 글자가 안 보인다.
+   막대 그래프는 색을 남긴다 (배경색을 지우면 비율이 안 보인다) */
+@media print {
+  .theme-dark { background: #ffffff !important; }
+  .theme-dark p, .theme-dark span, .theme-dark div, .theme-dark button { color: #111111 !important; }
+  .theme-dark .bg-\[\#15110d\], .theme-dark .bg-\[\#1c1713\], .theme-dark .bg-\[\#0b0907\] {
+    background: #ffffff !important;
+  }
+  .theme-dark [class*='border-white'] { border-color: #d8d8d8 !important; }
+  .theme-dark .bg-\[\#f26b1d\] { print-color-adjust: exact; -webkit-print-color-adjust: exact; }
+  header, .no-print { display: none !important; }
+}

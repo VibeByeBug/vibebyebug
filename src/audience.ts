@@ -26,7 +26,10 @@ export function audienceChannel(onMessage: (m: AudienceMessage) => void) {
   };
 }
 
-export function openAudienceWindow() {
-  // 프로젝터 쪽으로 끌어다 놓고 F11 로 전체 화면
-  return window.open(`${location.origin}/?audience=1`, 'readyq-audience', 'popup,width=1280,height=720');
+// 청중 화면을 새 창으로 연다. 프로젝터 쪽으로 끌어다 놓고 F11 로 전체 화면.
+// 팝업이 막히면 null 이 온다 (크롬은 주소창 오른쪽에 막았다는 표시만 띄워서 발표자가 모른다).
+export function openAudienceWindow(): Window | null {
+  const w = window.open(`${location.origin}/?audience=1`, 'readyq-audience', 'popup,width=1280,height=720');
+  if (w) w.focus();
+  return w;
 }
