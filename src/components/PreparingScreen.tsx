@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { fetchStatus } from '../api';
+import { fetchModelReady, fetchStatus } from '../api';
 import type { PreparingStatus } from '../types/flow';
 import { WarningIcon } from './icons';
 
@@ -9,9 +9,11 @@ const STEPS: { key: PreparingStatus; label: string }[] = [
   { key: 'ready', label: '실시간 연결 준비' },
 ];
 
-// 서버 준비(임베딩 모델 로딩과 색인)에 걸리는 대략의 시간. 진행률과 남은 시간 표시에만 쓴다.
-// 로컬 측정 19장 자료 기준 약 90초.
-const EXPECTED_SEC = 90;
+// 남은 시간 어림값. 진행률 막대와 "약 N초 남음" 에만 쓴다(실제 진행이 아니다).
+// 임베딩 모델을 이미 올려둔 서버는 색인만 하면 되므로 훨씬 짧다.
+//   측정(2026-09-20): 모델 올라와 있으면 16~20초, 서버를 막 켰으면 79초.
+const EXPECTED_WARM_SEC = 20;
+const EXPECTED_COLD_SEC = 80;
 
 interface PreparingScreenProps {
   presentationId: string;
@@ -23,16 +25,23 @@ export function PreparingScreen({ presentationId, onReady, onRetry }: PreparingS
   // 자료 인덱싱은 업로드 때 끝났으므로 모델 로딩부터 시작한다
   const [status, setStatus] = useState<PreparingStatus>('analyzing');
   const [progress, setProgress] = useState(8);
+  const [expected, setExpected] = useState(EXPECTED_COLD_SEC);
+  const [slow, setSlow] = useState(false); // 어림값을 넘겼다. 남은 시간을 세지 않는다.
 
   useEffect(() => {
     let stop = false;
     async function poll() {
+      // 모델이 이미 올라와 있으면 금방 끝난다. 90초를 세면서 기다리게 하면 안 된다.
+      const ready = await fetchModelReady();
+      if (!stop && ready) setExpected(EXPECTED_WARM_SEC);
       while (!stop) {
         try {
           const st = await fetchStatus(presentationId);
           if (st.state === '준비완료') return setStatus('ready');
           if (st.state === '실패' || st.state === '없음') return setStatus('failed');
-          setProgress(Math.min(96, 8 + ((st.elapsed_sec ?? 0) / EXPECTED_SEC) * 88));
+          const sec = st.elapsed_sec ?? 0;
+          setProgress(Math.min(96, 8 + (sec / (ready ? EXPECTED_WARM_SEC : EXPECTED_COLD_SEC)) * 88));
+          setSlow(sec > (ready ? EXPECTED_WARM_SEC : EXPECTED_COLD_SEC));
         } catch {
           return setStatus('failed');
         }
@@ -54,7 +63,7 @@ export function PreparingScreen({ presentationId, onReady, onRetry }: PreparingS
 
   const activeIndex = STEPS.findIndex((step) => step.key === status);
   const displayProgress = status === 'ready' ? 100 : progress;
-  const secondsLeft = Math.max(0, Math.round(((100 - displayProgress) / 88) * EXPECTED_SEC));
+  const secondsLeft = Math.max(0, Math.round(((100 - displayProgress) / 88) * expected));
 
   return (
     <div className="flex flex-1 items-center justify-center py-[44px] w-full">
@@ -87,7 +96,9 @@ export function PreparingScreen({ presentationId, onReady, onRetry }: PreparingS
           >
             <div className="bg-white flex flex-col items-center justify-center rounded-full size-[140px]">
               <p className="font-bold text-[30px] text-black">{Math.round(displayProgress)}%</p>
-              <p className="font-normal text-[12px] text-[#808080]">약 {secondsLeft}초 남음</p>
+              <p className="font-normal text-[12px] text-[#808080]">
+                {slow ? '거의 다 됐어요' : `약 ${secondsLeft}초 남음`}
+              </p>
             </div>
           </div>
 

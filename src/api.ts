@@ -51,7 +51,7 @@ export async function fetchStatus(presentationId: string): Promise<PrepareStatus
 interface CueEvidence {
   question_type: string;
   keywords: string[];
-  sources: { slide: number; snippet: string }[];
+  sources: { slide: number; snippet: string; refined?: boolean }[];
   status: 'ok' | 'no_evidence' | 'ignored';
   advice: string[];
   deflect: string[];
@@ -68,7 +68,9 @@ export function toQaResult(m: CueEvidence): QaResult {
     type,
     snippet: '',
     keywords: m.keywords ?? [],
-    sources: noEvidence ? [] : (m.sources ?? []).map((s) => ({ slide: s.slide, quote: s.snippet })),
+    sources: noEvidence
+      ? []
+      : (m.sources ?? []).map((s) => ({ slide: s.slide, quote: s.snippet, refined: s.refined })),
     suggestions: noEvidence ? m.advice : m.deflect,
     responseMs: Math.round(m.server_latency_ms ?? m.latency_ms ?? 0),
     status: m.status,
@@ -180,4 +182,15 @@ export async function getQaLogs(presentationId: string): Promise<QaLogRow[]> {
   const res = await fetch(`${API_URL}/api/logs/${presentationId}`);
   if (!res.ok) throw new Error(`기록을 불러오지 못했습니다 (${res.status})`);
   return ((await res.json()).logs ?? []) as QaLogRow[];
+}
+
+// 서버 상태 (/api/health). 준비 화면이 남은 시간을 어림잡는 데 쓴다.
+export async function fetchModelReady(): Promise<boolean> {
+  try {
+    const res = await fetch(`${API_URL}/api/health`);
+    if (!res.ok) return false;
+    return !!(await res.json()).model_ready;
+  } catch {
+    return false;
+  }
 }
