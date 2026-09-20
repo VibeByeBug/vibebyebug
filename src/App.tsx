@@ -545,6 +545,7 @@ function App() {
             question={question.finalText}
             cueNo={cueNo}
             sourceCount={sourceCount}
+            presentationId={upload?.presentation_id}
           />
           <AskBar onAsk={askByText} />
         </>

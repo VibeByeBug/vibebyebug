@@ -88,6 +88,46 @@ def _warm_worker_inner(pid: str, chunks_path: str, preset: str) -> None:
         print(f"❌ [준비실패] {pid} — {e}")
 
 
+_model_ready = False
+
+
+def model_ready() -> bool:
+    """임베딩 모델이 이 서버에 올라와 있나 (health 에서 본다)."""
+    return _model_ready
+
+
+def ready_ids() -> list[str]:
+    with _lock:
+        return sorted(_engines)
+
+
+def preload_model(preset: str = "balanced") -> None:
+    """임베딩 모델을 미리 올려둔다. 서버가 켜질 때 한 번 부른다.
+
+    모델을 처음 올리는 데 이 컴퓨터에서 60초 안팎 걸린다. 첫 발표를 준비할 때 올리면
+    발표자가 그 시간을 그대로 기다린다(첫 발표 79초, 두 번째 16초).
+    서버가 켜질 때 미리 올려두면 발표자는 기다리지 않는다.
+    """
+    import threading
+
+    def work() -> None:
+        t0 = time.time()
+        try:
+            from pipeline import PRESETS
+            from embedders import STEmbedder
+            model_id = PRESETS.get(preset)
+            if not model_id:
+                return
+            STEmbedder(model_id)._load()
+            global _model_ready
+            _model_ready = True
+            print(f"🔥 임베딩 모델 미리 올림 ({model_id}, {time.time() - t0:.1f}초)")
+        except Exception as e:   # 모델을 못 올려도 서버는 뜬다. 첫 발표 때 다시 시도한다.
+            print(f"⚠️  임베딩 모델 미리 올리기 실패: {type(e).__name__}: {e}")
+
+    threading.Thread(target=work, daemon=True).start()
+
+
 def start_warmup(pid: str, chunks_path: str | Path, preset: str = "balanced") -> None:
     """준비를 백그라운드로 시작한다. 이미 준비됐거나 진행 중이면 아무것도 안 한다."""
     with _lock:

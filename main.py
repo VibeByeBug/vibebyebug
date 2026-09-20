@@ -35,6 +35,57 @@ app.add_middleware(
     allow_headers=["*"],  # 모든 헤더 허용
 )
 
+@app.get("/api/health")
+def health() -> dict:
+    """설치가 제대로 됐는지 한 번에 본다. 팀원이 처음 돌릴 때 여기부터 열어보면 된다.
+
+    업로드가 안 되는 이유는 대개 셋 중 하나다: 백엔드 미실행, 이미지 자료인데 API 키 없음,
+    PDF 가 아닌 파일. 앞의 둘을 여기서 알려준다.
+    """
+    import shutil
+    import sys
+    from pathlib import Path as _Path
+
+    import caption
+
+    ok_dirs = []
+    for name in ("data", "uploaded_files"):
+        d = _Path(name)
+        try:
+            d.mkdir(parents=True, exist_ok=True)
+            probe = d / ".write_test"
+            probe.write_text("ok", encoding="utf-8")
+            probe.unlink()
+            ok_dirs.append(name)
+        except Exception:
+            pass
+
+    provider = caption.detect_provider()
+    missing = []
+    for mod in ("fitz", "pptx", "kiwipiepy", "sentence_transformers", "openai"):
+        try:
+            __import__(mod)
+        except Exception:
+            missing.append(mod)
+
+    return {
+        "ok": not missing and len(ok_dirs) == 2,
+        "python": sys.version.split()[0],
+        "빠진_패키지": missing,          # 있으면 pip install -r requirements.txt
+        "쓰기_가능_폴더": ok_dirs,
+        "이미지_인식_키": provider or None,   # None 이면 글자 없는 슬라이드를 못 읽는다
+        "임베딩_모델_준비": engine_store.model_ready(),
+        "준비된_발표": engine_store.ready_ids(),
+        "디스크_여유_GB": round(shutil.disk_usage(".").free / 1e9, 1),
+    }
+
+
+# 임베딩 모델을 서버가 켜질 때 미리 올린다 (첫 발표가 모델 로딩을 혼자 부담하지 않게)
+@app.on_event("startup")
+def _preload() -> None:
+    engine_store.preload_model()
+
+
 # HTML 템플릿 폴더 지정
 templates = Jinja2Templates(directory="templates")
 

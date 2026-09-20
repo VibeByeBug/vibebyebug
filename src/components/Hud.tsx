@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { API_URL } from '../api';
 import type { AnswerMode, FlowStep, QaAnswer, QaFlow, QaResult } from '../types/qa';
 import type { QuestionType } from '../types/mockPractice';
 import { ChevronDownIcon, MinusCircleIcon } from './icons';
@@ -14,6 +15,7 @@ interface HudProps {
   mode?: AnswerMode;
   notice?: string | null;
   cueNo?: number; // 몇 번째 질문인지 (슬레이트의 CUE 번호)
+  presentationId?: string; // 근거 카드에 슬라이드 그림을 띄우는 데 쓴다
   sourceCount?: number; // 한 번에 보여줄 근거 카드 수 (설정 화면에서 고른다)
 }
 
@@ -26,6 +28,7 @@ export function Hud({
   notice = null,
   cueNo,
   sourceCount = 3,
+  presentationId,
 }: HudProps) {
   // 질문 머리: CUE 번호와 질문. 가운데 정렬, 새 질문이면 아래에서 올라온다.
   const cueLabel = `CUE ${String(cueNo ?? 1).padStart(2, '0')}`;
@@ -306,9 +309,7 @@ export function Hud({
                   key={`${source.slide}-${index}`}
                   className="lift bg-[#1e1914] border border-white/10 hover:border-[#f26b1d]/60 flex gap-[18px] items-center px-[18px] py-[16px] rounded-[8px] w-full"
                 >
-                  <span className="bg-[#0b0907] border border-white/10 flex h-[68px] items-center justify-center rounded-[6px] shrink-0 w-[120px]">
-                    <span className="font-mono text-[9px] text-white/40">p{String(source.slide).padStart(3, '0')}</span>
-                  </span>
+                  <SourceThumb presentationId={presentationId} page={source.slide} />
                   <p className="font-black text-[34px] text-[#f26b1d] tracking-[-1.36px] shrink-0 w-[80px]">
                     p.{source.slide}
                   </p>
@@ -345,6 +346,29 @@ export function Hud({
 }
 
 // 핵심 단어만 글자 색을 바꾼다. 칸 전체를 다 읽지 않아도 숫자와 요점이 먼저 눈에 들어오게.
+// 근거 슬라이드 그림. 청중 화면에 쓰는 슬라이드 PNG 를 그대로 쓴다(서버가 만들어 저장해 둔다).
+// 그림을 못 만드는 자료(원본 PDF 가 없는 경우)는 슬라이드 번호만 남긴다.
+function SourceThumb({ presentationId, page }: { presentationId?: string; page: number }) {
+  const [failed, setFailed] = useState(false);
+  const label = (
+    <span className="font-mono text-[10px] text-white/40">p{String(page).padStart(3, '0')}</span>
+  );
+  return (
+    <span className="bg-[#0b0907] border border-white/10 flex h-[68px] items-center justify-center overflow-hidden rounded-[6px] shrink-0 w-[120px]">
+      {presentationId && !failed ? (
+        <img
+          src={`${API_URL}/api/slides/${presentationId}/${page}.png`}
+          alt={`${page}번 슬라이드`}
+          onError={() => setFailed(true)}
+          className="size-full object-cover"
+        />
+      ) : (
+        label
+      )}
+    </span>
+  );
+}
+
 // 여러 단어를 한 번에 강조한다. 추천 답변에서 키워드와 숫자에 색을 입힌다.
 // AI 를 다시 부르지 않고, 이미 받은 키워드와 답변 속 숫자만 쓴다.
 const NUM_WITH_UNIT = /(?<![A-Za-z\d])\d[\d,.~]*(?![A-Za-z])\s*(?:%|배|[가-힣]{1,2}(?=[\s,.)]|$))?/g; // B2B 의 2 는 빼고
