@@ -19,7 +19,13 @@ export interface UploadResult {
 export async function uploadPdf(file: File): Promise<UploadResult> {
   const body = new FormData();
   body.append('file', file);
-  const res = await fetch(`${API_URL}/api/upload/pdf`, { method: 'POST', body });
+  // 서버가 안 떠 있으면 fetch 가 "Failed to fetch" 를 던진다. 그대로 보여주면 원인을 알 수 없다.
+  let res: Response;
+  try {
+    res = await fetch(`${API_URL}/api/upload/pdf`, { method: 'POST', body });
+  } catch {
+    throw new Error(`서버에 연결하지 못했습니다. 백엔드(${API_URL})가 켜져 있는지 확인해주세요.`);
+  }
   const data = await res.json().catch(() => ({}));
   if (!res.ok) {
     const d = data.detail;
