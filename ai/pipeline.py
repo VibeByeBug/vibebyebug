@@ -182,6 +182,7 @@ class Source:
     slide: int
     snippet: str
     source: str
+    refined: bool = False   # 줄을 AI 정리본에서 골랐나 (화면에 표시한다)
 
 
 @dataclass
@@ -294,6 +295,29 @@ HEADING = re.compile(r"^[\[\(<※★①-⑤]|^STEP\s|^\s*[-•]\s*$")
 _VALUE = re.compile(r"(?<![A-Za-z])\d(?![A-Za-z])")
 LABEL_MAX = 25
 VALUE_MAX = 20
+
+
+# 정리본(slide_refine)의 표시 기호. 화면에 그대로 띄우므로 걷어낸다.
+_REFINED_MARK = re.compile(r"^\s*(?:#+\s*|[-•*]\s*)")
+
+
+def refined_lines(text: str) -> list[str]:
+    """AI 정리본에서 근거로 쓸 줄을 뽑는다.
+
+    원문 줄은 발표자료에서 그대로 오기 때문에 머리말("01 제안배경"), 쪽번호("03"),
+    브랜드 줄("READY-Q")과 띄어쓰기가 빠진 글("기존의문제해결방법분석")이 섞인다.
+    정리본은 준비 단계에서 이미 그런 것을 걷어내고 띄어쓰기를 살려 둔 글이다.
+    """
+    out = []
+    for raw in text.split(chr(10)):
+        line = _REFINED_MARK.sub("", raw).strip()
+        # 목록 번호는 화면에서 군더더기다 ("04 팀의 자료 조사자와..."). 문장이 충분히 길 때만 뗀다.
+        m = re.match(r"^(0\d|\d{1,2})[.)]?\s+(.{12,})$", line)
+        if m:
+            line = m.group(2)
+        if len(line) > 6:
+            out.append(line)
+    return out
 
 
 def split_lines(text: str) -> list[str]:
@@ -442,13 +466,8 @@ class ReadyQ:
         self.nouns = Nouns()
         self.idf = _idf(self.rows, self.nouns)
         # 줄별 명사를 미리 뽑아둔다. 질의 때는 집합 연산만 한다.
-        self.prepared = []
-        self.line_words = []
-        for r in self.rows:
-            lines = split_lines(r["text"])
-            wl = [self.nouns(l) for l in lines]
-            self.prepared.append([(l, {w.lower() for w in ws}) for l, ws in zip(lines, wl)])
-            self.line_words.append({l: ws for l, ws in zip(lines, wl)})
+        # (정리본이 들어오면 set_refined 가 정리본 줄로 다시 만든다)
+        self._rebuild_lines()
 
         self.fast = BM25()
         self.fast.index(docs)
@@ -523,7 +542,8 @@ class ReadyQ:
             r = self.rows[i]
             # 글머리표는 화면에서 군더더기다 ("-바이브 코딩 경진 대회...")
             shown = re.sub(r"^[-•▪◦●○■□※➢❖✓]\s*", "", line)
-            srcs.append(Source(slide=r["page"], snippet=shown[:120], source=r["source"]))
+            srcs.append(Source(slide=r["page"], snippet=shown[:120], source=r["source"],
+                               refined=bool(self.line_from_refined[i])))
             for w in _keywords(self.line_words[i].get(line, []), qwords,
                                self.idf, weak=self.weak, page=r["page"]):
                 if w not in kws:
@@ -734,9 +754,29 @@ class ReadyQ:
             yield m
 
     def set_refined(self, refined: dict[int, str] | None) -> None:
-        """AI 정리본 (slide_refine). 슬라이드 조각을 정리본의 묶음 단위로 나누는 데 쓴다."""
+        """AI 정리본 (slide_refine). 지식 조각을 나누고, 화면에 띄울 근거 줄도 여기서 고른다."""
         self.refined = dict(refined or {})
+        self._rebuild_lines()
         self._build_kb()
+
+    def _rebuild_lines(self) -> None:
+        """근거 줄 후보를 다시 만든다. 정리본이 있는 슬라이드는 정리본 줄을 쓴다.
+
+        검색과 답변 근거는 그대로 원문이다. 바뀌는 것은 화면에 띄울 한 줄을 고르는 후보뿐이다.
+        정리본이 없는 슬라이드(정리 실패, 준비 전)는 전처럼 원문 줄을 쓴다.
+        """
+        self.prepared = []
+        self.line_words = []
+        self.line_from_refined = []
+        for r in self.rows:
+            text = self.refined.get(r["page"]) if getattr(self, "refined", None) else None
+            lines = refined_lines(text) if text else split_lines(r["text"])
+            if not lines:                      # 정리본이 너무 짧으면 원문으로 돌아간다
+                lines, text = split_lines(r["text"]), None
+            wl = [self.nouns(l) for l in lines]
+            self.prepared.append([(l, {w.lower() for w in ws}) for l, ws in zip(lines, wl)])
+            self.line_words.append({l: ws for l, ws in zip(lines, wl)})
+            self.line_from_refined.append(bool(text))
 
     def _build_kb(self) -> None:
         """지식 조각을 다시 만들고 색인한다. 설명이나 정리본이 바뀔 때마다 부른다(19장 기준 1초 안팎)."""

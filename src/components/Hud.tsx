@@ -318,6 +318,12 @@ export function Hud({
               ))}
             </div>
 
+            {visibleSources.some((s) => s.refined) && (
+              <p className="font-medium text-[12px] text-white/35 text-center w-full">
+                근거 줄은 AI 정리본에서 골랐어요. 슬라이드 원문과 띄어쓰기나 표현이 조금 다를 수 있어요.
+              </p>
+            )}
+
             <div className={`flex gap-[14px] items-center justify-center w-full ${!canExpand ? 'hidden' : ''}`}>
               <button
                 type="button"
@@ -373,13 +379,22 @@ function SourceThumb({ presentationId, page }: { presentationId?: string; page: 
 // AI 를 다시 부르지 않고, 이미 받은 키워드와 답변 속 숫자만 쓴다.
 const NUM_WITH_UNIT = /(?<![A-Za-z\d])\d[\d,.~]*(?![A-Za-z])\s*(?:%|배|[가-힣]{1,2}(?=[\s,.)]|$))?/g; // B2B 의 2 는 빼고
 
+// 낱말 경계. 한글, 영문, 숫자면 낱말 안이다.
+const WORDCH = /[가-힣ㄱ-ㅎㅏ-ㅣa-zA-Z0-9]/;
+
 function HighlightMany({ text, words }: { text: string; words: string[] }) {
   const ranges: [number, number][] = [];
   for (const w of words) {
     if (w.length < 2) continue;
     let at = text.indexOf(w);
     while (at >= 0) {
-      ranges.push([at, at + w.length]);
+      // 어절 가운데에서 시작하는 것은 건너뛴다 ("재발표" 안의 "발표")
+      if (at === 0 || !WORDCH.test(text[at - 1])) {
+        // 조사까지 같이 칠한다. "발표" 만 칠하고 "자에게" 를 남기면 글자가 잘려 보인다
+        let end = at + w.length;
+        while (end < text.length && WORDCH.test(text[end])) end += 1;
+        ranges.push([at, end]);
+      }
       at = text.indexOf(w, at + w.length);
     }
   }

@@ -2,7 +2,8 @@ import type { QuestionType } from './mockPractice';
 
 export interface QaSource {
   slide: number; // 슬라이드 번호
-  quote: string; // 인용문 원문
+  quote: string; // 화면에 띄울 근거 한 줄
+  refined?: boolean; // AI 정리본에서 고른 줄인가 (원문 그대로가 아니다)
 }
 
 export interface QaResult {

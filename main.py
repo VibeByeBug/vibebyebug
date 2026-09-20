@@ -75,6 +75,7 @@ def health() -> dict:
         "쓰기_가능_폴더": ok_dirs,
         "이미지_인식_키": provider or None,   # None 이면 글자 없는 슬라이드를 못 읽는다
         "임베딩_모델_준비": engine_store.model_ready(),
+        "model_ready": engine_store.model_ready(),   # 준비 화면이 남은 시간을 어림잡는 데 쓴다
         "준비된_발표": engine_store.ready_ids(),
         "디스크_여유_GB": round(shutil.disk_usage(".").free / 1e9, 1),
     }
