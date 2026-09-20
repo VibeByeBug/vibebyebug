@@ -1,5 +1,7 @@
+import json
 import os
 import uuid
+from datetime import datetime
 from fastapi import APIRouter, UploadFile, File, HTTPException
 
 from indexing import build_index, chunks_path
@@ -70,27 +72,52 @@ async def upload_pdf(file: UploadFile = File(...)):
         "message": "파일 업로드 및 자료 분석이 완료되었습니다."
     }
 
+def _title_of(presentation_id: str) -> str:
+    """발표 이름. 첫 슬라이드의 첫 줄을 쓴다.
+
+    업로드할 때 발표자가 적은 이름은 화면에만 있고 서버에 없다. 파일 이름도 발표 ID 라
+    사람이 읽을 수 없어서, 자료에서 바로 뽑는다.
+    """
+    path = chunks_path(presentation_id)
+    if not path.exists():
+        return "제목 없는 발표"
+    try:
+        with path.open(encoding="utf-8") as f:
+            row = json.loads(f.readline())
+    except (OSError, ValueError):
+        return "제목 없는 발표"
+    for line in (row.get("text") or "").splitlines():
+        line = line.strip()
+        if len(line) >= 2:
+            return line[:40]
+    return "제목 없는 발표"
+
+
 @router.get("/list")
 async def list_presentations():
-    """서버에 저장된 모든 PDF 발표 자료 목록을 반환합니다."""
+    """서버에 있는 발표 목록. 최근에 올린 것부터."""
     if not os.path.exists(UPLOAD_DIR):
         return {"status": "success", "files": []}
-        
+
     files = []
     for filename in os.listdir(UPLOAD_DIR):
-        if filename.endswith(".pdf"):
-            presentation_id = filename.replace(".pdf", "")
-            # 파일의 크기(MB)와 수정 시간도 함께 전달하면 프론트에서 보여주기 좋습니다.
-            file_path = os.path.join(UPLOAD_DIR, filename)
-            size_mb = round(os.path.getsize(file_path) / (1024 * 1024), 2)
-            
-            files.append({
-                "presentation_id": presentation_id,
-                "filename": filename,
-                "size_mb": size_mb
-            })
-            
+        if not filename.endswith(".pdf"):
+            continue
+        presentation_id = filename[:-4]
+        file_path = os.path.join(UPLOAD_DIR, filename)
+        stat = os.stat(file_path)
+        files.append({
+            "presentation_id": presentation_id,
+            "filename": filename,
+            "size_mb": round(stat.st_size / (1024 * 1024), 2),
+            "title": _title_of(presentation_id),
+            "uploaded_at": datetime.fromtimestamp(stat.st_mtime).isoformat(timespec="seconds"),
+            "ready": bool(engine_store.get_status(presentation_id).get("ready")),
+        })
+
+    files.sort(key=lambda f: f["uploaded_at"], reverse=True)
     return {"status": "success", "files": files}
+
 
 @router.delete("/{presentation_id}")
 async def delete_presentation(presentation_id: str):

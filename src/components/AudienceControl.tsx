@@ -11,6 +11,7 @@ export function AudienceControl({
   candidates,
   current,
   open,
+  blocked = false,
   onOpen,
   onSend,
   onClear,
@@ -18,6 +19,7 @@ export function AudienceControl({
   candidates: AudienceCandidate[];
   current: number | null; // 청중 화면에 떠 있는 슬라이드 번호
   open: boolean; // 청중 화면 창이 열려 있나
+  blocked?: boolean; // 브라우저가 팝업을 막아서 창이 안 열렸다
   onOpen: () => void;
   onSend: (i: number) => void;
   onClear: () => void;
@@ -34,13 +36,21 @@ export function AudienceControl({
         </span>
 
         {!open ? (
-          <button
-            type="button"
-            onClick={onOpen}
-            className="cta ml-[6px] h-[30px] rounded-full bg-[#f26b1d] px-[14px] text-[13px] font-bold text-white"
-          >
-            청중 화면 열기
-          </button>
+          <>
+            <button
+              type="button"
+              onClick={onOpen}
+              className="cta ml-[6px] h-[30px] rounded-full bg-[#f26b1d] px-[14px] text-[13px] font-bold text-white"
+            >
+              청중 화면 열기
+            </button>
+            {/* 크롬은 팝업을 막아도 주소창 오른쪽에 작은 표시만 띄워서, 발표자가 안 열린 이유를 모른다 */}
+            {blocked && (
+              <span className="text-[13px] font-medium text-[#ff9a5c] break-keep">
+                브라우저가 팝업을 막았어요. 주소창 오른쪽의 팝업 차단 표시를 눌러 이 사이트를 허용한 뒤 다시 눌러주세요.
+              </span>
+            )}
+          </>
         ) : (
           <>
             <span className="mx-[4px] h-[16px] w-px bg-white/15" />

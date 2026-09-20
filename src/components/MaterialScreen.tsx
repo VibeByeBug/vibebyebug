@@ -569,21 +569,21 @@ function DocInput({ presentationId, onSaved }: { presentationId: string; onSaved
   }
 
   return (
-    <div className="flex flex-col gap-[12px]">
-      <div className="flex gap-[8px] items-center">
+    <div className="flex flex-col gap-[14px] w-full max-w-[900px] mx-auto">
+      <div className="flex flex-wrap gap-[8px] items-center justify-center">
         {(['script', 'doc'] as const).map((s) => (
           <button
             key={s}
             type="button"
             onClick={() => setSource(s)}
-            className={`h-[34px] px-[14px] rounded-[6px] font-bold text-[13px] ${
-              source === s ? 'bg-[#f26b1d] text-white' : 'border border-[#e5e7eb] text-[#6b7280]'
+            className={`h-[36px] px-[16px] rounded-[8px] font-bold text-[13px] transition-colors ${
+              source === s ? 'bg-[#ede6d6] text-[#15110d]' : 'border border-white/20 text-white/65 hover:text-white'
             }`}
           >
             {SOURCE_LABEL[s]}
           </button>
         ))}
-        <span className="font-normal text-[13px] text-[#6b7280]">
+        <span className="font-normal text-[13px] text-white/50 break-keep">
           {source === 'script' ? '발표할 때 읽는 대본' : '기획서, 보고서, README 같은 프로젝트 설명'}
         </span>
       </div>
@@ -591,7 +591,7 @@ function DocInput({ presentationId, onSaved }: { presentationId: string; onSaved
         value={text}
         onChange={(e) => setText(e.target.value)}
         placeholder="내용을 붙여넣으세요. 슬라이드에 이미 있는 말은 자동으로 걸러집니다."
-        className="border border-[#e5e7eb] min-h-[180px] px-[14px] py-[12px] rounded-[6px] text-[14px] text-[#1a1a1a] leading-[23px] outline-none resize-y"
+        className="border border-white/12 bg-[#1c1713] min-h-[220px] px-[18px] py-[16px] rounded-[10px] text-[15px] text-white/90 leading-[25px] outline-none resize-y placeholder:text-white/30"
       />
       <div className="flex justify-between items-center">
         <div className="flex gap-[8px] items-center">
@@ -610,7 +610,7 @@ function DocInput({ presentationId, onSaved }: { presentationId: string; onSaved
             type="button"
             onClick={() => fileRef.current?.click()}
             disabled={busy}
-            className="border border-[#e5e7eb] h-[38px] px-[14px] rounded-[6px] font-bold text-[13px] text-[#6b7280]"
+            className="h-[38px] px-[16px] rounded-[8px] border border-white/20 font-bold text-[13px] text-white/70 hover:border-white/45 disabled:opacity-40"
           >
             파일로 올리기 (txt, md, pdf)
           </button>
@@ -619,13 +619,13 @@ function DocInput({ presentationId, onSaved }: { presentationId: string; onSaved
           type="button"
           onClick={organizeText}
           disabled={!text.trim() || busy}
-          className="bg-[#f26b1d] h-[40px] px-[18px] rounded-[6px] font-bold text-[14px] text-white disabled:opacity-40"
+          className="cta bg-[#f26b1d] h-[42px] px-[20px] rounded-[8px] font-bold text-[15px] text-white disabled:opacity-40"
         >
-          {busy ? 'AI가 정리하는 중···' : '정리하기'}
+          {busy ? 'AI가 정리하는 중···' : '정리하기 →'}
         </button>
       </div>
-      {error && <p className="font-medium text-[13px] text-[#bf382e]">{error}</p>}
-      {savedMsg && <p className="font-medium text-[13px] text-[#409959]">{savedMsg}</p>}
+      {error && <p className="font-medium text-[13px] text-[#ff7a70]">{error}</p>}
+      {savedMsg && <p className="font-medium text-[13px] text-[#7ee2a0]">{savedMsg}</p>}
       {items && (
         <Review
           items={items}
@@ -788,29 +788,43 @@ function Saved({
   }
 
   return (
-    <div className="flex flex-col gap-[12px]">
-      <label className="flex gap-[6px] items-center font-medium text-[13px] text-[#6b7280]">
+    <div className="flex flex-col gap-[16px] w-full max-w-[900px] mx-auto">
+      <label className="flex gap-[8px] items-center justify-center font-medium text-[13px] text-white/55 cursor-pointer">
         <input type="checkbox" checked={showRepeat} onChange={() => setShowRepeat((v) => !v)} className="accent-[#f26b1d]" />
         검색용 표현(슬라이드 반복)도 보기
       </label>
-      {groups.size === 0 && <p className="font-normal text-[14px] text-[#6b7280]">아직 저장된 설명이 없어요.</p>}
+      {groups.size === 0 && (
+        <p className="rounded-[10px] border border-dashed border-white/15 px-[14px] py-[18px] text-center font-medium text-[14px] text-white/50">
+          아직 저장된 설명이 없어요. 리허설 녹음이나 대본으로 모아보세요.
+        </p>
+      )}
       {[...groups.entries()]
         .sort((a, b) => (a[0] || 999) - (b[0] || 999))
         .map(([p, list]) => (
-          <div key={p} className="flex flex-col gap-[6px]">
-            <p className="font-bold text-[14px] text-[#1a1a1a]">{title(p)}</p>
+          <div key={p} className="flex flex-col gap-[8px]">
+            <p className="font-bold text-[15px] text-white break-keep">
+              {p ? <span className="font-mono text-[#f26b1d] mr-[6px]">p.{p}</span> : null}
+              {p ? (slides.find((s) => s.page === p)?.title ?? '') : title(p)}
+            </p>
             {list.map((n) => (
-              <div key={n.id} className="flex gap-[10px] items-start border border-[#e5e7eb] px-[12px] py-[8px] rounded-[6px]">
+              <div
+                key={n.id}
+                className="group flex gap-[12px] items-start rounded-[10px] border border-white/10 bg-[#1c1713] px-[16px] py-[12px] transition-colors hover:bg-[#241e18]"
+              >
                 <span
-                  className={`font-bold text-[11px] shrink-0 mt-[2px] ${
-                    n.kind === 'fact' ? 'text-[#f26b1d]' : n.kind === 'repeat' ? 'text-[#9ca3af]' : 'text-[#409959]'
+                  className={`font-bold text-[12px] shrink-0 mt-[2px] w-[74px] ${
+                    n.kind === 'fact' ? 'text-[#ff9a5c]' : n.kind === 'repeat' ? 'text-white/40' : 'text-[#7ee2a0]'
                   }`}
                 >
                   {KIND_LABEL[n.kind]}
                 </span>
-                <span className="flex-1 font-medium text-[14px] text-[#1a1a1a] leading-[21px]">{n.text}</span>
-                <span className="font-medium text-[11px] text-[#9ca3af] shrink-0 mt-[2px]">{SOURCE_LABEL[n.source]}</span>
-                <button type="button" onClick={() => remove(n.id)} className="font-bold text-[12px] text-[#9ca3af] shrink-0">
+                <span className="flex-1 font-medium text-[15px] text-white/90 leading-[23px] break-keep">{n.text}</span>
+                <span className="font-medium text-[12px] text-white/40 shrink-0 mt-[2px]">{SOURCE_LABEL[n.source]}</span>
+                <button
+                  type="button"
+                  onClick={() => remove(n.id)}
+                  className="font-bold text-[12px] text-white/35 hover:text-[#ff7a70] shrink-0 mt-[2px]"
+                >
                   지우기
                 </button>
               </div>

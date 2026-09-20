@@ -1,17 +1,30 @@
 import { useEffect, useRef, useState } from 'react';
-import { mockRecentPresentations } from '../mocks/recentMock';
+import { listPresentations, type SavedPresentation } from '../api';
 import { ArrowRightIcon } from './icons';
 import { StartGuide } from './StartGuide';
 
 interface StartScreenProps {
   onStart: (title: string) => void;
   onOpenReport: () => void;
+  onResume: (p: SavedPresentation) => void; // 서버에 남아 있는 발표를 다시 연다
   loggedIn?: boolean; // 로그인 전(랜딩)에는 최근 발표와 회고를 숨긴다
 }
 
 // 시작 화면 = 검은 무대. 조명이 커서를 천천히 따라오고, 오른쪽 슬레이트 판에 발표 이름이 쓰인다.
 // 시작하면 슬레이트 팔이 "딱" 닫힌 뒤 넘어간다. (다른 화면은 흰 배경, 시작 화면만 어둡게)
-export function StartScreen({ onStart, onOpenReport, loggedIn = false }: StartScreenProps) {
+export function StartScreen({ onStart, onOpenReport, onResume, loggedIn = false }: StartScreenProps) {
+  // 최근 촬영분: 서버에 남아 있는 발표. 다시 올리지 않고 이어서 열 수 있다.
+  const [recent, setRecent] = useState<SavedPresentation[]>([]);
+  useEffect(() => {
+    if (!loggedIn) return;
+    let stop = false;
+    listPresentations()
+      .then((list) => !stop && setRecent(list.slice(0, 3)))
+      .catch(() => setRecent([])); // 서버가 꺼져 있으면 그냥 안 보여준다
+    return () => {
+      stop = true;
+    };
+  }, [loggedIn]);
   const [title, setTitle] = useState('');
   const [snap, setSnap] = useState(false);
   const stage = useRef<HTMLDivElement>(null);
@@ -180,16 +193,25 @@ export function StartScreen({ onStart, onOpenReport, loggedIn = false }: StartSc
         <div className="bg-[#0b0907] rounded-[6px] px-[10px] py-[8px] flex flex-col gap-[8px]">
           <div className="film-holes text-white/20" />
           <div className="flex gap-[10px]">
-            {mockRecentPresentations.map((p, i) => (
+            {recent.length === 0 && (
+              <span className="flex-1 self-center px-[16px] font-medium text-[13px] text-white/40">
+                아직 올린 발표가 없어요
+              </span>
+            )}
+            {recent.map((p, i) => (
               <button
-                key={p.id}
+                key={p.presentation_id}
                 type="button"
-                onClick={onOpenReport}
+                onClick={() => onResume(p)}
+                title="이 발표로 이어서 하기"
                 className="lift flex-1 min-w-0 bg-[#221c16] hover:bg-[#2d251d] rounded-[4px] px-[16px] py-[12px] flex flex-col gap-[4px] text-left"
               >
                 <span className="font-slate font-semibold text-[12px] tracking-[1px] text-[#f26b1d]">TAKE {i + 1}</span>
-                <span className="font-bold text-[16px] truncate">{p.name}</span>
-                <span className="text-[12px] text-white/50">{p.date}</span>
+                <span className="font-bold text-[16px] truncate">{p.title}</span>
+                <span className="text-[12px] text-white/50">
+                  {new Date(p.uploaded_at).toLocaleDateString('ko-KR', { month: 'long', day: 'numeric' })}
+                  {p.ready && <span className="ml-[6px] text-[#7ee2a0]">준비됨</span>}
+                </span>
               </button>
             ))}
             <button

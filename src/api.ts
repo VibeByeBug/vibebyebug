@@ -126,3 +126,52 @@ export async function discardCore(presentationId: string, id: string) {
 }
 
 export type { AnswerMode };
+
+// 서버에 남아 있는 발표 목록 (/api/upload/list). 시작 화면의 "최근 촬영분" 에서 이어서 열 때 쓴다.
+export interface SavedPresentation {
+  presentation_id: string;
+  title: string;
+  uploaded_at: string; // ISO
+  size_mb: number;
+  ready: boolean; // 지금 서버 메모리에 올라와 있나 (아니면 다시 준비한다)
+}
+
+export async function listPresentations(): Promise<SavedPresentation[]> {
+  const res = await fetch(`${API_URL}/api/upload/list`);
+  if (!res.ok) throw new Error(`목록을 불러오지 못했습니다 (${res.status})`);
+  const data = await res.json();
+  return (data.files ?? []) as SavedPresentation[];
+}
+
+// Q&A 기록 (/api/logs). 실전에서 받은 질문마다 ReadyQ 가 직접 남긴다.
+export interface QaLogRow {
+  at: string;
+  question: string;
+  qtype?: string;
+  status: 'ok' | 'no_evidence' | 'ignored' | string;
+  latency_ms?: number;
+  slides?: number[];
+  keywords?: string[];
+}
+
+export interface QaSession {
+  presentation_id: string;
+  total: number;
+  answered: number;
+  no_evidence: number;
+  ignored: number;
+  avg_latency_ms: number | null;
+  last_at: string;
+}
+
+export async function listQaSessions(): Promise<QaSession[]> {
+  const res = await fetch(`${API_URL}/api/logs`);
+  if (!res.ok) throw new Error(`기록을 불러오지 못했습니다 (${res.status})`);
+  return ((await res.json()).sessions ?? []) as QaSession[];
+}
+
+export async function getQaLogs(presentationId: string): Promise<QaLogRow[]> {
+  const res = await fetch(`${API_URL}/api/logs/${presentationId}`);
+  if (!res.ok) throw new Error(`기록을 불러오지 못했습니다 (${res.status})`);
+  return ((await res.json()).logs ?? []) as QaLogRow[];
+}
