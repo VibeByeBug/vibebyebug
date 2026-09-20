@@ -4,7 +4,7 @@ import { useSpeechRecognition } from '../hooks/useSpeechRecognition';
 import { SlideText } from './SlideText';
 
 // 발표자 설명 모으기: 리허설 녹음, 발표 대본, 설명 자료.
-// AI 가 문장을 나눠 분류하고, 발표자가 확인한 것만 저장한다. 저장된 설명은 검색, 답변, 논리 지도에 들어간다.
+// AI 가 문장을 나눠 분류하고, 발표자가 확인한 것만 저장한다. 저장된 설명은 검색, 답변, 슬라이드 지도에 들어간다.
 
 interface Slide {
   page: number;
@@ -57,14 +57,11 @@ export function MaterialScreen({
 }: {
   presentationId: string;
   onBack: () => void;
-  initialPage?: number; // 논리 지도에서 "이 슬라이드 설명 추가" 로 들어오면 그 슬라이드부터 연다
+  initialPage?: number; // 슬라이드 지도에서 "이 슬라이드 설명 추가" 로 들어오면 그 슬라이드부터 연다
 }) {
   const [tab, setTab] = useState<'rehearsal' | 'doc' | 'saved'>('rehearsal');
   const [slides, setSlides] = useState<Slide[]>([]);
   const [notes, setNotes] = useState<Note[]>([]);
-  const [graphMsg, setGraphMsg] = useState<string | null>(null);
-  const [graphBusy, setGraphBusy] = useState(false);
-  const [dirty, setDirty] = useState(false); // 지도를 만든 뒤 설명이 바뀌었나
 
   const [refining, setRefining] = useState(false);
 
@@ -93,23 +90,8 @@ export function MaterialScreen({
     load();
   }, [load]);
 
-  async function rebuildGraph() {
-    setGraphBusy(true);
-    setGraphMsg(null);
-    try {
-      const r = await post(`${API_URL}/api/notes/${presentationId}/rebuild-graph`, {});
-      setGraphMsg(`지식 지도를 다시 만들었어요. 슬라이드 연결 ${r.edges}개, 발표자 설명 ${r.notes_used}개 반영`);
-      setDirty(false);
-    } catch (e) {
-      setGraphMsg(e instanceof Error ? e.message : '지식 지도를 만들지 못했습니다');
-    } finally {
-      setGraphBusy(false);
-    }
-  }
-
   function onSaved(next: Note[]) {
     setNotes(next);
-    setDirty(true);
   }
 
   const answerNotes = notes.filter((n) => n.kind !== 'repeat').length;
@@ -149,16 +131,7 @@ export function MaterialScreen({
           ))}
         </div>
         <div className="flex gap-[8px] justify-center lg:justify-end">
-          <button
-            type="button"
-            onClick={rebuildGraph}
-            disabled={graphBusy}
-            className={`cta h-[38px] px-[16px] rounded-[8px] font-bold text-[14px] whitespace-nowrap disabled:opacity-50 ${
-              dirty ? 'bg-[#f26b1d] text-white' : 'border border-white/20 text-white/75 hover:border-white/45'
-            }`}
-          >
-            {graphBusy ? '지도 만드는 중··· (30초 안팎)' : '지식 지도 다시 만들기'}
-          </button>
+          {/* 지도 다시 그리기는 지도 화면으로 옮겼다. 저장한 설명은 검색과 답변에 바로 반영된다. */}
           <button
             type="button"
             onClick={onBack}
@@ -168,12 +141,6 @@ export function MaterialScreen({
           </button>
         </div>
       </div>
-      {graphMsg && <p className="font-medium text-[13px] text-[#7ee2a0] text-center">{graphMsg}</p>}
-      {dirty && !graphMsg && (
-        <p className="font-medium text-[13px] text-[#ff9a5c] text-center break-keep">
-          설명이 바뀌었어요. 검색과 답변에는 바로 반영됐고, 지식 지도에도 넣으려면 "지식 지도 다시 만들기"를 눌러주세요.
-        </p>
-      )}
 
       {tab === 'rehearsal' && (
         <Rehearsal

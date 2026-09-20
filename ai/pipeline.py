@@ -271,12 +271,12 @@ def _useful_number(w: str) -> bool:
 # 둘 다 크게 흔들지 않는 (3, 1.5). 문항 수가 적어서 더 잘게 맞추지 않았다.
 RANK_BONUS = (3.0, 1.5, 0.0, 0.0, 0.0)
 
-# 논리 지도로 더 붙일 슬라이드 수. 많을수록 흐름도와 추천 답변이 느려진다.
+# 슬라이드 지도로 더 붙일 슬라이드 수. 많을수록 흐름도와 추천 답변이 느려진다.
 GRAPH_EXTRA = 3
 # 통합 지식 조각 검색 (knowledge.py). 답변과 흐름도에 넘길 조각 수.
 # 조각 하나가 슬라이드 묶음이나 이어진 문장 3개 정도라, 8개면 슬라이드 서너 장 분량이다.
 KB_K = 8
-# 지식 그래프로 더할 이웃 조각 수. 검색 상위 몇 개의 이웃에서 고를지.
+# 지식 지도로 더할 이웃 조각 수. 검색 상위 몇 개의 이웃에서 고를지.
 KG_EXTRA = 3
 KG_SEED = 4
 # 슬라이드에서 근거를 못 찾았을 때 대신 넘길 발표자 설명 수와 슬라이드 수 (_fallback)
@@ -466,7 +466,7 @@ class ReadyQ:
         self.kb: list[dict] = []
         self.kb_index = None
         self.kgraph: dict | None = None      # set_kgraph() 로 넣는다 (knowledge_graph.py)
-        # 지식 그래프 이웃을 답변 근거에 더할지. 지금은 끈다 (2026-09-19 측정):
+        # 지식 지도 이웃을 답변 근거에 더할지. 지금은 끈다 (2026-09-19 측정):
         #   여러 조각을 엮어야 하는 질문 8개 x 2회에서 근거에 든 사실 88% -> 88%, 답변 69% -> 71%.
         #   조각 60개 중 8개를 검색하면 이미 필요한 사실의 88% 가 들어왔다. 병목은 검색이 아니라
         #   답변 길이(2문장)였다. 그래프는 화면의 지식 지도에 쓰고, 자료가 커지면 다시 잰다.
@@ -719,7 +719,7 @@ class ReadyQ:
             yield m
 
     def _or_fallback(self, first: Iterator[dict], again, question: str, base: dict) -> Iterator[dict]:
-        """슬라이드로 만든 답이 "자료로 답할 수 없음" 이면 보강 자료와 논리 지도를 더해 한 번 더 만든다.
+        """슬라이드로 만든 답이 "자료로 답할 수 없음" 이면 보강 자료와 슬라이드 지도를 더해 한 번 더 만든다.
 
         검색은 슬라이드를 찾았는데 그 슬라이드에 답이 없는 경우다("형태소 분석기는 왜 필요했나요?" 에
         검색은 비슷한 낱말이 있는 슬라이드를 주지만 이유는 설명 자료에만 있다).
@@ -760,19 +760,19 @@ class ReadyQ:
         if self.use_kg and self.kgraph:
             picked = self._with_kgraph(picked, question)
         slides = knowledge.to_context(picked)
-        graph = getattr(self, "graph", None)
-        story = deck_graph.story_text(graph) if graph else ""
-        return slides, story, any(c["kind"] == "slide" for c in picked)
+        # 발표 줄거리(슬라이드 지도)는 넘기지 않는다. 2026-09-20 측정에서 지도가 있으나 없으나
+        # 근거 슬라이드가 12문항 모두 같았고 답변에 든 사실 차이도 잡음 범위였다(ai/README.md).
+        return slides, "", any(c["kind"] == "slide" for c in picked)
 
     def set_kgraph(self, graph: dict | None) -> None:
-        """지식 그래프 (knowledge_graph.py). 없으면 검색한 조각만 쓴다."""
+        """지식 지도 (knowledge_graph.py). 없으면 검색한 조각만 쓴다."""
         self.kgraph = graph if graph and graph.get("ok") else None
 
     def _with_kgraph(self, picked: list[dict], question: str) -> list[dict]:
-        """검색한 조각에 지식 그래프의 이웃을 더하고, 같은 내용이 겹치면 하나만 남긴다.
+        """검색한 조각에 지식 지도의 이웃을 더하고, 같은 내용이 겹치면 하나만 남긴다.
 
         이웃을 다 붙이면 연결이 많은 조각(서비스 소개 등)이 질문과 상관없이 매번 끼었다
-        (슬라이드 논리 지도에서 겪은 것과 같다). 질문 낱말과 맞는 이웃만 더한다.
+        (슬라이드 슬라이드 지도에서 겪은 것과 같다). 질문 낱말과 맞는 이웃만 더한다.
         """
         qwords = {w.lower() for w in self.nouns(question)}
         ids = [c["id"] for c in picked]
@@ -842,18 +842,18 @@ class ReadyQ:
         return "\n".join(f"[프로젝트 설명] {t}" for _, t in scored[:limit])
 
     def set_graph(self, graph: dict | None) -> None:
-        """발표자료 논리 지도 (deck_graph). 없으면 지금처럼 검색한 슬라이드만 쓴다."""
+        """발표자료 슬라이드 지도 (deck_graph). 없으면 지금처럼 검색한 슬라이드만 쓴다."""
         self.graph = graph
 
     def _with_graph(self, by_page: dict, question: str = "") -> tuple[list[tuple[int, str]], str]:
         """검색한 슬라이드에 논리적으로 연결된 슬라이드를 붙인다. 그리고 발표 줄거리.
 
         "왜 이 방법이 맞나요?" 처럼 문제, 방법, 검증이 여러 장에 흩어진 질문에서
-        검색이 한두 장만 찾아도 나머지를 논리 지도로 끌어온다.
+        검색이 한두 장만 찾아도 나머지를 슬라이드 지도로 끌어온다.
 
         처음엔 이웃을 전부 붙였더니 연결이 많은 슬라이드(문제 제기 3번 등)가 질문과 상관없이
         매번 끼었다. 그래서 두 길로 후보를 모으고 질문 단어와 맞는 것만 남긴다.
-          이웃    검색한 슬라이드와 논리 지도로 이어진 슬라이드
+          이웃    검색한 슬라이드와 슬라이드 지도로 이어진 슬라이드
           줄거리  질문과 맞는 줄거리 단계의 슬라이드 (검색이 처음부터 놓친 슬라이드를 찾는 길)
         """
         graph = getattr(self, "graph", None)
@@ -892,16 +892,18 @@ class ReadyQ:
         return cue.status == "no_evidence" or not cue.sources
 
     def _fallback(self, question: str, base: dict | None = None) -> tuple[list[tuple[int, str]], str] | None:
-        """슬라이드에서 근거를 못 찾았을 때 쓸 자료. 발표자 설명과 논리 지도 줄거리로 모은다.
+        """슬라이드에서 근거를 못 찾았을 때 쓸 자료. 발표자 설명(리허설, 대본, 설명 자료)으로 모은다.
 
         "이 프로젝트의 의의는?" 처럼 슬라이드 글자와 겹치지 않는 질문도 발표자가 대본이나
-        설명 자료로 넣어둔 내용, 논리 지도가 정리한 발표 줄거리로는 답할 수 있는 경우가 많다.
+        설명 자료로 넣어둔 내용으로는 답할 수 있는 경우가 많다.
         여기서도 모델은 넘긴 자료 안에서만 답하고, 숫자는 자료와 대조한다(answer.py).
-        보강 자료도 논리 지도도 없으면 None - 지금처럼 근거 없음으로 둔다.
+        보강 자료가 없으면 None - 지금처럼 근거 없음으로 두고, 추론 답으로 넘어간다.
+
+        슬라이드 지도 줄거리도 여기서 뺐다(2026-09-20 측정). 지도가 있으나 없으나 답변에 든 사실이
+        잡음 범위 안이었고, 설명 자료를 넣는 것이 실제로 답을 바꿨다(설명자료 질문 0% -> 64%).
         """
         notes = [n for n in getattr(self, "notes", []) if n.get("kind") in ("explain", "fact")]
-        graph = getattr(self, "graph", None)
-        if not notes and not graph:
+        if not notes:
             return None
         qwords = {w.lower() for w in self.nouns(question)}
 
@@ -924,19 +926,7 @@ class ReadyQ:
             if row is not None:
                 by_page.setdefault(p, self._page_text(row))
 
-        # 논리 지도: 질문과 맞는 줄거리 단계의 슬라이드를 붙이고, 줄거리 자체도 근거로 넘긴다
         story = ""
-        if graph:
-            for line in graph.get("story", []):
-                lw = {w.lower() for w in self.nouns(line["text"])}
-                if qwords & lw:
-                    for p in line.get("pages", [])[:2]:
-                        row = next((r for r in self.rows if r["page"] == p), None)
-                        if row is not None and len(by_page) < FALLBACK_SLIDES + len(base or {}):
-                            by_page.setdefault(p, self._page_text(row))
-            story = deck_graph.story_text(graph)
-            if story:
-                general_lines.append("[발표 줄거리] " + " / ".join(s["text"] for s in graph.get("story", [])))
         if general_lines:
             by_page[0] = "\n".join(general_lines)
         # 검색 결과에 더한 게 없으면 다시 만들어도 같은 답이다

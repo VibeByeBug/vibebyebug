@@ -113,7 +113,7 @@ def build(rows: list[dict], notes: list[dict] | None = None,
         chunks += _slide_chunks(r["page"], r["text"], refined.get(r["page"]))
     chunks += _note_chunks(notes or [])
     # 번호는 내용으로 정한다. 설명을 더하거나 지워도 나머지 조각의 번호가 그대로라
-    # 지식 그래프(knowledge_graph.py)를 통째로 다시 만들지 않아도 된다.
+    # 지식 지도(knowledge_graph.py)를 통째로 다시 만들지 않아도 된다.
     seen = set()
     out = []
     for c in chunks:

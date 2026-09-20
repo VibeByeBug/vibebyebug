@@ -91,7 +91,7 @@ _SENT_END = re.compile(r"(?<=[.!?])\s+")
 
 
 def _story_block(story: str) -> str:
-    """논리 지도의 발표 줄거리. 없으면 빈 줄."""
+    """슬라이드 지도의 발표 줄거리. 없으면 빈 줄."""
     if not story:
         return ""
     return f"\n--- 발표 줄거리 (어느 단계의 질문인지 볼 때만 쓴다. 근거는 아래 자료에서) ---\n{story}\n"

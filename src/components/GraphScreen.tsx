@@ -80,18 +80,44 @@ export function GraphScreen({
   const [storyAt, setStoryAt] = useState<number | null>(null);
   const [relFilter, setRelFilter] = useState<string | null>(null);
   const [showText, setShowText] = useState(false);
-  // 프로젝트 지식 지도(기본) | 슬라이드 순서로 보기
+  // 지식 지도(조각 단위, 기본) | 슬라이드 지도(슬라이드 단위)
   const [view, setView] = useState<'knowledge' | 'slides'>('knowledge');
+  // 지도 다시 그리기: 저장한 설명까지 넣어 두 지도를 새로 만든다 (자료 보강 화면에 있던 버튼을 여기로 옮겼다).
+  // 지식 지도는 조각이 많이 바뀌면 열 때 알아서 다시 만들지만, 슬라이드 지도는 이 버튼으로만 갱신된다.
+  const [busy, setBusy] = useState(false);
+  const [msg, setMsg] = useState<string | null>(null);
+  const [reloadKey, setReloadKey] = useState(0);
+
+  async function rebuild() {
+    setBusy(true);
+    setMsg(null);
+    try {
+      const res = await fetch(`${API_URL}/api/notes/${presentationId}/rebuild-graph`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: '{}',
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.detail ?? '지도를 다시 그리지 못했습니다');
+      setMsg(`다시 그렸어요. 슬라이드 연결 ${data.edges}개, 발표자 설명 ${data.notes_used}개 반영`);
+      setReloadKey((n) => n + 1);
+    } catch (e) {
+      setMsg(e instanceof Error ? e.message : '지도를 다시 그리지 못했습니다');
+    } finally {
+      setBusy(false);
+    }
+  }
 
   useEffect(() => {
+    setGraph(null);
     fetch(`${API_URL}/api/graph/${presentationId}`)
       .then(async (r) => {
-        if (!r.ok) throw new Error((await r.json()).detail ?? '지식 지도를 불러오지 못했습니다');
+        if (!r.ok) throw new Error((await r.json()).detail ?? '슬라이드 지도를 불러오지 못했습니다');
         return r.json();
       })
       .then(setGraph)
-      .catch((e) => setError(e instanceof Error ? e.message : '지식 지도를 불러오지 못했습니다'));
-  }, [presentationId]);
+      .catch((e) => setError(e instanceof Error ? e.message : '슬라이드 지도를 불러오지 못했습니다'));
+  }, [presentationId, reloadKey]);
 
   // 연결이 하나도 없는 슬라이드(표지, 목차, 감사 인사)는 지도에서 빼고 아래에 따로 적는다
   const { linked, loose } = useMemo(() => {
@@ -134,7 +160,7 @@ export function GraphScreen({
         </button>
       </div>
     );
-  if (!graph) return <p className="p-[44px] font-medium text-[15px] text-[#6b7280]">지식 지도를 불러오는 중···</p>;
+  if (!graph) return <p className="p-[44px] font-medium text-[15px] text-[#6b7280]">슬라이드 지도를 만들고 있어요··· (처음 열 때만 10초 안팎)</p>;
 
   const byPage = new Map(graph.nodes.map((n) => [n.page, n]));
   const focus = hovered ?? selected;
@@ -218,17 +244,17 @@ export function GraphScreen({
       {/* 머리말 */}
       <div className="flex flex-col items-center text-center gap-[14px]">
         <div className="flex flex-col gap-[8px] items-center">
-          <p className="font-black text-[30px] text-[#111111] tracking-[-0.8px]">지식 지도</p>
+          <p className="font-black text-[30px] text-[#111111] tracking-[-0.8px]">지도</p>
           <p className="font-normal text-[14px] text-[#6b7280] leading-[21px] max-w-[720px]">
             {view === 'knowledge'
-              ? '슬라이드, 대본, 설명 자료, 리허설에서 모은 프로젝트 지식을 주제별로 이은 지도입니다. 실전 답변도 이 전체 자료에서 근거를 찾습니다.'
-              : '슬라이드 사이의 주장과 근거를 발표 순서대로 이은 지도입니다. 슬라이드를 누르면 어떤 슬라이드와 엮어 답하면 되는지 보여줍니다.'}
+              ? '슬라이드, 대본, 설명 자료, 리허설에서 모은 지식 조각을 주제별로 이은 지도입니다. 실전 답변은 같은 조각에서 근거를 찾습니다.'
+              : '슬라이드 사이의 주장과 근거를 발표 순서대로 이은 지도입니다. 발표 흐름을 점검할 때 봅니다.'}
           </p>
           <div className="flex p-[3px] rounded-full bg-[#f3f4f6] mt-[4px]">
             {(
               [
-                ['knowledge', '프로젝트 지식 지도'],
-                ['slides', '슬라이드 순서로 보기'],
+                ['knowledge', '지식 지도'],
+                ['slides', '슬라이드 지도'],
               ] as const
             ).map(([k, label]) => (
               <button
@@ -255,6 +281,15 @@ export function GraphScreen({
           </div>
         </div>
         <div className="flex gap-[8px] shrink-0">
+          <button
+            type="button"
+            onClick={rebuild}
+            disabled={busy}
+            title="저장한 설명까지 넣어 지도를 새로 그립니다"
+            className="border border-[#e5e7eb] h-[38px] px-[14px] rounded-[6px] font-bold text-[14px] text-[#6b7280] whitespace-nowrap disabled:opacity-50"
+          >
+            {busy ? '다시 그리는 중··· (30초 안팎)' : '지도 다시 그리기'}
+          </button>
           {onAddNote && (
             <button
               type="button"
@@ -274,7 +309,9 @@ export function GraphScreen({
         </div>
       </div>
 
-      {view === 'knowledge' && <KnowledgeMap presentationId={presentationId} onAddNote={onAddNote} />}
+      {msg && <p className="font-medium text-[13px] text-[#409959] text-center">{msg}</p>}
+
+      {view === 'knowledge' && <KnowledgeMap key={reloadKey} presentationId={presentationId} onAddNote={onAddNote} />}
 
       {view === 'slides' && (
       <>

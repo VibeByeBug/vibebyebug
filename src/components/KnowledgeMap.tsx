@@ -97,7 +97,13 @@ export function KnowledgeMap({
   }, [data]);
 
   if (error) return <p className="py-[40px] text-center font-medium text-[15px] text-[#bf382e]">{error}</p>;
-  if (!data) return <p className="py-[40px] text-center font-medium text-[15px] text-[#6b7280]">지식 지도를 불러오는 중···</p>;
+  if (!data)
+    return (
+      <div className="flex flex-col items-center gap-[6px] py-[40px] text-center">
+        <p className="font-bold text-[17px] text-[#1a1a1a]">지식 지도를 만들고 있어요···</p>
+        <p className="font-medium text-[14px] text-[#6b7280]">처음 열 때만 10~25초 걸려요. 만든 지도는 저장해 둡니다.</p>
+      </div>
+    );
 
   const byId = new Map(data.nodes.map((n) => [n.id, n]));
   const focus = hovered ?? selected;
@@ -157,8 +163,48 @@ export function KnowledgeMap({
     );
   };
 
+  // 설명이 비어 있는 슬라이드. 슬라이드 조각만 있고 대본, 설명 자료, 리허설 조각이 안 붙은 장.
+  // 이 목록이 지도의 쓸모다: 설명을 넣으면 자료에만 있는 질문의 답변이 달라진다(0% -> 64%, ai/README.md).
+  const slidePages = [...new Set(data.nodes.filter((n) => n.kind === 'slide' && n.page).map((n) => n.page!))];
+  const explained = new Set(data.nodes.filter((n) => n.kind !== 'slide' && n.page).map((n) => n.page!));
+  const gaps = slidePages.filter((p) => !explained.has(p)).sort((a, b) => a - b);
+
   return (
     <div className="flex flex-col gap-[16px]">
+      {/* 설명이 없는 슬라이드 */}
+      {slidePages.length > 0 && (
+        <div className="flex flex-col gap-[8px] items-center rounded-[12px] border border-[#e5e7eb] bg-white px-[18px] py-[14px]">
+          <p className="font-bold text-[15px] text-[#1a1a1a] text-center break-keep">
+            {gaps.length === 0
+              ? `슬라이드 ${slidePages.length}장에 모두 설명이 붙어 있어요`
+              : `설명이 없는 슬라이드 ${gaps.length}장`}
+          </p>
+          <p className="font-normal text-[13px] text-[#6b7280] text-center break-keep">
+            슬라이드에 없는 이유와 배경을 넣어둔 만큼 "왜" 질문에 답할 수 있어요.
+          </p>
+          {gaps.length > 0 && (
+            <div className="flex flex-wrap justify-center items-center gap-[6px] pt-[2px]">
+              {/* 393장짜리 자료도 있다. 앞에서부터 12장만 보여주고 나머지는 수만 적는다 */}
+              {gaps.slice(0, 12).map((page) => (
+                <button
+                  key={page}
+                  type="button"
+                  onClick={() => onAddNote?.(page)}
+                  title={`p.${page} 설명 넣기`}
+                  className="inline-flex items-center gap-[5px] h-[28px] px-[11px] rounded-full border border-[#fbd5bd] bg-[#fff3eb] text-[12px] font-bold text-[#c2410c] hover:border-[#f26b1d]"
+                >
+                  p.{page}
+                  <span className="text-[#f26b1d]">+</span>
+                </button>
+              ))}
+              {gaps.length > 12 && (
+                <span className="font-medium text-[12px] text-[#6b7280]">외 {gaps.length - 12}장</span>
+              )}
+            </div>
+          )}
+        </div>
+      )}
+
       {/* 통계와 거르기 */}
       <div className="flex flex-col items-center gap-[10px]">
         <div className="flex flex-wrap justify-center gap-[8px]">
@@ -167,7 +213,7 @@ export function KnowledgeMap({
           <Pill label="주제 묶음" value={`${layout.cols.length}개`} />
           {data.coverage < 0.8 && (
             <span className="inline-flex items-center h-[28px] px-[10px] rounded-full text-[12px] font-bold bg-[#fff3eb] text-[#c2410c]">
-              새로 더한 자료가 많아요. 자료 보강 화면에서 "지식 지도 다시 만들기"를 눌러주세요
+              새로 더한 자료가 많아요. "지도 다시 그리기" 를 누르면 새 자료까지 이어집니다
             </span>
           )}
         </div>
