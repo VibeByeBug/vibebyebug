@@ -159,13 +159,11 @@ async def rebuild_graph(pid: str):
     if not graph.get("ok"):
         raise HTTPException(status_code=502, detail="논리 지도를 만들지 못했습니다. 잠시 뒤 다시 시도해주세요.")
     deck_graph.save(graph, graph_path(pid))
+    # 지도는 화면에서만 쓴다. 답변 엔진에는 넣지 않는다(2026-09-20 측정, ai/README.md).
     rq = engine_store.get_engine(pid)
     if rq is not None:
-        rq.set_graph(graph)
-        # 지식 그래프도 지금 조각(설명 포함)으로 다시 만든다
         import knowledge_graph
         kg = await asyncio.to_thread(knowledge_graph.build, rq.kb)
         if kg.get("ok"):
             knowledge_graph.save(kg, DATA_DIR / "kgraph" / f"{pid}.json")
-            rq.set_kgraph(kg)
     return {"edges": len(graph["edges"]), "notes_used": graph.get("notes_used", 0)}

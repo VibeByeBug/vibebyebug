@@ -760,9 +760,9 @@ class ReadyQ:
         if self.use_kg and self.kgraph:
             picked = self._with_kgraph(picked, question)
         slides = knowledge.to_context(picked)
-        graph = getattr(self, "graph", None)
-        story = deck_graph.story_text(graph) if graph else ""
-        return slides, story, any(c["kind"] == "slide" for c in picked)
+        # 발표 줄거리(논리 지도)는 넘기지 않는다. 2026-09-20 측정에서 지도가 있으나 없으나
+        # 근거 슬라이드가 12문항 모두 같았고 답변에 든 사실 차이도 잡음 범위였다(ai/README.md).
+        return slides, "", any(c["kind"] == "slide" for c in picked)
 
     def set_kgraph(self, graph: dict | None) -> None:
         """지식 그래프 (knowledge_graph.py). 없으면 검색한 조각만 쓴다."""
@@ -892,16 +892,18 @@ class ReadyQ:
         return cue.status == "no_evidence" or not cue.sources
 
     def _fallback(self, question: str, base: dict | None = None) -> tuple[list[tuple[int, str]], str] | None:
-        """슬라이드에서 근거를 못 찾았을 때 쓸 자료. 발표자 설명과 논리 지도 줄거리로 모은다.
+        """슬라이드에서 근거를 못 찾았을 때 쓸 자료. 발표자 설명(리허설, 대본, 설명 자료)으로 모은다.
 
         "이 프로젝트의 의의는?" 처럼 슬라이드 글자와 겹치지 않는 질문도 발표자가 대본이나
-        설명 자료로 넣어둔 내용, 논리 지도가 정리한 발표 줄거리로는 답할 수 있는 경우가 많다.
+        설명 자료로 넣어둔 내용으로는 답할 수 있는 경우가 많다.
         여기서도 모델은 넘긴 자료 안에서만 답하고, 숫자는 자료와 대조한다(answer.py).
-        보강 자료도 논리 지도도 없으면 None - 지금처럼 근거 없음으로 둔다.
+        보강 자료가 없으면 None - 지금처럼 근거 없음으로 두고, 추론 답으로 넘어간다.
+
+        논리 지도 줄거리도 여기서 뺐다(2026-09-20 측정). 지도가 있으나 없으나 답변에 든 사실이
+        잡음 범위 안이었고, 설명 자료를 넣는 것이 실제로 답을 바꿨다(설명자료 질문 0% -> 64%).
         """
         notes = [n for n in getattr(self, "notes", []) if n.get("kind") in ("explain", "fact")]
-        graph = getattr(self, "graph", None)
-        if not notes and not graph:
+        if not notes:
             return None
         qwords = {w.lower() for w in self.nouns(question)}
 
@@ -924,19 +926,7 @@ class ReadyQ:
             if row is not None:
                 by_page.setdefault(p, self._page_text(row))
 
-        # 논리 지도: 질문과 맞는 줄거리 단계의 슬라이드를 붙이고, 줄거리 자체도 근거로 넘긴다
         story = ""
-        if graph:
-            for line in graph.get("story", []):
-                lw = {w.lower() for w in self.nouns(line["text"])}
-                if qwords & lw:
-                    for p in line.get("pages", [])[:2]:
-                        row = next((r for r in self.rows if r["page"] == p), None)
-                        if row is not None and len(by_page) < FALLBACK_SLIDES + len(base or {}):
-                            by_page.setdefault(p, self._page_text(row))
-            story = deck_graph.story_text(graph)
-            if story:
-                general_lines.append("[발표 줄거리] " + " / ".join(s["text"] for s in graph.get("story", [])))
         if general_lines:
             by_page[0] = "\n".join(general_lines)
         # 검색 결과에 더한 게 없으면 다시 만들어도 같은 답이다
