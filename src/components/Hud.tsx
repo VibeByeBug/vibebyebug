@@ -429,12 +429,12 @@ export function FlowSteps({
         guessHoles: 'text-[#9f86e0]/35',
         shot: 'text-[#f26b1d]',
         guessShot: 'text-[#c4b1f5]',
-        page: 'text-white/45',
+        page: 'text-white/60',
         title: 'text-white',
         detail: 'text-white/75',
         mark: '#ffb547',
         chip: 'bg-[#f26b1d]/20 text-[#ffb08a]',
-        why: 'text-white/50',
+        why: 'text-white/70',
       }
     : {
         card: 'bg-white border-2 border-[#f26b1d]',
@@ -443,12 +443,12 @@ export function FlowSteps({
         guessHoles: 'text-[#7c5cbf]/25',
         shot: 'text-[#f26b1d]',
         guessShot: 'text-[#5b3fa0]',
-        page: 'text-[#9ca3af]',
+        page: 'text-[#6b7280]',
         title: 'text-[#111111]',
         detail: 'text-[#374151]',
         mark: '#e0470f',
         chip: 'bg-[#f3f4f6] text-[#c2410c]',
-        why: 'text-[#6b7280]',
+        why: 'text-[#4b5563]',
       };
   return (
     // 넓은 화면은 칸을 가로로, 좁은 화면(1024px 미만)은 세로로 쌓는다
@@ -477,7 +477,7 @@ export function FlowSteps({
                 >
                   {i + 1}
                 </span>
-                <span className={`font-mono font-bold text-[11px] ${first ? 'text-white/70' : c.page}`}>
+                <span className={`font-mono font-bold text-[12px] ${first ? 'text-white/80' : c.page}`}>
                   {step.slide ? `p.${step.slide}` : guess ? 'AI 추론' : '발표자 설명'}
                 </span>
               </div>
@@ -516,7 +516,7 @@ export function FlowSteps({
                 </div>
                 <span className="lg:hidden font-black text-[14px] text-[#f26b1d] leading-none">▼</span>
                 {step.why && (
-                  <span className={`font-medium text-[12px] leading-[16px] text-center break-keep ${c.why}`}>{step.why}</span>
+                  <span className={`font-medium text-[13px] leading-[18px] text-center break-keep ${c.why}`}>{step.why}</span>
                 )}
               </div>
             )}

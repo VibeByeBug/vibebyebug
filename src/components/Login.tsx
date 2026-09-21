@@ -1,3 +1,5 @@
+import { DEFAULT_TITLE } from '../constants';
+
 interface LoginProps {
   onLogin: () => void;
   onBack?: () => void; // 랜딩으로 돌아가기
@@ -5,7 +7,8 @@ interface LoginProps {
 }
 
 // 로그인. 랜딩(슬레이트)에서 발표를 시작하려고 할 때 온다. 무대 위 작은 슬레이트 판 모양.
-// 지금은 계정 없이 게스트로 시작한다. 구글, 카카오 로그인은 아직 없어서 눌리지 않게 막아뒀다.
+// 지금은 게스트로만 들어간다. 구글, 카카오는 실제 인증이 없어 눌리지 않게 막아뒀다(화면에는 설명을 적지 않는다).
+// 인증을 붙일 때 그 두 버튼의 disabled 를 풀고 onClick 을 연결한다.
 export function Login({ onLogin, onBack, pendingTitle }: LoginProps) {
   return (
     <div className="relative flex flex-1 min-h-screen w-full items-center justify-center overflow-hidden bg-[#15110d] text-white px-[16px]">
@@ -29,13 +32,10 @@ export function Login({ onLogin, onBack, pendingTitle }: LoginProps) {
           <div className="slate-stripes h-[26px] rounded-t-[8px]" />
           <div className="bg-[#111111] rounded-b-[12px] px-[28px] pt-[24px] pb-[26px] flex flex-col gap-[18px] shadow-[0_40px_70px_-20px_rgba(0,0,0,0.8)]">
             <div className="flex flex-col gap-[6px] items-center text-center">
-              <p className="font-black text-[24px] tracking-[-0.6px]">게스트로 바로 시작해요</p>
-              {pendingTitle ? (
-                <p className="font-normal text-[14px] text-white/60 leading-[21px]">
-                  계정 없이 <span className="font-bold text-white">“{pendingTitle}”</span> 발표 준비로 바로 이어져요.
-                </p>
-              ) : (
-                <p className="font-normal text-[14px] text-white/60 leading-[21px]">계정 없이 바로 발표 준비를 시작할 수 있어요.</p>
+              <p className="font-black text-[24px] tracking-[-0.6px]">발표 준비를 시작해요</p>
+              {/* 발표 이름을 적어서 온 경우에만 보여준다. 기본 이름은 안내가 되지 않는다 */}
+              {pendingTitle && pendingTitle !== DEFAULT_TITLE && (
+                <p className="font-bold text-[15px] text-white/70 leading-[22px] break-keep">“{pendingTitle}”</p>
               )}
             </div>
             <div className="flex flex-col gap-[10px]">
@@ -48,20 +48,20 @@ export function Login({ onLogin, onBack, pendingTitle }: LoginProps) {
               </button>
               <div className="flex items-center gap-[10px] text-[12px] text-white/35">
                 <span className="h-px flex-1 bg-white/10" />
-                소셜 로그인은 준비 중이에요
+                또는
                 <span className="h-px flex-1 bg-white/10" />
               </div>
               <button
                 type="button"
                 disabled
-                aria-disabled="true"
-                className="flex gap-[12px] h-[46px] items-center px-[16px] rounded-[8px] w-full opacity-40 cursor-not-allowed"
+                title="준비 중이에요"
+                className="flex gap-[12px] h-[52px] items-center px-[16px] rounded-[8px] w-full opacity-40 cursor-not-allowed"
                 style={{ backgroundColor: '#ffffff' }}
               >
                 <span className="flex items-center justify-center rounded-full size-[22px] border border-[#dadce0]">
                   <span className="font-bold text-[12px]" style={{ color: '#4285f4' }}>G</span>
                 </span>
-                <span className="flex-1 font-bold text-[15px] text-center" style={{ color: '#3c4043' }}>
+                <span className="flex-1 font-bold text-[16px] text-center" style={{ color: '#3c4043' }}>
                   구글로 계속하기
                 </span>
                 <span className="w-[22px]" />
@@ -69,20 +69,17 @@ export function Login({ onLogin, onBack, pendingTitle }: LoginProps) {
               <button
                 type="button"
                 disabled
-                aria-disabled="true"
-                className="flex gap-[12px] h-[46px] items-center px-[16px] rounded-[8px] w-full opacity-40 cursor-not-allowed"
+                title="준비 중이에요"
+                className="flex gap-[12px] h-[52px] items-center px-[16px] rounded-[8px] w-full opacity-40 cursor-not-allowed"
                 style={{ backgroundColor: '#fee500' }}
               >
                 <span className="flex items-center justify-center size-[22px] font-bold text-[13px]">💬</span>
-                <span className="flex-1 font-bold text-[15px] text-center" style={{ color: '#191600' }}>
+                <span className="flex-1 font-bold text-[16px] text-center" style={{ color: '#191600' }}>
                   카카오로 계속하기
                 </span>
                 <span className="w-[22px]" />
               </button>
             </div>
-            <p className="font-normal text-[12px] text-white/45 leading-[19px] text-center">
-              데모 버전이라 계정 없이 쓸 수 있어요. 올린 자료는 이 서비스를 돌리는 컴퓨터에 저장돼요.
-            </p>
           </div>
         </div>
 

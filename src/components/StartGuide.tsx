@@ -8,27 +8,27 @@ import { FlowSteps } from './Hud';
 const SCENES = [
   {
     no: '01',
-    title: '대본 입고',
+    title: '자료 올리기',
     what: '발표자료(PDF)를 올려요.',
-    detail: '글자가 없는 이미지 슬라이드도 읽고, 흩어진 표와 카드를 읽기 좋게 정리해요.',
+    detail: '이미지로 된 슬라이드도 글자를 읽어 와요.',
   },
   {
     no: '02',
     title: '리허설',
     what: '발표하듯 말하거나 대본, 설명 자료를 올려요.',
-    detail: '슬라이드에 이미 있는 말은 거르고, 슬라이드에 없는 이유와 배경만 모아요.',
+    detail: '슬라이드에 없는 이유와 배경만 골라서 모아요.',
   },
   {
     no: '03',
-    title: 'ON AIR',
-    what: '청중 질문을 들으면 바로 띄워요.',
-    detail: '근거 슬라이드는 1초 안에 뜨고, 추천 답변은 2~4초, 말할 순서는 그 뒤에 이어서 떠요.',
+    title: '실전',
+    what: '청중 질문이 들어오면 바로 띄워요.',
+    detail: '근거 슬라이드는 1초 안에, 추천 답변은 2~4초 안에 떠요.',
   },
   {
     no: '04',
-    title: '콘티 보드',
-    what: '발표 지식을 주제별로 이은 지도를 봐요.',
-    detail: '어떤 질문에 무엇을 엮어 답할지, 설명이 모자란 곳이 어디인지 미리 확인해요.',
+    title: '지도',
+    what: '발표 내용을 주제별로 이은 지도를 봐요.',
+    detail: '설명이 부족한 곳이 어디인지 미리 확인해요.',
   },
 ];
 
@@ -38,23 +38,23 @@ const DEMO_STEPS: FlowStep[] = [
     text: '근거부터 1초 안에',
     slide: 6,
     keys: ['근거 슬라이드', '1초'],
-    detail: '질문을 듣고 화면으로 눈을 돌리는 시간이 1초라, 근거 슬라이드를 먼저 띄우고 답변은 이어서 채웁니다.',
+    detail: '질문을 듣고 화면을 보기까지 1초라서, 근거 슬라이드를 먼저 띄우고 답변은 이어서 채웁니다.',
     link: '그래서',
-    why: '먼저 띄울 것을 고른 기준',
+    why: '1초 안에 끝내려고',
   },
   {
     text: '빠른 하이브리드 검색',
     slide: 8,
     keys: ['하이브리드', 'e5-small'],
-    detail: '더 정확한 모델은 느릴 때 2초가 넘어서, 정확도를 조금 내주고 e5-small 하이브리드를 골랐습니다. 근거 검색은 1초 안에 끝납니다.',
+    detail: '더 정확한 모델은 느릴 때 2초가 넘어서, 정확도를 조금 내주고 e5-small 하이브리드를 골랐습니다.',
     link: '덧붙이면',
-    why: '화면 흔들림 제거',
+    why: '화면이 흔들리지 않게',
   },
   {
     text: '답변과 순서는 같이',
     slide: 6,
     keys: ['추천 답변 2~4초', '동시 생성'],
-    detail: '추천 답변과 말할 순서를 동시에 만들어서, 답변이 뜬 뒤 순서를 따로 기다리지 않습니다.',
+    detail: '추천 답변과 말할 순서를 동시에 만들어서, 순서를 따로 기다리지 않습니다.',
   },
 ];
 
@@ -107,8 +107,8 @@ export function StartGuide({ onStart }: { onStart: () => void }) {
             발표 Q&amp;A 를 촬영하듯 준비하세요
           </p>
           <p className="font-normal text-[17px] leading-[29px] text-white/70 break-keep">
-            Ready-Q 는 발표자료와 대본, 설명 자료를 미리 읽어두었다가 청중 질문이 들어오면 근거 슬라이드와 말할 순서를
-            바로 띄워주는 발표 Q&amp;A 프롬프터예요. 자료에 없는 내용은 지어내지 않고, 추론한 답은 따로 표시해요.
+            발표자료를 미리 읽어두었다가, 청중 질문이 들어오면 근거 슬라이드와 답할 순서를 바로 띄워줘요.
+            자료에 없는 내용은 지어내지 않고, 추론한 답은 따로 표시해요.
           </p>
         </div>
 
@@ -135,9 +135,9 @@ export function StartGuide({ onStart }: { onStart: () => void }) {
         {/* 실전 화면 예시 */}
         <div className="reveal flex flex-col items-center gap-[22px] w-full max-w-[1200px] mt-[72px]" style={delay(1600)}>
           <div className="flex flex-col items-center gap-[10px] text-center">
-            <p className="font-black text-[34px] tracking-[-1px] break-keep">실전에서는 이렇게 떠요</p>
-            <p className="font-normal text-[16px] text-white/60 break-keep">
-              청중이 “응답 시간을 지키려고 어떤 선택을 했나요?” 라고 물으면, 질문이 끝나고 말할 순서가 칸으로 떠요.
+            <p className="font-black text-[34px] tracking-[-1px] break-keep">질문이 들어오면 이렇게 떠요</p>
+            <p className="font-normal text-[16px] text-white/70 break-keep">
+              “응답 시간을 지키려고 어떤 선택을 했나요?” 라는 질문에는 답할 순서가 칸으로 나와요.
             </p>
           </div>
           <FlowSteps steps={DEMO_STEPS} dark />

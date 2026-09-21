@@ -31,7 +31,7 @@ export function AudienceControl({
           <span className={`size-[8px] rounded-full ${open ? (current ? 'bg-[#e5322d] tally-pulse' : 'bg-[#58d68d]') : 'bg-white/25'}`} />
           청중 화면
           <span className="font-medium text-white/45">
-            {!open ? '닫힘' : current ? `p.${current} 띄우는 중` : '대기 (Q&A 슬레이트)'}
+            {!open ? '닫힘' : current ? `p.${current} 띄우는 중` : '대기 중'}
           </span>
         </span>
 
