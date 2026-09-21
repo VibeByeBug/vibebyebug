@@ -13,7 +13,7 @@ pydantic==2.13.5
 # uvicorn 이 WebSocket 을 처리하려면 별도 라이브러리가 있어야 한다.
 # 없으면 코드는 멀쩡한데 /ws 만 404 로 떨어져서 원인을 찾기 어렵다.
 #   WARNING: No supported WebSocket library detected.
-websockets==17.1
+websockets>=13.0,<17.0     # google-genai 2.22.0 이 <17 을 요구한다. 17.1 로 고정하면 설치 전체가 실패한다.
 
 # ── 파일 업로드 / 템플릿 ─────────────────────────────────────
 python-multipart==0.0.32    # UploadFile 처리. 없으면 업로드 API 가 500
