@@ -13,6 +13,7 @@ export type AudienceMessage =
   | { type: 'show'; slide: AudienceSlide }
   | { type: 'clear' }
   | { type: 'hello' } // 청중 화면이 열렸다 (발표자 화면이 지금 상태를 다시 보내준다)
+  | { type: 'ping' } // 발표자 화면이 켜졌다 (이미 열려 있는 청중 화면은 hello 로 답한다)
   | { type: 'bye' }; // 청중 화면이 닫혔다
 
 const NAME = 'readyq-audience';

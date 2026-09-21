@@ -230,6 +230,8 @@ function App() {
       if (m.type === 'bye') setAudienceOpen(false);
     });
     channelRef.current = ch;
+    // 발표자 화면이 새로고침돼도 이미 열려 있는 청중 화면을 찾는다 (청중 화면은 열릴 때 한 번만 hello 를 보낸다)
+    ch.send({ type: 'ping' });
     return () => ch.close();
   }, []);
 

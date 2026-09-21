@@ -14,6 +14,8 @@ export function AudienceScreen() {
     const ch = audienceChannel((m) => {
       if (m.type === 'show') setSlide(m.slide);
       if (m.type === 'clear') setSlide(null);
+      // 발표자 화면이 새로고침돼서 청중 화면이 열려 있는 줄 모른다. 다시 알려준다.
+      if (m.type === 'ping') ch.send({ type: 'hello' });
     });
     ch.send({ type: 'hello' });
     const bye = () => ch.send({ type: 'bye' });
