@@ -1,3 +1,5 @@
+import { useTheme } from '../theme';
+
 interface LoginProps {
   onLogin: () => void;
   onBack?: () => void; // 랜딩으로 돌아가기
@@ -7,27 +9,39 @@ interface LoginProps {
 // 로그인. 랜딩(슬레이트)에서 발표를 시작하려고 할 때 온다. 무대 위 작은 슬레이트 판 모양.
 // 지금은 계정 없이 게스트로 시작한다. 구글, 카카오 로그인은 아직 없어서 눌리지 않게 막아뒀다.
 export function Login({ onLogin, onBack, pendingTitle }: LoginProps) {
+  // 라이트 모드: 무대 바닥은 종이, 글자는 잉크. 슬레이트 판은 소품이라 검은 판에 흰 글씨 그대로.
+  const light = useTheme().theme === 'light';
   return (
-    <div className="relative flex flex-1 min-h-screen w-full items-center justify-center overflow-hidden bg-[#15110d] text-white px-[16px]">
+    <div className="relative flex flex-1 min-h-screen w-full items-center justify-center overflow-hidden bg-page text-ink px-[16px]">
       <div
         className="pointer-events-none absolute inset-0"
-        style={{ background: 'radial-gradient(760px 520px at 50% 20%, rgba(255,181,71,0.14), transparent 70%)' }}
+        style={{
+          background: `radial-gradient(760px 520px at 50% 20%, rgba(255,181,71,${light ? 0.3 : 0.14}), transparent 70%)`,
+        }}
       />
-      <div className="pointer-events-none absolute inset-y-0 left-0 w-[70px] bg-gradient-to-r from-[#4a1712] to-transparent" />
-      <div className="pointer-events-none absolute inset-y-0 right-0 w-[70px] bg-gradient-to-l from-[#4a1712] to-transparent" />
+      <div
+        className={`pointer-events-none absolute inset-y-0 left-0 w-[70px] bg-gradient-to-r to-transparent ${
+          light ? 'from-slateInk/[0.06]' : 'from-[#4a1712]'
+        }`}
+      />
+      <div
+        className={`pointer-events-none absolute inset-y-0 right-0 w-[70px] bg-gradient-to-l to-transparent ${
+          light ? 'from-slateInk/[0.06]' : 'from-[#4a1712]'
+        }`}
+      />
 
       <div className="relative w-full max-w-[440px] flex flex-col gap-[22px] items-center">
         <button
           type="button"
           onClick={onBack}
-          className="font-display text-[34px] tracking-[1.5px] leading-none text-white"
+          className="font-display text-[34px] tracking-[1.5px] leading-none text-ink"
         >
           READY-<span className="text-[#f26b1d]">Q</span>
         </button>
 
         <div className="w-full">
           <div className="slate-stripes h-[26px] rounded-t-[8px]" />
-          <div className="bg-[#111111] rounded-b-[12px] px-[28px] pt-[24px] pb-[26px] flex flex-col gap-[18px] shadow-[0_40px_70px_-20px_rgba(0,0,0,0.8)]">
+          <div className="bg-[#111111] text-white rounded-b-[12px] px-[28px] pt-[24px] pb-[26px] flex flex-col gap-[18px] shadow-[0_40px_70px_-20px_rgba(0,0,0,0.8)]">
             <div className="flex flex-col gap-[6px] items-center text-center">
               <p className="font-black text-[24px] tracking-[-0.6px]">게스트로 바로 시작해요</p>
               {pendingTitle ? (
@@ -87,7 +101,7 @@ export function Login({ onLogin, onBack, pendingTitle }: LoginProps) {
         </div>
 
         {onBack && (
-          <button type="button" onClick={onBack} className="font-bold text-[14px] text-white/55 hover:text-white transition-colors">
+          <button type="button" onClick={onBack} className="font-bold text-[14px] text-ink/55 hover:text-ink transition-colors">
             ← 처음 화면으로
           </button>
         )}

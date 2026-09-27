@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { listPresentations, type SavedPresentation } from '../api';
 import { ArrowRightIcon } from './icons';
 import { StartGuide } from './StartGuide';
+import { useTheme } from '../theme';
 
 interface StartScreenProps {
   onStart: (title: string) => void;
@@ -11,8 +12,11 @@ interface StartScreenProps {
 }
 
 // 시작 화면 = 검은 무대. 조명이 커서를 천천히 따라오고, 오른쪽 슬레이트 판에 발표 이름이 쓰인다.
-// 시작하면 슬레이트 팔이 "딱" 닫힌 뒤 넘어간다. (다른 화면은 흰 배경, 시작 화면만 어둡게)
+// 시작하면 슬레이트 팔이 "딱" 닫힌 뒤 넘어간다.
+// 라이트 모드에서는 무대 바닥이 종이(paper)가 되고 글자는 슬레이트 잉크(slateInk)로 바뀐다.
+// 슬레이트 판과 필름 스트립은 소품이라 두 모드 모두 검은색 그대로 둔다.
 export function StartScreen({ onStart, onOpenReport, onResume, loggedIn = false }: StartScreenProps) {
+  const light = useTheme().theme === 'light';
   // 최근 촬영분: 서버에 남아 있는 발표. 다시 올리지 않고 이어서 열 수 있다.
   const [recent, setRecent] = useState<SavedPresentation[]>([]);
   useEffect(() => {
@@ -71,39 +75,54 @@ export function StartScreen({ onStart, onOpenReport, onResume, loggedIn = false 
   }
 
   return (
-    <div className="flex flex-col bg-[#15110d]">
+    <div className={`flex flex-col ${light ? 'bg-paper' : 'bg-stage'}`}>
     {/* 첫 화면: 화면 높이를 채운다 (헤더 60px + 줄무늬 6px 을 뺀 높이) */}
     <div
       ref={stage}
-      className="relative flex min-h-[calc(100vh-66px)] flex-col overflow-hidden bg-[#15110d] text-white"
+      className={`relative flex min-h-[calc(100vh-66px)] flex-col overflow-hidden ${
+        light ? 'bg-paper text-slateInk' : 'bg-stage text-white'
+      }`}
       style={{ ['--sx' as string]: '70%', ['--sy' as string]: '20%' }}
     >
-      {/* 조명과 무대 바닥 */}
+      {/* 조명과 무대 바닥. 라이트에서는 종이 위에 스포트 앰버가 은은하게 비친다 */}
       <div
         className="pointer-events-none absolute inset-0"
         style={{
-          background:
-            'radial-gradient(640px circle at var(--sx) var(--sy), rgba(255,181,71,0.16), transparent 62%), radial-gradient(900px 220px at 60% 100%, rgba(242,107,29,0.16), transparent 70%)',
+          background: light
+            ? 'radial-gradient(640px circle at var(--sx) var(--sy), rgba(255,181,71,0.30), transparent 62%), radial-gradient(900px 220px at 60% 100%, rgba(220,74,30,0.10), transparent 70%)'
+            : 'radial-gradient(640px circle at var(--sx) var(--sy), rgba(255,181,71,0.16), transparent 62%), radial-gradient(900px 220px at 60% 100%, rgba(242,107,29,0.16), transparent 70%)',
         }}
       />
-      <div className="pointer-events-none absolute inset-y-0 left-0 w-[70px] bg-gradient-to-r from-[#4a1712] to-transparent" />
-      <div className="pointer-events-none absolute inset-y-0 right-0 w-[70px] bg-gradient-to-l from-[#4a1712] to-transparent" />
+      {/* 양옆 커튼 그림자. 라이트는 붉은 커튼 대신 종이 가장자리가 살짝 어두워진다 */}
+      <div
+        className={`pointer-events-none absolute inset-y-0 left-0 w-[70px] bg-gradient-to-r to-transparent ${
+          light ? 'from-slateInk/[0.06]' : 'from-[#4a1712]'
+        }`}
+      />
+      <div
+        className={`pointer-events-none absolute inset-y-0 right-0 w-[70px] bg-gradient-to-l to-transparent ${
+          light ? 'from-slateInk/[0.06]' : 'from-[#4a1712]'
+        }`}
+      />
       <div
         className="pointer-events-none absolute inset-x-0 bottom-0 h-[160px] opacity-[0.07]"
-        style={{ backgroundImage: 'repeating-linear-gradient(0deg, #fff 0 1px, transparent 1px 24px)' }}
+        style={{
+          backgroundImage: `repeating-linear-gradient(0deg, ${light ? '#111111' : '#fff'} 0 1px, transparent 1px 24px)`,
+        }}
       />
 
       <div className="relative flex flex-1 flex-col lg:flex-row items-center justify-center gap-[72px] lg:gap-[56px] px-[24px] md:px-[96px] pt-[40px] pb-[24px]">
         {/* 왼쪽: 문구와 버튼 */}
         <div className="flex flex-col gap-[20px] max-w-[560px]">
           <p className="font-black text-[44px] leading-[56px] md:text-[68px] md:leading-[86px] tracking-[-2px] break-keep">
-            질문이 들어오면,
+            예상 밖 질문에도,
             <br />
-            <span className="text-[#f26b1d]">큐</span>가 뜹니다.
+            답변<span className="text-[#f26b1d]"> 큐</span>
           </p>
-          <p className="font-normal text-[17px] leading-[29px] text-white/70">
-            발표자료를 올리면 청중 질문에 맞는 근거 슬라이드와 말할 순서를 바로 띄워드려요. 리허설로 모은 설명까지 엮어서
-            답합니다.
+          <p className={`font-normal text-[17px] leading-[29px] ${light ? 'text-slateInk/70' : 'text-white/70'}`}>
+            발표자료와 대본을 올려주세요. <br />
+            질문에 맞는 근거 슬라이드와 순서 구조도를 바로 띄워드려요.<br /> 
+            리허설부터 실전, 발표 리뷰까지 함께합니다.
           </p>
           <div className="flex gap-[12px] pt-[8px]">
             <button
@@ -121,7 +140,9 @@ export function StartScreen({ onStart, onOpenReport, onResume, loggedIn = false 
               onClick={() =>
                 loggedIn ? onOpenReport() : document.getElementById('how-it-works')?.scrollIntoView({ behavior: 'smooth' })
               }
-              className="border border-white/30 hover:border-white/60 transition-colors h-[58px] px-[24px] rounded-[10px] font-bold text-[18px]"
+              className={`border transition-colors h-[58px] px-[24px] rounded-[10px] font-bold text-[18px] ${
+                light ? 'border-slateInk/25 hover:border-slateInk/50' : 'border-white/30 hover:border-white/60'
+              }`}
             >
               {loggedIn ? '지난 발표 회고 보기' : '사용 방법 보기'}
             </button>
@@ -146,7 +167,8 @@ export function StartScreen({ onStart, onOpenReport, onResume, loggedIn = false 
         >
           <div className={`clapper-arm slate-stripes h-[58px] rounded-t-[6px] ${snap ? 'snap' : ''}`} />
           <div className="slate-stripes h-[36px]" />
-          <div className="bg-[#111111] rounded-b-[10px] px-[26px] pt-[20px] pb-[18px] flex flex-col gap-[14px] shadow-[0_40px_70px_-20px_rgba(0,0,0,0.8)]">
+          {/* 슬레이트 판은 소품이라 테마와 상관없이 검은 판에 흰 분필 글씨 */}
+          <div className="bg-[#111111] text-white rounded-b-[10px] px-[26px] pt-[20px] pb-[18px] flex flex-col gap-[14px] shadow-[0_40px_70px_-20px_rgba(0,0,0,0.8)]">
             <div className="flex flex-col gap-[4px]">
               <span className="font-slate font-medium text-[12px] tracking-[1px] text-white/55">PRODUCTION</span>
               <input
@@ -189,8 +211,9 @@ export function StartScreen({ onStart, onOpenReport, onResume, loggedIn = false 
       <div className="relative px-[24px] md:px-[96px] pb-[36px] flex flex-col gap-[10px]">
         {loggedIn && (
         <>
-        <p className="font-bold text-[15px] text-white/70">최근 촬영분</p>
-        <div className="bg-[#0b0907] rounded-[6px] px-[10px] py-[8px] flex flex-col gap-[8px]">
+        <p className={`font-bold text-[15px] ${light ? 'text-slateInk/70' : 'text-white/70'}`}>최근 촬영분</p>
+        {/* 필름 스트립도 소품이라 두 모드 모두 검은 필름에 흰 글씨 */}
+        <div className="bg-[#0b0907] text-white rounded-[6px] px-[10px] py-[8px] flex flex-col gap-[8px]">
           <div className="film-holes text-white/20" />
           <div className="flex gap-[10px]">
             {recent.length === 0 && (
@@ -230,7 +253,9 @@ export function StartScreen({ onStart, onOpenReport, onResume, loggedIn = false 
         <button
           type="button"
           onClick={() => document.getElementById('how-it-works')?.scrollIntoView({ behavior: 'smooth' })}
-          className="nudge self-center flex flex-col items-center gap-[2px] pt-[14px] text-white/55 hover:text-white transition-colors"
+          className={`nudge self-center flex flex-col items-center gap-[2px] pt-[14px] transition-colors ${
+            light ? 'text-slateInk/55 hover:text-slateInk' : 'text-white/55 hover:text-white'
+          }`}
         >
           <span className="font-bold text-[14px]">사용 방법 보기</span>
           <span className="text-[18px] leading-none">↓</span>

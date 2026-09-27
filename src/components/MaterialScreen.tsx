@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { API_URL } from '../api';
 import { useSpeechRecognition } from '../hooks/useSpeechRecognition';
+import { useFileDrop } from '../hooks/useFileDrop';
 import { SlideText } from './SlideText';
 
 // 발표자 설명 모으기: 리허설 녹음, 발표 대본, 설명 자료.
@@ -99,8 +100,8 @@ export function MaterialScreen({
   return (
     <div className="flex flex-col gap-[16px] pb-[36px] pt-[24px] px-[16px] sm:px-[32px] w-full max-w-[1400px] mx-auto">
       <div className="flex flex-col items-center text-center gap-[6px]">
-        <p className="font-black text-[30px] text-white tracking-[-0.8px]">자료 보강</p>
-        <p className="font-normal text-[14px] text-white/55 leading-[21px] max-w-[720px] break-keep">
+        <p className="font-black text-[30px] text-ink tracking-[-0.8px]">자료 보강</p>
+        <p className="font-normal text-[14px] text-ink/55 leading-[21px] max-w-[720px] break-keep">
           슬라이드에 없는 설명을 모으면 "왜", "어떻게" 질문에 더 깊게 답할 수 있어요. 슬라이드에 이미 있는 말은 답변 근거로
           쓰지 않고, 청중 질문을 찾는 표현으로만 둡니다.
         </p>
@@ -109,7 +110,7 @@ export function MaterialScreen({
       {/* 탭은 가운데, 지도 다시 만들기와 돌아가기는 오른쪽 */}
       <div className="grid grid-cols-1 lg:grid-cols-[1fr_auto_1fr] items-center gap-[12px]">
         <div className="hidden lg:block" />
-        <div className="justify-self-center flex gap-[4px] rounded-[10px] border border-white/10 bg-white/[0.05] p-[4px]">
+        <div className="justify-self-center flex gap-[4px] rounded-[10px] border border-ink/10 bg-ink/[0.05] p-[4px]">
           {(
             [
               ['rehearsal', '리허설 녹음', null],
@@ -122,11 +123,11 @@ export function MaterialScreen({
               type="button"
               onClick={() => setTab(key)}
               className={`flex items-center gap-[7px] h-[36px] px-[16px] rounded-[7px] font-bold text-[14px] whitespace-nowrap transition-colors ${
-                tab === key ? 'bg-[#ede6d6] text-[#15110d]' : 'text-white/60 hover:text-white hover:bg-white/[0.06]'
+                tab === key ? 'bg-sel text-selInk' : 'text-ink/60 hover:text-ink hover:bg-ink/[0.06]'
               }`}
             >
               {label}
-              {n !== null && <span className={`font-mono text-[13px] ${tab === key ? 'text-[#f26b1d]' : 'text-white/40'}`}>{n}</span>}
+              {n !== null && <span className={`font-mono text-[13px] ${tab === key ? 'text-[#f26b1d]' : 'text-ink/40'}`}>{n}</span>}
             </button>
           ))}
         </div>
@@ -135,7 +136,7 @@ export function MaterialScreen({
           <button
             type="button"
             onClick={onBack}
-            className="h-[38px] px-[16px] rounded-[8px] border border-white/20 font-bold text-[14px] text-white/75 hover:border-white/45"
+            className="h-[38px] px-[16px] rounded-[8px] border border-ink/20 font-bold text-[14px] text-ink/75 hover:border-ink/45"
           >
             돌아가기
           </button>
@@ -251,7 +252,7 @@ function Rehearsal({
     }
   }
 
-  if (!slide) return <p className="font-medium text-[14px] text-white/55 text-center py-[40px]">슬라이드를 불러오는 중···</p>;
+  if (!slide) return <p className="font-medium text-[14px] text-ink/55 text-center py-[40px]">슬라이드를 불러오는 중···</p>;
 
   const clock = `${String(Math.floor(secs / 60)).padStart(2, '0')}:${String(secs % 60).padStart(2, '0')}`;
 
@@ -260,14 +261,14 @@ function Rehearsal({
       <FilmStrip presentationId={presentationId} slides={slides} index={index} counts={counts} onPick={go} />
 
       {/* 슬라이드 카드: 슬라이드 그림, 그 아래 AI 정리본(또는 PDF 원문) */}
-      <section className={`flex flex-col min-w-0 rounded-[12px] border border-white/10 bg-[#1c1713] overflow-hidden ${PANE_H}`}>
+      <section className={`flex flex-col min-w-0 rounded-[12px] border border-ink/10 bg-card overflow-hidden ${PANE_H}`}>
         <div className="flex items-start justify-between gap-[12px] px-[22px] pt-[16px] pb-[12px]">
           <div className="flex items-baseline gap-[12px] min-w-0">
             <span className="font-display text-[44px] leading-[40px] text-[#f26b1d] shrink-0">P.{slide.page}</span>
-            <span className="font-bold text-[16px] text-white/85 leading-[22px] line-clamp-2 break-keep">{slide.title}</span>
+            <span className="font-bold text-[16px] text-ink/85 leading-[22px] line-clamp-2 break-keep">{slide.title}</span>
           </div>
           {slide.refined ? (
-            <div className="flex shrink-0 gap-[2px] rounded-full bg-white/[0.07] p-[3px]">
+            <div className="flex shrink-0 gap-[2px] rounded-full bg-ink/[0.07] p-[3px]">
               {(
                 [
                   [false, 'AI 정리본'],
@@ -279,7 +280,7 @@ function Rehearsal({
                   type="button"
                   onClick={() => setShowRaw(raw)}
                   className={`h-[26px] px-[12px] rounded-full font-bold text-[12px] whitespace-nowrap transition-colors ${
-                    showRaw === raw ? 'bg-[#ede6d6] text-[#15110d]' : 'text-white/55 hover:text-white'
+                    showRaw === raw ? 'bg-sel text-selInk' : 'text-ink/55 hover:text-ink'
                   }`}
                 >
                   {label}
@@ -287,35 +288,35 @@ function Rehearsal({
               ))}
             </div>
           ) : (
-            refining && <span className="shrink-0 font-medium text-[12px] text-white/45 pt-[6px]">읽기 좋게 정리하는 중···</span>
+            refining && <span className="shrink-0 font-medium text-[12px] text-ink/45 pt-[6px]">읽기 좋게 정리하는 중···</span>
           )}
         </div>
         <div className="flex-1 overflow-auto px-[22px] pb-[18px] [scrollbar-width:thin] [scrollbar-color:rgba(255,255,255,0.15)_transparent]">
           <SlideImage key={slide.page} presentationId={presentationId} page={slide.page} />
           <SlideText raw={slide.text} refined={slide.refined} pending={refining} dark showRaw={showRaw} />
           {slide.refined && !showRaw && (
-            <p className="mt-[14px] font-medium text-[12px] text-white/40 break-keep">
+            <p className="mt-[14px] font-medium text-[12px] text-ink/40 break-keep">
               AI 가 PDF 글자를 읽기 좋게 다시 정리했어요. 검색과 답변에는 원문을 씁니다.
             </p>
           )}
         </div>
-        <div className="flex items-center justify-between border-t border-white/10 px-[14px] py-[10px]">
+        <div className="flex items-center justify-between border-t border-ink/10 px-[14px] py-[10px]">
           <button
             type="button"
             onClick={() => go(index - 1)}
             disabled={index === 0}
-            className="h-[32px] px-[12px] rounded-[7px] font-bold text-[13px] text-white/70 hover:bg-white/[0.07] hover:text-white disabled:opacity-30"
+            className="h-[32px] px-[12px] rounded-[7px] font-bold text-[13px] text-ink/70 hover:bg-ink/[0.07] hover:text-ink disabled:opacity-30"
           >
             ← 이전
           </button>
-          <span className="font-mono text-[13px] text-white/45">
-            <span className="text-white/85">{index + 1}</span> / {slides.length}
+          <span className="font-mono text-[13px] text-ink/45">
+            <span className="text-ink/85">{index + 1}</span> / {slides.length}
           </span>
           <button
             type="button"
             onClick={() => go(index + 1)}
             disabled={index === slides.length - 1}
-            className="h-[32px] px-[12px] rounded-[7px] font-bold text-[13px] text-white/70 hover:bg-white/[0.07] hover:text-white disabled:opacity-30"
+            className="h-[32px] px-[12px] rounded-[7px] font-bold text-[13px] text-ink/70 hover:bg-ink/[0.07] hover:text-ink disabled:opacity-30"
           >
             다음 →
           </button>
@@ -325,14 +326,14 @@ function Rehearsal({
       {/* 녹음 패널과 정리 결과 */}
       <div className={`flex flex-col gap-[14px] min-w-0 lg:overflow-auto lg:pr-[4px] [scrollbar-width:thin] [scrollbar-color:rgba(255,255,255,0.15)_transparent] ${PANE_H}`}>
         <section
-          className={`flex flex-col gap-[14px] rounded-[12px] border bg-[#0b0907] px-[22px] py-[18px] transition-colors ${
-            listening ? 'border-[#e5322d]/60' : 'border-white/10'
+          className={`flex flex-col gap-[14px] rounded-[12px] border bg-well px-[22px] py-[18px] transition-colors ${
+            listening ? 'border-[#e5322d]/60' : 'border-ink/10'
           }`}
         >
           <div className="flex items-start justify-between gap-[16px]">
             <div className="flex flex-col gap-[8px] min-w-0">
               <div className="flex items-center gap-[10px]">
-                <span className="font-display text-[40px] leading-[38px] tracking-[1px] text-[#ede6d6]">TAKE {take}</span>
+                <span className="font-display text-[40px] leading-[38px] tracking-[1px] text-ink">TAKE {take}</span>
                 {listening && (
                   <span className="flex items-center gap-[6px] rounded-full bg-[#e5322d] px-[9px] h-[22px] font-bold text-[12px] text-white">
                     <span className="size-[6px] rounded-full bg-white tally-pulse" />
@@ -340,7 +341,7 @@ function Rehearsal({
                   </span>
                 )}
               </div>
-              <p className="font-normal text-[13px] text-white/55 leading-[20px] max-w-[380px] break-keep">
+              <p className="font-normal text-[13px] text-ink/55 leading-[20px] max-w-[380px] break-keep">
                 이 슬라이드를 실제로 발표하듯 설명해보세요. 슬라이드에 없는 이유, 예시, 배경이 모일수록 답이 깊어져요.
               </p>
             </div>
@@ -363,21 +364,21 @@ function Rehearsal({
                   }`}
                 />
               </button>
-              <span className={`font-mono font-bold text-[14px] ${listening ? 'text-[#ede6d6]' : 'text-white/40'}`}>{clock}</span>
+              <span className={`font-mono font-bold text-[14px] ${listening ? 'text-ink' : 'text-ink/40'}`}>{clock}</span>
             </div>
           </div>
-          <div className="h-px bg-white/10" />
+          <div className="h-px bg-ink/10" />
           <textarea
             value={transcript}
             onChange={(e) => setTranscript(e.target.value)}
             placeholder="녹음 버튼을 누르고 말하면 여기에 쌓여요. 직접 적거나 고쳐도 됩니다."
-            className="min-h-[150px] w-full resize-y bg-transparent font-medium text-[16px] leading-[26px] text-[#ede6d6] caret-[#f26b1d] outline-none placeholder:text-white/30"
+            className="min-h-[150px] w-full resize-y bg-transparent font-medium text-[16px] leading-[26px] text-ink caret-[#f26b1d] outline-none placeholder:text-ink/30"
           />
-          {partial && <p className="font-medium text-[15px] leading-[24px] text-white/40">{partial}</p>}
+          {partial && <p className="font-medium text-[15px] leading-[24px] text-ink/40">{partial}</p>}
         </section>
 
         <div className="flex items-center justify-between gap-[12px]">
-          <span className="font-medium text-[12px] text-white/40">
+          <span className="font-medium text-[12px] text-ink/40">
             {transcript.trim() ? `${transcript.trim().length}자` : ''}
           </span>
           <button
@@ -389,8 +390,8 @@ function Rehearsal({
             {busy ? 'AI가 정리하는 중···' : '정리하기 →'}
           </button>
         </div>
-        {error && <p className="font-medium text-[13px] text-[#ff7a70]">{error}</p>}
-        {savedMsg && <p className="font-medium text-[13px] text-[#7ee2a0]">{savedMsg}</p>}
+        {error && <p className="font-medium text-[13px] text-err">{error}</p>}
+        {savedMsg && <p className="font-medium text-[13px] text-ok">{savedMsg}</p>}
         {items && (
           <Review
             items={items}
@@ -421,7 +422,7 @@ function SlideImage({ presentationId, page }: { presentationId: string; page: nu
       src={`${API_URL}/api/slides/${presentationId}/${page}.png`}
       alt={`${page}번 슬라이드`}
       onError={() => setFailed(true)}
-      className="mb-[16px] w-full rounded-[6px] border border-white/10 bg-[#f5f5f4]"
+      className="mb-[16px] w-full rounded-[6px] border border-ink/10 bg-[#f5f5f4]"
     />
   );
 }
@@ -445,7 +446,7 @@ function FilmStrip({
     activeRef.current?.scrollIntoView({ block: 'nearest', inline: 'nearest', behavior: 'smooth' });
   }, [index]);
   return (
-    <nav aria-label="슬라이드" className={`overflow-auto [scrollbar-width:none] rounded-[10px] border border-white/10 bg-[#0b0907] ${PANE_H}`}>
+    <nav aria-label="슬라이드" className={`overflow-auto [scrollbar-width:none] rounded-[10px] border border-ink/10 bg-well ${PANE_H}`}>
       <div className="film-reel flex lg:flex-col gap-[14px] w-max lg:w-auto px-[14px] py-[22px] lg:px-[22px] lg:py-[14px]">
         {slides.map((s, i) => {
           const on = i === index;
@@ -458,7 +459,7 @@ function FilmStrip({
               onClick={() => onPick(i)}
               title={s.title}
               className={`group flex w-[128px] shrink-0 flex-col gap-[6px] rounded-[6px] p-[5px] text-left transition-colors ${
-                on ? 'bg-[#ede6d6]' : 'hover:bg-white/[0.07]'
+                on ? 'bg-sel' : 'hover:bg-ink/[0.07]'
               }`}
             >
               <div
@@ -475,14 +476,14 @@ function FilmStrip({
                 />
               </div>
               <div className="flex items-center justify-between gap-[4px] px-[2px]">
-                <span className={`font-mono font-bold text-[11px] ${on ? 'text-[#f26b1d]' : 'text-white/55'}`}>p.{s.page}</span>
+                <span className={`font-mono font-bold text-[11px] ${on ? 'text-[#f26b1d]' : 'text-ink/55'}`}>p.{s.page}</span>
                 {n > 0 && (
                   <span className="rounded-full bg-[#2f7a47] px-[7px] font-bold text-[10px] leading-[16px] text-white">설명 {n}</span>
                 )}
               </div>
               <span
                 className={`px-[2px] font-bold text-[12px] leading-[16px] line-clamp-2 break-keep ${
-                  on ? 'text-[#15110d]' : 'text-white/75'
+                  on ? 'text-selInk' : 'text-ink/75'
                 }`}
               >
                 {s.title}
@@ -503,6 +504,14 @@ function DocInput({ presentationId, onSaved }: { presentationId: string; onSaved
   const [error, setError] = useState<string | null>(null);
   const [savedMsg, setSavedMsg] = useState<string | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
+
+  // 입력칸에 파일을 끌어다 놓으면 "파일로 올리기" 와 똑같이 정리한다. 정리하는 중에는 받지 않는다.
+  const { dragging, bind } = useFileDrop({
+    accept: ['.txt', '.md', '.pdf'],
+    onFile: organizeFile,
+    onReject: (f) => setError(`${f.name} 은(는) 올릴 수 없어요. txt, md, pdf 파일만 됩니다.`),
+    disabled: busy,
+  });
 
   async function organizeText() {
     setBusy(true);
@@ -544,22 +553,30 @@ function DocInput({ presentationId, onSaved }: { presentationId: string; onSaved
             type="button"
             onClick={() => setSource(s)}
             className={`h-[36px] px-[16px] rounded-[8px] font-bold text-[13px] transition-colors ${
-              source === s ? 'bg-[#ede6d6] text-[#15110d]' : 'border border-white/20 text-white/65 hover:text-white'
+              source === s ? 'bg-sel text-selInk' : 'border border-ink/20 text-ink/65 hover:text-ink'
             }`}
           >
             {SOURCE_LABEL[s]}
           </button>
         ))}
-        <span className="font-normal text-[13px] text-white/50 break-keep">
+        <span className="font-normal text-[13px] text-ink/50 break-keep">
           {source === 'script' ? '발표할 때 읽는 대본' : '기획서, 보고서, README 같은 프로젝트 설명'}
         </span>
       </div>
-      <textarea
-        value={text}
-        onChange={(e) => setText(e.target.value)}
-        placeholder="내용을 붙여넣으세요. 슬라이드에 이미 있는 말은 자동으로 걸러집니다."
-        className="border border-white/12 bg-[#1c1713] min-h-[220px] px-[18px] py-[16px] rounded-[10px] text-[15px] text-white/90 leading-[25px] outline-none resize-y placeholder:text-white/30"
-      />
+      <div {...bind} className="relative flex flex-col">
+        <textarea
+          value={text}
+          onChange={(e) => setText(e.target.value)}
+          placeholder="내용을 붙여넣거나, 파일(txt, md, pdf)을 여기로 끌어다 놓으세요. 슬라이드에 이미 있는 말은 자동으로 걸러집니다."
+          className="border border-ink/12 bg-card min-h-[220px] px-[18px] py-[16px] rounded-[10px] text-[15px] text-ink/90 leading-[25px] outline-none resize-y placeholder:text-ink/30"
+        />
+        {/* 끄는 동안만 덮는다. pointer-events-none 이라 끌기 이벤트는 아래 칸이 그대로 받는다 */}
+        {dragging && (
+          <div className="pointer-events-none absolute inset-0 flex items-center justify-center rounded-[10px] border-2 border-dashed border-[#f26b1d] bg-[#f26b1d]/10">
+            <p className="font-bold text-[16px] text-[#f26b1d]">여기에 놓으면 파일로 정리해요</p>
+          </div>
+        )}
+      </div>
       <div className="flex justify-between items-center">
         <div className="flex gap-[8px] items-center">
           <input
@@ -577,10 +594,11 @@ function DocInput({ presentationId, onSaved }: { presentationId: string; onSaved
             type="button"
             onClick={() => fileRef.current?.click()}
             disabled={busy}
-            className="h-[38px] px-[16px] rounded-[8px] border border-white/20 font-bold text-[13px] text-white/70 hover:border-white/45 disabled:opacity-40"
+            className="h-[38px] px-[16px] rounded-[8px] border border-ink/20 font-bold text-[13px] text-ink/70 hover:border-ink/45 disabled:opacity-40"
           >
             파일로 올리기 (txt, md, pdf)
           </button>
+          <span className="font-normal text-[12px] text-ink/45 break-keep">또는 입력칸으로 끌어다 놓기</span>
         </div>
         <button
           type="button"
@@ -591,8 +609,8 @@ function DocInput({ presentationId, onSaved }: { presentationId: string; onSaved
           {busy ? 'AI가 정리하는 중···' : '정리하기 →'}
         </button>
       </div>
-      {error && <p className="font-medium text-[13px] text-[#ff7a70]">{error}</p>}
-      {savedMsg && <p className="font-medium text-[13px] text-[#7ee2a0]">{savedMsg}</p>}
+      {error && <p className="font-medium text-[13px] text-err">{error}</p>}
+      {savedMsg && <p className="font-medium text-[13px] text-ok">{savedMsg}</p>}
       {items && (
         <Review
           items={items}
@@ -655,32 +673,32 @@ function Review({
     return (
       <label
         key={i}
-        className={`rise-in flex cursor-pointer gap-[12px] items-start rounded-[10px] border bg-[#1c1713] px-[14px] py-[12px] transition-colors hover:bg-[#241e18] ${
-          fact ? 'border-[#f26b1d]/60' : quiet ? 'border-white/10' : 'border-[#58d68d]/35'
+        className={`rise-in flex cursor-pointer gap-[12px] items-start rounded-[10px] border bg-card px-[14px] py-[12px] transition-colors hover:bg-cardHover ${
+          fact ? 'border-[#f26b1d]/60' : quiet ? 'border-ink/10' : 'border-[#58d68d]/35'
         }`}
       >
         <input type="checkbox" checked={!!it.checked} onChange={() => toggle(i)} className="sr-only" />
         <span
           aria-hidden
           className={`mt-[1px] grid size-[20px] shrink-0 place-items-center rounded-[5px] text-[13px] font-black transition-colors ${
-            it.checked ? 'bg-[#f26b1d] text-white' : 'border border-white/25 text-transparent'
+            it.checked ? 'bg-[#f26b1d] text-white' : 'border border-ink/25 text-transparent'
           }`}
         >
           ✓
         </span>
         <div className="flex flex-col gap-[4px] min-w-0">
           <div className="flex flex-wrap gap-x-[8px] gap-y-[2px] items-center">
-            <span className={`font-bold text-[12px] ${fact ? 'text-[#ff9a5c]' : quiet ? 'text-white/45' : 'text-[#7ee2a0]'}`}>
+            <span className={`font-bold text-[12px] ${fact ? 'text-warn' : quiet ? 'text-ink/45' : 'text-ok'}`}>
               {it.dup ? '이미 저장됨' : KIND_LABEL[it.kind]}
             </span>
-            <span className="font-mono font-bold text-[11px] text-white/40">{it.page ? `p.${it.page}` : '전체'}</span>
+            <span className="font-mono font-bold text-[11px] text-ink/40">{it.page ? `p.${it.page}` : '전체'}</span>
             {fact && (
-              <span className="font-medium text-[12px] text-[#ff9a5c]/85 break-keep">
+              <span className="font-medium text-[12px] text-warn/85 break-keep">
                 슬라이드에 없는 내용이에요{it.new_numbers.length ? ` (${it.new_numbers.join(', ')})` : ''}. 맞는지 확인해주세요
               </span>
             )}
           </div>
-          <span className={`font-medium text-[15px] leading-[23px] break-keep ${quiet ? 'text-white/50' : 'text-white/90'}`}>
+          <span className={`font-medium text-[15px] leading-[23px] break-keep ${quiet ? 'text-ink/50' : 'text-ink/90'}`}>
             {it.text}
           </span>
         </div>
@@ -691,13 +709,13 @@ function Review({
   return (
     <div className="flex flex-col gap-[10px] pt-[4px]">
       <div className="flex flex-wrap items-baseline gap-x-[12px] gap-y-[2px]">
-        <p className="font-black text-[18px] text-white">
+        <p className="font-black text-[18px] text-ink">
           새로 저장될 설명 <span className="font-mono text-[#f26b1d]">{main.length}</span>
         </p>
-        <p className="font-medium text-[13px] text-white/45">슬라이드에 이미 있는 말과 저장된 설명은 걸렀어요</p>
+        <p className="font-medium text-[13px] text-ink/45">슬라이드에 이미 있는 말과 저장된 설명은 걸렀어요</p>
       </div>
       {main.length === 0 && (
-        <p className="rounded-[10px] border border-dashed border-white/15 px-[14px] py-[14px] text-center font-medium text-[14px] text-white/50">
+        <p className="rounded-[10px] border border-dashed border-ink/15 px-[14px] py-[14px] text-center font-medium text-[14px] text-ink/50">
           슬라이드에 없는 새 설명이 없었어요. 이유나 예시를 더 말해보세요.
         </p>
       )}
@@ -706,21 +724,21 @@ function Review({
         <button
           type="button"
           onClick={() => setShowHidden((v) => !v)}
-          className="self-start font-bold text-[13px] text-white/50 hover:text-white/80"
+          className="self-start font-bold text-[13px] text-ink/50 hover:text-ink/80"
         >
           {showHidden ? '▾' : '▸'} 걸러진 문장 {hidden.length} (슬라이드 반복, 중복, 군말)
         </button>
       )}
       {showHidden && hidden.map(row)}
       <div className="flex flex-wrap justify-between items-center gap-[10px] pt-[4px]">
-        <span className="font-normal text-[12px] text-white/40 break-keep">
+        <span className="font-normal text-[12px] text-ink/40 break-keep">
           슬라이드 반복은 답변 근거가 아니라 질문을 찾는 표현으로만 저장돼요.
         </span>
         <button
           type="button"
           onClick={save}
           disabled={busy || count === 0}
-          className="cta h-[42px] px-[20px] rounded-[8px] bg-[#ede6d6] font-bold text-[15px] text-[#15110d] disabled:opacity-40"
+          className="cta h-[42px] px-[20px] rounded-[8px] bg-sel font-bold text-[15px] text-selInk disabled:opacity-40"
         >
           {busy ? '저장 중···' : `체크한 ${count}개 저장`}
         </button>
@@ -756,12 +774,12 @@ function Saved({
 
   return (
     <div className="flex flex-col gap-[16px] w-full max-w-[900px] mx-auto">
-      <label className="flex gap-[8px] items-center justify-center font-medium text-[13px] text-white/55 cursor-pointer">
+      <label className="flex gap-[8px] items-center justify-center font-medium text-[13px] text-ink/55 cursor-pointer">
         <input type="checkbox" checked={showRepeat} onChange={() => setShowRepeat((v) => !v)} className="accent-[#f26b1d]" />
         검색용 표현(슬라이드 반복)도 보기
       </label>
       {groups.size === 0 && (
-        <p className="rounded-[10px] border border-dashed border-white/15 px-[14px] py-[18px] text-center font-medium text-[14px] text-white/50">
+        <p className="rounded-[10px] border border-dashed border-ink/15 px-[14px] py-[18px] text-center font-medium text-[14px] text-ink/50">
           아직 저장된 설명이 없어요. 리허설 녹음이나 대본으로 모아보세요.
         </p>
       )}
@@ -769,28 +787,28 @@ function Saved({
         .sort((a, b) => (a[0] || 999) - (b[0] || 999))
         .map(([p, list]) => (
           <div key={p} className="flex flex-col gap-[8px]">
-            <p className="font-bold text-[15px] text-white break-keep">
+            <p className="font-bold text-[15px] text-ink break-keep">
               {p ? <span className="font-mono text-[#f26b1d] mr-[6px]">p.{p}</span> : null}
               {p ? (slides.find((s) => s.page === p)?.title ?? '') : title(p)}
             </p>
             {list.map((n) => (
               <div
                 key={n.id}
-                className="group flex gap-[12px] items-start rounded-[10px] border border-white/10 bg-[#1c1713] px-[16px] py-[12px] transition-colors hover:bg-[#241e18]"
+                className="group flex gap-[12px] items-start rounded-[10px] border border-ink/10 bg-card px-[16px] py-[12px] transition-colors hover:bg-cardHover"
               >
                 <span
                   className={`font-bold text-[12px] shrink-0 mt-[2px] w-[74px] ${
-                    n.kind === 'fact' ? 'text-[#ff9a5c]' : n.kind === 'repeat' ? 'text-white/40' : 'text-[#7ee2a0]'
+                    n.kind === 'fact' ? 'text-warn' : n.kind === 'repeat' ? 'text-ink/40' : 'text-ok'
                   }`}
                 >
                   {KIND_LABEL[n.kind]}
                 </span>
-                <span className="flex-1 font-medium text-[15px] text-white/90 leading-[23px] break-keep">{n.text}</span>
-                <span className="font-medium text-[12px] text-white/40 shrink-0 mt-[2px]">{SOURCE_LABEL[n.source]}</span>
+                <span className="flex-1 font-medium text-[15px] text-ink/90 leading-[23px] break-keep">{n.text}</span>
+                <span className="font-medium text-[12px] text-ink/40 shrink-0 mt-[2px]">{SOURCE_LABEL[n.source]}</span>
                 <button
                   type="button"
                   onClick={() => remove(n.id)}
-                  className="font-bold text-[12px] text-white/35 hover:text-[#ff7a70] shrink-0 mt-[2px]"
+                  className="font-bold text-[12px] text-ink/35 hover:text-err shrink-0 mt-[2px]"
                 >
                   지우기
                 </button>

@@ -1,3 +1,5 @@
+import { useTheme } from '../theme';
+
 interface RecognizedQuestionProps {
   partialText: string;
   finalText: string;
@@ -21,27 +23,30 @@ export function RecognizedQuestion({
 }: RecognizedQuestionProps) {
   const text = isConfirmed ? finalText : partialText;
   const waiting = !listening && !isConfirmed;
+  const light = useTheme().theme === 'light';
 
   return (
-    // 실전 화면과 같은 검은 무대. 질문을 받아 적는 동안 가운데에 크게 보여준다.
-    <div className="relative flex flex-1 flex-col items-center justify-center pb-[36px] pt-[32px] px-[16px] sm:px-[44px] w-full bg-[#15110d] overflow-hidden">
+    // 실전 화면과 같은 무대(다크는 검은 무대, 라이트는 종이). 질문을 받아 적는 동안 가운데에 크게 보여준다.
+    <div className="relative flex flex-1 flex-col items-center justify-center pb-[36px] pt-[32px] px-[16px] sm:px-[44px] w-full bg-page overflow-hidden">
       <div
         className="pointer-events-none absolute inset-0"
-        style={{ background: 'radial-gradient(1100px 520px at 50% -120px, rgba(255,181,71,0.13), transparent 70%)' }}
+        style={{
+          background: `radial-gradient(1100px 520px at 50% -120px, rgba(255,181,71,${light ? 0.28 : 0.13}), transparent 70%)`,
+        }}
       />
       <div className="relative flex flex-col gap-[18px] items-center text-center w-full max-w-[1100px]">
-        <p className={`font-bold text-[15px] ${listening ? 'text-[#ff7a70]' : 'text-white/55'}`}>
+        <p className={`font-bold text-[15px] ${listening ? (light ? 'text-[#bf382e]' : 'text-[#ff7a70]') : 'text-ink/55'}`}>
           {listening ? '질문을 듣고 있어요' : isConfirmed ? '이 질문으로 찾고 있어요' : '질문 대기'}
         </p>
 
         {waiting ? (
-          <p className="font-black text-[38px] sm:text-[44px] tracking-[-1.4px] leading-[1.3] text-white/85 break-keep">
+          <p className="font-black text-[38px] sm:text-[44px] tracking-[-1.4px] leading-[1.3] text-ink/85 break-keep">
             {missed ? '말을 알아듣지 못했어요. 다시 들어볼까요?' : '질문이 시작되면 마이크를 켜세요'}
           </p>
         ) : (
           <p
             className={`font-black text-[38px] sm:text-[44px] tracking-[-1.4px] leading-[1.3] w-full break-keep ${
-              isConfirmed ? 'text-white' : 'text-white/50'
+              isConfirmed ? 'text-ink' : 'text-ink/50'
             }`}
           >
             {text || '말씀하시면 여기에 받아 적어요···'}
@@ -77,7 +82,7 @@ export function RecognizedQuestion({
           </button>
         )}
 
-        <p className="font-normal text-[13px] text-white/40 break-keep">
+        <p className="font-normal text-[13px] text-ink/40 break-keep">
           {listening
             ? '말이 잠깐 끊겨도 계속 받아 적어요. 질문이 다 끝나면 눌러주세요. "어", "음" 같은 군말은 빼고 찾아요.'
             : isConfirmed

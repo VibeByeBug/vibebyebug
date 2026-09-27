@@ -310,6 +310,25 @@ function App() {
     setScreen('upload');
   }
 
+  // 발표 마치기: 청중 화면(있으면)을 내리고, 지금 발표 상태를 지운 뒤 처음 화면으로 돌아간다.
+  // 마이크는 화면이 'hud' 를 벗어나면 위 useEffect(146줄)가 자동으로 꺼준다.
+  function finishPresentation() {
+    if (!window.confirm('발표를 마칠까요? 처음 화면으로 돌아갑니다.')) return;
+    clearAudience();
+    setUpload(null);
+    setScreen('start');
+  }
+
+  const finishButton = (
+    <button
+      type="button"
+      onClick={finishPresentation}
+      className="border border-[#e5e7eb] h-[32px] px-[12px] rounded-[6px] font-bold text-[13px] text-[#6b7280] whitespace-nowrap"
+    >
+      발표 마치기
+    </button>
+  );
+
   // 헤더의 이동. 로그인한 상태에서 'login' 으로 가는 건 로그아웃이다(랜딩으로 돌아간다).
   function navigate(target: ScreenName) {
     if (target === 'login' && loggedIn) {
@@ -321,7 +340,7 @@ function App() {
   }
 
   return (
-    <div className="theme-dark flex flex-col min-h-screen w-full bg-[#15110d] text-[#f5f5f4]">
+    <div className="flex flex-col min-h-screen w-full">
       {screen === 'login' && (
         <Login
           onLogin={() => {
@@ -473,7 +492,6 @@ function App() {
         <>
           <Header
             onNavigate={navigate}
-            dark
             compact
             listening={listening}
             label="Space 로 질문 듣기"
@@ -514,7 +532,6 @@ function App() {
         <>
           <Header
             onNavigate={navigate}
-            dark
             cueKey={cueNo}
             compact
             listening={listening}
@@ -525,6 +542,7 @@ function App() {
                 {micToggle}
                 {graphButton}
                 {materialButton}
+                {finishButton}
               </>
             }
             showProfile={false}

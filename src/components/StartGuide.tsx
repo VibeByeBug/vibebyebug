@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import type { FlowStep } from '../types/qa';
 import { FlowSteps } from './Hud';
+import { useTheme } from '../theme';
 
 // 시작 화면 아래 소개 무대. 스크롤해서 무대가 보이면 커튼이 양옆으로 걷히고,
 // 어떤 사이트인지와 사용 방법이 차례로 나온다.
@@ -9,19 +10,19 @@ const SCENES = [
   {
     no: '01',
     title: '대본 입고',
-    what: '발표자료(PDF)를 올려요.',
-    detail: '글자가 없는 이미지 슬라이드도 읽고, 흩어진 표와 카드를 읽기 좋게 정리해요.',
+    what: '발표자료(PDF)를 올려주세요.',
+    detail: '글자가 없는 이미지 슬라이드도 읽고, 흩어진 표와 카드를 읽기 좋게 정리할게요.',
   },
   {
     no: '02',
     title: '리허설',
-    what: '발표하듯 말하거나 대본, 설명 자료를 올려요.',
-    detail: '슬라이드에 이미 있는 말은 거르고, 슬라이드에 없는 이유와 배경만 모아요.',
+    what: '대본과 설명 자료를 올리고, 발표하듯 말하거나 글로 연습해보세요.',
+    detail: '슬라이드에 이미 있는 말은 걸러내고, 슬라이드에 없는 이유와 배경만 모아요.',
   },
   {
     no: '03',
     title: 'ON AIR',
-    what: '청중 질문을 들으면 바로 띄워요.',
+    what: '청중의 질문을 들으면 바로 답변을 띄워드려요.',
     detail: '근거 슬라이드는 1초 안에 뜨고, 추천 답변은 2~4초, 말할 순서는 그 뒤에 이어서 떠요.',
   },
   {
@@ -38,9 +39,9 @@ const DEMO_STEPS: FlowStep[] = [
     text: '근거부터 1초 안에',
     slide: 6,
     keys: ['근거 슬라이드', '1초'],
-    detail: '질문을 듣고 화면으로 눈을 돌리는 시간이 1초라, 근거 슬라이드를 먼저 띄우고 답변은 이어서 채웁니다.',
+    detail: '질문을 듣고 화면으로 눈을 돌리는 시간인 1초 내에, 근거 슬라이드를 먼저 띄우고 답변은 이어서 채웁니다.',
     link: '그래서',
-    why: '먼저 띄울 것을 고른 기준',
+    why: '우선 순위의 기준',
   },
   {
     text: '빠른 하이브리드 검색',
@@ -61,6 +62,8 @@ const DEMO_STEPS: FlowStep[] = [
 export function StartGuide({ onStart }: { onStart: () => void }) {
   const stage = useRef<HTMLDivElement>(null);
   const [open, setOpen] = useState(false);
+  // 라이트 모드: 무대 바닥은 종이, 글자는 잉크. 커튼과 필름 스트립, 장면 카드는 소품이라 그대로 둔다.
+  const light = useTheme().theme === 'light';
 
   // 무대가 화면에 30% 이상 들어오면 커튼을 걷는다. 한 번 걷히면 그대로 둔다.
   useEffect(() => {
@@ -86,7 +89,7 @@ export function StartGuide({ onStart }: { onStart: () => void }) {
     <section
       id="how-it-works"
       ref={stage}
-      className={`curtain-stage relative overflow-hidden bg-[#15110d] text-white ${open ? 'open' : ''}`}
+      className={`curtain-stage relative overflow-hidden bg-page text-ink ${open ? 'open' : ''}`}
     >
       <div className="curtain-valance" />
       <div className="curtain curtain-left" />
@@ -95,8 +98,9 @@ export function StartGuide({ onStart }: { onStart: () => void }) {
       <div
         className="pointer-events-none absolute inset-0"
         style={{
-          background:
-            'radial-gradient(900px 520px at 50% 60px, rgba(255,181,71,0.14), transparent 70%), radial-gradient(1000px 260px at 50% 100%, rgba(242,107,29,0.14), transparent 70%)',
+          background: light
+            ? 'radial-gradient(900px 520px at 50% 60px, rgba(255,181,71,0.30), transparent 70%), radial-gradient(1000px 260px at 50% 100%, rgba(220,74,30,0.10), transparent 70%)'
+            : 'radial-gradient(900px 520px at 50% 60px, rgba(255,181,71,0.14), transparent 70%), radial-gradient(1000px 260px at 50% 100%, rgba(242,107,29,0.14), transparent 70%)',
         }}
       />
 
@@ -106,14 +110,14 @@ export function StartGuide({ onStart }: { onStart: () => void }) {
           <p className="font-black text-[44px] tracking-[-1.4px] leading-[56px] break-keep">
             발표 Q&amp;A 를 촬영하듯 준비하세요
           </p>
-          <p className="font-normal text-[17px] leading-[29px] text-white/70 break-keep">
-            Ready-Q 는 발표자료와 대본, 설명 자료를 미리 읽어두었다가 청중 질문이 들어오면 근거 슬라이드와 말할 순서를
+          <p className="font-normal text-[17px] leading-[29px] text-ink/70 break-keep">
+            Ready-Q 는 발표자료와 대본, 설명 자료를 미리 RAG 지식베이스를 통해 저장해두고, 청중 질문이 들어오면 순서 구조도와 추천 답변을
             바로 띄워주는 발표 Q&amp;A 프롬프터예요. 자료에 없는 내용은 지어내지 않고, 추론한 답은 따로 표시해요.
           </p>
         </div>
 
         {/* 사용 방법 4단계: 필름 스트립 칸 */}
-        <div className="reveal w-full max-w-[1200px] bg-[#0b0907] rounded-[8px] px-[12px] py-[10px] flex flex-col gap-[10px]" style={delay(900)}>
+        <div className="reveal w-full max-w-[1200px] bg-[#0b0907] text-white rounded-[8px] px-[12px] py-[10px] flex flex-col gap-[10px]" style={delay(900)}>
           <div className="film-holes text-white/20" />
           <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-[10px]">
             {SCENES.map((s, i) => (
@@ -136,17 +140,17 @@ export function StartGuide({ onStart }: { onStart: () => void }) {
         <div className="reveal flex flex-col items-center gap-[22px] w-full max-w-[1200px] mt-[72px]" style={delay(1600)}>
           <div className="flex flex-col items-center gap-[10px] text-center">
             <p className="font-black text-[34px] tracking-[-1px] break-keep">실전에서는 이렇게 떠요</p>
-            <p className="font-normal text-[16px] text-white/60 break-keep">
+            <p className="font-normal text-[16px] text-ink/60 break-keep">
               청중이 “응답 시간을 지키려고 어떤 선택을 했나요?” 라고 물으면, 질문이 끝나고 말할 순서가 칸으로 떠요.
             </p>
           </div>
-          <FlowSteps steps={DEMO_STEPS} dark />
+          <FlowSteps steps={DEMO_STEPS} dark={!light} />
         </div>
 
         <button
           type="button"
           onClick={onStart}
-          className="reveal cta bg-[#f26b1d] hover:bg-[#e25c10] h-[58px] px-[34px] rounded-[10px] font-bold text-[18px]"
+          className="reveal cta bg-[#f26b1d] hover:bg-[#e25c10] text-white h-[58px] px-[34px] rounded-[10px] font-bold text-[18px]"
           style={delay(1800)}
         >
           새 발표 준비하기

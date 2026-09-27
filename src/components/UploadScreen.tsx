@@ -1,5 +1,6 @@
 import { useRef, useState } from 'react';
 import { uploadPdf, type UploadResult } from '../api';
+import { useFileDrop } from '../hooks/useFileDrop';
 import { DocumentIcon, RefreshIcon, SearchIcon, ImageIcon, WarningIcon, CheckIcon } from './icons';
 
 interface UploadScreenProps {
@@ -13,12 +14,26 @@ interface UploadScreenProps {
 export function UploadScreen({ onSkip, onStartMock, onAddMaterial, onUploaded, onUploadFail }: UploadScreenProps) {
   const [fileName, setFileName] = useState<string | null>(null);
   const [result, setResult] = useState<UploadResult | null>(null);
+  const [dropError, setDropError] = useState<string | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
+  const uploading = !!fileName && !result;
 
-  async function handleFileChange(e: React.ChangeEvent<HTMLInputElement>) {
+  // 폴더나 바탕화면에서 끌어다 놓아도 클릭해서 고른 것과 똑같이 올린다. 올리는 중에는 받지 않는다.
+  const { dragging, bind } = useFileDrop({
+    accept: ['.pdf'],
+    onFile: upload,
+    onReject: (f) => setDropError(`${f.name} 은(는) 올릴 수 없어요. PDF 파일만 됩니다.`),
+    disabled: uploading,
+  });
+
+  function handleFileChange(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
     e.target.value = ''; // 같은 파일을 다시 골라도 change 가 오게
-    if (!file) return;
+    if (file) upload(file);
+  }
+
+  async function upload(file: File) {
+    setDropError(null);
     setFileName(file.name);
     setResult(null);
     try {
@@ -37,7 +52,8 @@ export function UploadScreen({ onSkip, onStartMock, onAddMaterial, onUploaded, o
   const textSlides = result ? result.slides - captioned.length : 0;
 
   return (
-    <div className="flex flex-1 items-center justify-center py-[44px] w-full">
+    // 화면 전체가 놓을 자리다. 가운데 점선 칸을 정확히 겨냥하지 않아도 된다.
+    <div {...bind} className="flex flex-1 items-center justify-center py-[44px] w-full">
       <input ref={inputRef} type="file" accept=".pdf" onChange={handleFileChange} className="hidden" />
       <div className="flex flex-col gap-[26px] w-full max-w-[880px] px-[16px]">
         <div className="flex flex-col gap-[7px] items-center text-center w-full">
@@ -47,26 +63,36 @@ export function UploadScreen({ onSkip, onStartMock, onAddMaterial, onUploaded, o
           <p className="font-normal text-[15px] text-[#6b7280] w-full">PDF, 최대 50MB</p>
         </div>
 
+        {dropError && <p className="font-medium text-[14px] text-[#bf382e] text-center w-full">{dropError}</p>}
+
         {!fileName ? (
           <button
             type="button"
             onClick={() => inputRef.current?.click()}
-            className="border border-dashed border-[#e5e7eb] flex items-center justify-center px-[26px] py-[40px] rounded-[6px] w-full text-[15px] font-medium text-[#6b7280]"
+            className={`border border-dashed flex items-center justify-center px-[26px] py-[40px] rounded-[6px] w-full text-[15px] font-medium transition-colors ${
+              dragging ? 'border-[#f26b1d] bg-[#fff3eb] text-[#f26b1d]' : 'border-[#e5e7eb] text-[#6b7280]'
+            }`}
           >
-            클릭해서 파일을 선택하세요
+            {dragging ? '여기에 놓으면 바로 올라가요' : '클릭하거나, PDF 파일을 여기로 끌어다 놓으세요'}
           </button>
         ) : (
           <>
-            <div className="border border-[#e5e7eb] flex gap-[18px] items-center p-[26px] rounded-[6px] w-full">
+            <div
+              className={`border flex gap-[18px] items-center p-[26px] rounded-[6px] w-full transition-colors ${
+                dragging ? 'border-[#f26b1d] bg-[#fff3eb]' : 'border-[#e5e7eb]'
+              }`}
+            >
               <span className="size-[40px] text-[#1a1a1a] shrink-0">
                 <DocumentIcon />
               </span>
               <div className="flex flex-col flex-1 gap-[5px] min-w-0">
                 <p className="font-bold text-[17px] text-[#1a1a1a] w-full">{fileName}</p>
-                <p className="font-normal text-[14px] text-[#6b7280] w-full">
-                  {result
-                    ? `${result.sizeMb.toFixed(1)}MB, 슬라이드 ${result.slides}장, 업로드 완료`
-                    : '업로드하고 슬라이드를 읽는 중···'}
+                <p className={`font-normal text-[14px] w-full ${dragging ? 'text-[#f26b1d]' : 'text-[#6b7280]'}`}>
+                  {dragging
+                    ? '놓으면 이 파일로 바꿔요'
+                    : result
+                      ? `${result.sizeMb.toFixed(1)}MB, 슬라이드 ${result.slides}장, 업로드 완료`
+                      : '업로드하고 슬라이드를 읽는 중···'}
                 </p>
               </div>
               <button

@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
 import type { SourceCount } from '../settings';
+import { useTheme, type Theme } from '../theme';
 import { MicSmallIcon, WatchIcon } from './icons';
 
 // 설정. 지금 실제로 동작하는 것만 둔다.
@@ -16,6 +17,7 @@ export function SettingsScreen({
 }) {
   const [mic, setMic] = useState<string | null>(null);
   const [needPermission, setNeedPermission] = useState(false);
+  const { theme, setTheme } = useTheme();
 
   const readMic = useCallback(async () => {
     if (!navigator.mediaDevices?.enumerateDevices) {
@@ -53,8 +55,31 @@ export function SettingsScreen({
   return (
     <div className="flex flex-col pb-[44px] pt-[34px] px-[16px] sm:px-[44px] w-full max-w-[1000px] mx-auto">
       <div className="flex flex-col gap-[12px] items-start w-full">
-        <p className="font-black text-[30px] text-white tracking-[-0.8px] w-full text-center">설정</p>
+        <p className="font-black text-[30px] text-ink tracking-[-0.8px] w-full text-center">설정</p>
         <div className="flex flex-col items-start w-full">
+          <Row title="화면 모드" desc="기본은 검은 무대입니다. 밝은 곳에서 보기 편하게 라이트로 바꿀 수 있어요">
+            <div className="flex gap-[8px] items-start">
+              {(
+                [
+                  ['dark', '검은 무대'],
+                  ['light', '라이트'],
+                ] as [Theme, string][]
+              ).map(([value, label]) => (
+                <button
+                  key={value}
+                  type="button"
+                  onClick={() => setTheme(value)}
+                  aria-pressed={theme === value}
+                  className={`flex h-[40px] items-center px-[20px] rounded-[8px] font-bold text-[15px] transition-colors ${
+                    theme === value ? 'bg-[#f26b1d] text-white' : 'border border-ink/20 text-ink/65 hover:text-ink'
+                  }`}
+                >
+                  {label}
+                </button>
+              ))}
+            </div>
+          </Row>
+
           <Row title="근거 표시 개수" desc="실전 화면에 한 번에 보여줄 근거 카드 수. 나머지는 접어 두고 펼쳐서 봅니다">
             <div className="flex gap-[8px] items-start">
               {([3, 5] as const).map((n) => (
@@ -63,7 +88,7 @@ export function SettingsScreen({
                   type="button"
                   onClick={() => onSourceCountChange(n)}
                   className={`flex h-[40px] items-center px-[20px] rounded-[8px] font-bold text-[15px] transition-colors ${
-                    sourceCount === n ? 'bg-[#f26b1d] text-white' : 'border border-white/20 text-white/65 hover:text-white'
+                    sourceCount === n ? 'bg-[#f26b1d] text-white' : 'border border-ink/20 text-ink/65 hover:text-ink'
                   }`}
                 >
                   {n}개
@@ -74,15 +99,15 @@ export function SettingsScreen({
 
           <Row title="마이크" desc="브라우저 음성 인식은 시스템 기본 마이크를 씁니다. 바꾸려면 윈도우 소리 설정에서 기본 장치를 바꿔주세요">
             <div className="flex flex-1 flex-wrap gap-[10px] items-center">
-              <span className="size-[17px] text-white/55 shrink-0">
+              <span className="size-[17px] text-ink/55 shrink-0">
                 <MicSmallIcon />
               </span>
-              <p className="font-medium text-[15px] text-white/85 break-keep">{mic ?? '마이크 권한을 허용하면 장치 이름이 보여요'}</p>
+              <p className="font-medium text-[15px] text-ink/85 break-keep">{mic ?? '마이크 권한을 허용하면 장치 이름이 보여요'}</p>
               {needPermission && (
                 <button
                   type="button"
                   onClick={allowMic}
-                  className="h-[34px] px-[14px] rounded-[8px] border border-white/20 font-bold text-[13px] text-white/75 hover:border-white/45"
+                  className="h-[34px] px-[14px] rounded-[8px] border border-ink/20 font-bold text-[13px] text-ink/75 hover:border-ink/45"
                 >
                   마이크 확인
                 </button>
@@ -92,11 +117,11 @@ export function SettingsScreen({
 
           <Row title="갤럭시 워치" desc="손목에서 질문 유형과 슬라이드 번호 보기">
             <div className="flex flex-1 gap-[10px] items-center">
-              <span className="size-[18px] text-white/35">
+              <span className="size-[18px] text-ink/35">
                 <WatchIcon />
               </span>
               {/* 아직 만들지 않은 기능이다. 연결된 것처럼 보이면 시연에서 거짓말이 된다 */}
-              <p className="font-bold text-[15px] text-white/45 whitespace-nowrap">준비 중</p>
+              <p className="font-bold text-[15px] text-ink/45 whitespace-nowrap">준비 중</p>
             </div>
           </Row>
         </div>
@@ -107,10 +132,10 @@ export function SettingsScreen({
 
 function Row({ title, desc, children }: { title: string; desc: string; children: React.ReactNode }) {
   return (
-    <div className="border-t border-white/10 last:border-b flex flex-wrap gap-[14px] sm:gap-[20px] items-center px-[4px] py-[16px] w-full">
+    <div className="border-t border-ink/10 last:border-b flex flex-wrap gap-[14px] sm:gap-[20px] items-center px-[4px] py-[16px] w-full">
       <div className="flex flex-col gap-[4px] w-full sm:w-[300px]">
-        <p className="font-bold text-[16px] text-white w-full">{title}</p>
-        <p className="font-normal text-[13px] text-white/50 w-full break-keep">{desc}</p>
+        <p className="font-bold text-[16px] text-ink w-full">{title}</p>
+        <p className="font-normal text-[13px] text-ink/50 w-full break-keep">{desc}</p>
       </div>
       {children}
     </div>

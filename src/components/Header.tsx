@@ -1,6 +1,7 @@
 import { useState, type ReactNode } from 'react';
 import type { ScreenName } from '../types/flow';
 import { ChevronDownIcon, ClockIcon, LogoutIcon, MicSmallIcon, SettingsIcon } from './icons';
+import { useTheme } from '../theme';
 
 interface HeaderProps {
   compact?: boolean;
@@ -26,23 +27,26 @@ export function Header({
   activeMenu,
   onNavigate,
   cueKey,
-  dark = true, // 전체 검은 무대 테마. 모든 화면의 헤더가 어둡다.
+  dark,
   guest = false,
 }: HeaderProps) {
   const [menuOpen, setMenuOpen] = useState(false);
+  // 화면이 따로 정해주지 않으면 지금 테마를 따른다 (기본은 검은 무대, 설정에서 라이트로 바꾸면 흰 헤더).
+  const { theme } = useTheme();
+  const isDark = dark ?? theme === 'dark';
 
   return (
     <div className="w-full shrink-0">
     <header
       className={`flex items-center justify-between px-[28px] w-full ${compact ? 'h-[56px]' : 'h-[60px]'} ${
-        dark ? 'bg-[#0b0907]' : 'bg-white'
+        isDark ? 'bg-[#0b0907]' : 'bg-white'
       }`}
     >
       <div className="flex gap-[14px] items-center">
         <button
           type="button"
           onClick={() => onNavigate('start')}
-          className={`logo font-display tracking-[1.5px] whitespace-nowrap leading-none pt-[3px] ${dark ? 'text-white' : 'text-[#111111]'} ${
+          className={`logo font-display tracking-[1.5px] whitespace-nowrap leading-none pt-[3px] ${isDark ? 'text-white' : 'text-[#111111]'} ${
             compact ? 'text-[26px]' : 'text-[28px]'
           }`}
         >
@@ -61,16 +65,16 @@ export function Header({
                 </span>
               </div>
             ) : (
-              <p className={`font-medium text-[14px] whitespace-nowrap ${dark ? 'text-white/55' : 'text-[#6b7280]'}`}>{label}</p>
+              <p className={`font-medium text-[14px] whitespace-nowrap ${isDark ? 'text-white/55' : 'text-[#6b7280]'}`}>{label}</p>
             )}
           </>
         )}
       </div>
 
-      <div className={`flex gap-[14px] items-center ${dark ? 'hdr-dark' : ''}`}>
+      <div className={`flex gap-[14px] items-center ${isDark ? 'hdr-dark' : ''}`}>
         {rightButtons}
         {rightText && (
-          <p className={`font-bold text-[13px] whitespace-nowrap ${dark ? 'text-white/55' : 'text-[#6b7280]'}`}>{rightText}</p>
+          <p className={`font-bold text-[13px] whitespace-nowrap ${isDark ? 'text-white/55' : 'text-[#6b7280]'}`}>{rightText}</p>
         )}
         {guest && (
           <button
@@ -89,13 +93,13 @@ export function Header({
                 type="button"
                 onClick={() => setMenuOpen((v) => !v)}
                 className={`border flex gap-[9px] h-[38px] items-center pl-[6px] pr-[10px] rounded-[6px] ${
-                  dark ? 'border-white/20' : 'border-[#e5e7eb]'
+                  isDark ? 'border-white/20' : 'border-[#e5e7eb]'
                 }`}
               >
                 <span className="bg-[#f3f4f6] border border-[#e5e7eb] flex items-center justify-center rounded-full size-[26px]">
                   <span className="font-bold text-[11px] text-[#6b7280]">사</span>
                 </span>
-                <span className={`font-bold text-[14px] whitespace-nowrap ${dark ? 'text-white' : 'text-[#1a1a1a]'}`}>사용자</span>
+                <span className={`font-bold text-[14px] whitespace-nowrap ${isDark ? 'text-white' : 'text-[#1a1a1a]'}`}>사용자</span>
                 <span className={`size-[14px] text-[#6b7280] transition-transform ${menuOpen ? 'rotate-180' : ''}`}>
                   <ChevronDownIcon />
                 </span>

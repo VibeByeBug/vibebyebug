@@ -1,11 +1,54 @@
 @config "../tailwind.config.js";
 @import "tailwindcss";
 
+/* 모드에 따라 바뀌는 색. 라이트가 기본값이고, body.theme-dark 일 때 무대 색으로 덮는다.
+   page = 바탕, ink = 바탕 위 글자와 선. (tailwind.config.js 의 bg-page, text-ink, border-ink/20 …) */
+:root {
+  --page: #f6efe7; /* Paper */
+  --ink: #111111; /* Slate Ink */
+  --card: #ffffff;
+  --card-hover: #faf6f1;
+  --well: #efe7dc;
+  --sel: #111111;
+  --sel-ink: #f6efe7;
+  --ok: #2f7a47;
+  --err: #bf382e;
+  --warn: #c2410c;
+}
+body.theme-dark {
+  --page: #15110d; /* Stage */
+  --ink: #f8f8f8; /* Chalk */
+  --card: #1e1914;
+  --card-hover: #241e18;
+  --well: #0b0907;
+  --sel: #ede6d6;
+  --sel-ink: #15110d;
+  --ok: #7ee2a0;
+  --err: #ff7a70;
+  --warn: #ff9a5c;
+}
+
 body {
-  background-color: #ffffff;
+  background-color: var(--page);
   font-family: "Noto Sans KR", sans-serif;
   color: #1a1a1a;
 }
+
+/* 라이트 모드 보정: 같은 투명도라도 종이 위 잉크는 무대 위 분필보다 흐려 보인다
+   (예: /35 는 다크에서 대비 3.1, 라이트에서 2.2). 다크와 대비가 같아지도록 라이트에서만 투명도를 올린다.
+   다크는 그대로다. 숫자는 두 모드의 대비를 맞춰 계산한 값. */
+body:not(.theme-dark) .text-ink\/30 { color: color-mix(in oklab, var(--ink) 41%, transparent); }
+body:not(.theme-dark) .text-ink\/35 { color: color-mix(in oklab, var(--ink) 47%, transparent); }
+body:not(.theme-dark) .text-ink\/40 { color: color-mix(in oklab, var(--ink) 53%, transparent); }
+body:not(.theme-dark) .text-ink\/45 { color: color-mix(in oklab, var(--ink) 57%, transparent); }
+body:not(.theme-dark) .text-ink\/50 { color: color-mix(in oklab, var(--ink) 63%, transparent); }
+body:not(.theme-dark) .text-ink\/55 { color: color-mix(in oklab, var(--ink) 67%, transparent); }
+body:not(.theme-dark) .text-ink\/60 { color: color-mix(in oklab, var(--ink) 71%, transparent); }
+body:not(.theme-dark) .text-ink\/65 { color: color-mix(in oklab, var(--ink) 75%, transparent); }
+body:not(.theme-dark) .text-ink\/70 { color: color-mix(in oklab, var(--ink) 79%, transparent); }
+
+/* 라이트 모드일 때(= body 에 theme-dark 가 없을 때) 위 기본값을 그대로 쓴다.
+   무대(다크) 색은 아래 "전체 검은 무대 테마" 구간에서 .theme-dark 로만 들어간다. */
 
 /* ── 슬레이트 컨셉 공통 ─────────────────────────────────────────────
    배경은 흰색, 검정은 슬레이트 줄무늬와 필름 스트립 같은 포인트에만 쓴다. */
@@ -151,11 +194,12 @@ body {
 }
 @keyframes rise-fade { from { opacity: 0; } to { opacity: 1; } }
 
-/* ── 전체 검은 무대 테마 ─────────────────────────────────────────────
+/* ── 검은 무대 테마 (기본값, 설정에서 라이트로 바꿀 수 있다) ────────────
    화면들은 흰 바탕 기준 색(흰 카드, 회색 글자, 회색 테두리)으로 만들어져 있다. 화면 17개를 하나씩 다시
-   칠하는 대신, 앱 맨 바깥(.theme-dark) 아래에서 그 색들을 무대 색으로 바꾼다.
+   칠하는 대신, body 에 .theme-dark 가 붙어 있을 때만(theme.tsx 가 붙였다 뗐다 한다) 그 색들을 무대
+   색으로 바꾼다. 떼면 원래 라이트 색 그대로 보인다.
    Tailwind 유틸리티는 @layer 안에 있어서, 레이어 밖의 이 규칙이 우선한다. */
-body { background-color: #15110d; }
+body.theme-dark { background-color: #15110d; color: #f5f5f4; }
 
 /* 표면 */
 .theme-dark .bg-white { background-color: #1c1713; }
@@ -167,7 +211,7 @@ body { background-color: #15110d; }
 .theme-dark .bg-\[\#fff3eb\], .theme-dark .bg-\[\#fff8f3\], .theme-dark .bg-\[\#fff8f2\],
 .theme-dark .bg-\[\#fff0de\], .theme-dark .bg-\[\#fde3d1\] { background-color: rgba(242, 107, 29, 0.14); }
 .theme-dark .bg-\[\#e8f5ec\], .theme-dark .bg-\[\#f3faf5\] { background-color: rgba(64, 153, 89, 0.16); }
-.theme-dark .bg-\[\#f8f5fe\] { background-color: rgba(124, 92, 191, 0.18); }
+.theme-dark .bg-\[\#f8f5fe\], .theme-dark .bg-\[\#f1ecfb\] { background-color: rgba(124, 92, 191, 0.18); }
 .theme-dark .bg-\[\#fae5e0\] { background-color: rgba(191, 56, 46, 0.18); }
 /* 검은 버튼(선택된 탭, "설명 추가" 등)은 무대 위에서 안 보이므로 주황으로. 슬레이트 판 같은 div 는 그대로 */
 .theme-dark button.bg-\[\#1a1a1a\], .theme-dark button.bg-\[\#111111\] { background-color: #f26b1d; }

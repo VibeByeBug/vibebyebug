@@ -14,8 +14,8 @@ export function AskBar({ onAsk }: { onAsk: (text: string) => void }) {
   }
 
   return (
-    <div className="sticky bottom-0 z-10 w-full bg-gradient-to-t from-[#15110d] via-[#15110d]/95 to-transparent pt-[18px] pb-[18px] px-[16px]">
-      <div className="mx-auto flex max-w-[760px] items-center gap-[8px] rounded-full border border-white/15 bg-[#1e1914] pl-[20px] pr-[6px] py-[6px] focus-within:border-[#f26b1d] transition-colors">
+    <div className="sticky bottom-0 z-10 w-full bg-gradient-to-t from-page via-page/95 to-transparent pt-[18px] pb-[18px] px-[16px]">
+      <div className="mx-auto flex max-w-[760px] items-center gap-[8px] rounded-full border border-ink/15 bg-card pl-[20px] pr-[6px] py-[6px] focus-within:border-[#f26b1d] transition-colors">
         <input
           value={text}
           onChange={(e) => setText(e.target.value)}
@@ -24,7 +24,7 @@ export function AskBar({ onAsk }: { onAsk: (text: string) => void }) {
             if (e.key === 'Enter' && !e.nativeEvent.isComposing) send();
           }}
           placeholder="말 대신 글로 질문하기 (Enter)"
-          className="flex-1 min-w-0 bg-transparent text-[15px] text-white placeholder:text-white/35 outline-none"
+          className="flex-1 min-w-0 bg-transparent text-[15px] text-ink placeholder:text-ink/35 outline-none"
         />
         <button
           type="button"

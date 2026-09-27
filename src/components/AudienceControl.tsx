@@ -25,12 +25,12 @@ export function AudienceControl({
   onClear: () => void;
 }) {
   return (
-    <div className="w-full border-b border-white/10 bg-[#0f0c09]">
+    <div className="w-full border-b border-ink/10 bg-well">
       <div className="mx-auto flex max-w-[1320px] flex-wrap items-center justify-center gap-[8px] px-[16px] py-[8px]">
-        <span className="flex items-center gap-[7px] text-[13px] font-bold text-white/70">
-          <span className={`size-[8px] rounded-full ${open ? (current ? 'bg-[#e5322d] tally-pulse' : 'bg-[#58d68d]') : 'bg-white/25'}`} />
+        <span className="flex items-center gap-[7px] text-[13px] font-bold text-ink/70">
+          <span className={`size-[8px] rounded-full ${open ? (current ? 'bg-[#e5322d] tally-pulse' : 'bg-[#58d68d]') : 'bg-ink/25'}`} />
           청중 화면
-          <span className="font-medium text-white/45">
+          <span className="font-medium text-ink/45">
             {!open ? '닫힘' : current ? `p.${current} 띄우는 중` : '대기 (Q&A 슬레이트)'}
           </span>
         </span>
@@ -46,15 +46,15 @@ export function AudienceControl({
             </button>
             {/* 크롬은 팝업을 막아도 주소창 오른쪽에 작은 표시만 띄워서, 발표자가 안 열린 이유를 모른다 */}
             {blocked && (
-              <span className="text-[13px] font-medium text-[#ff9a5c] break-keep">
+              <span className="text-[13px] font-medium text-warn break-keep">
                 브라우저가 팝업을 막았어요. 주소창 오른쪽의 팝업 차단 표시를 눌러 이 사이트를 허용한 뒤 다시 눌러주세요.
               </span>
             )}
           </>
         ) : (
           <>
-            <span className="mx-[4px] h-[16px] w-px bg-white/15" />
-            {candidates.length === 0 && <span className="text-[13px] text-white/40">띄울 근거 슬라이드가 없어요</span>}
+            <span className="mx-[4px] h-[16px] w-px bg-ink/15" />
+            {candidates.length === 0 && <span className="text-[13px] text-ink/40">띄울 근거 슬라이드가 없어요</span>}
             {candidates.map((c, i) => {
               const on = current === c.page;
               return (
@@ -64,7 +64,7 @@ export function AudienceControl({
                   onClick={() => onSend(i)}
                   title={c.quote}
                   className={`flex h-[30px] items-center gap-[6px] rounded-full border px-[12px] text-[13px] font-bold transition-colors ${
-                    on ? 'border-[#e5322d] bg-[#e5322d] text-white' : 'border-white/20 text-white/80 hover:border-[#f26b1d] hover:text-white'
+                    on ? 'border-[#e5322d] bg-[#e5322d] text-white' : 'border-ink/20 text-ink/80 hover:border-[#f26b1d] hover:text-ink'
                   }`}
                 >
                   <kbd className={`font-display text-[15px] leading-none ${on ? 'text-white' : 'text-[#f26b1d]'}`}>{i + 1}</kbd>
@@ -76,9 +76,9 @@ export function AudienceControl({
               type="button"
               onClick={onClear}
               disabled={!current}
-              className="flex h-[30px] items-center gap-[6px] rounded-full border border-white/20 px-[12px] text-[13px] font-bold text-white/70 hover:border-white/50 disabled:opacity-30"
+              className="flex h-[30px] items-center gap-[6px] rounded-full border border-ink/20 px-[12px] text-[13px] font-bold text-ink/70 hover:border-ink/50 disabled:opacity-30"
             >
-              <kbd className="font-display text-[15px] leading-none text-white/60">0</kbd>
+              <kbd className="font-display text-[15px] leading-none text-ink/60">0</kbd>
               내리기
             </button>
           </>

@@ -3,6 +3,7 @@ import { API_URL } from '../api';
 import type { AnswerMode, FlowStep, QaAnswer, QaFlow, QaResult } from '../types/qa';
 import type { QuestionType } from '../types/mockPractice';
 import { ChevronDownIcon, MinusCircleIcon } from './icons';
+import { useTheme } from '../theme';
 
 const MAX_SOURCES = 5;
 const QUESTION_TYPES: QuestionType[] = ['사실확인', '절차', '근거', '한계/반론'];
@@ -30,6 +31,9 @@ export function Hud({
   sourceCount = 3,
   presentationId,
 }: HudProps) {
+  // 라이트 모드: 바탕은 종이, 글자는 잉크, 카드는 흰색 (index.css 의 --page/--ink/--card)
+  const light = useTheme().theme === 'light';
+  const glow = `radial-gradient(1100px 520px at 50% -120px, rgba(255,181,71,${light ? 0.28 : 0.13}), transparent 70%)`;
   // 질문 머리: CUE 번호와 질문. 가운데 정렬, 새 질문이면 아래에서 올라온다.
   const cueLabel = `CUE ${String(cueNo ?? 1).padStart(2, '0')}`;
   const questionHead = (
@@ -38,7 +42,7 @@ export function Hud({
       <span className="font-display text-[20px] leading-none tracking-[1px] rounded-[4px] bg-[#f26b1d] text-white px-[10px] pt-[5px] pb-[3px]">
         {cueLabel}
       </span>
-      <p className="font-black text-[42px] text-white tracking-[-1.5px] leading-[54px] max-w-[1100px] break-keep">
+      <p className="font-black text-[42px] text-ink tracking-[-1.5px] leading-[54px] max-w-[1100px] break-keep">
         {question}
       </p>
     </div>
@@ -49,14 +53,14 @@ export function Hud({
 
   if (!result) {
     return (
-      <div className="relative flex flex-1 flex-col w-full bg-[#15110d] text-white overflow-hidden">
+      <div className="relative flex flex-1 flex-col w-full bg-page text-ink overflow-hidden">
       <div
         className="pointer-events-none absolute inset-0"
-        style={{ background: 'radial-gradient(1100px 520px at 50% -120px, rgba(255,181,71,0.13), transparent 70%)' }}
+        style={{ background: glow }}
       />
       <div className="relative flex flex-1 flex-col gap-[26px] items-center pb-[36px] pt-[34px] px-[44px] w-full max-w-[1320px] mx-auto">
         {questionHead}
-        <p className={`font-medium text-[17px] text-center ${notice ? 'text-[#ff7a70]' : 'text-white/55'}`}>
+        <p className={`font-medium text-[17px] text-center ${notice ? (light ? 'text-[#bf382e]' : 'text-[#ff7a70]') : 'text-ink/55'}`}>
           {notice ?? '근거를 찾고 있어요···'}
         </p>
       </div>
@@ -83,49 +87,49 @@ export function Hud({
   // 흐름도와 추천 답변 칸. 슬라이드 근거가 없을 때(보강 자료로 만든 답)도 같은 모양으로 보여준다.
   const flowSection = (
       <div className="flex flex-col gap-[12px] w-full">
-        <p className="font-bold text-[14px] text-white/55 w-full text-center">
+        <p className="font-bold text-[14px] text-ink/55 w-full text-center">
           말할 순서
-          {flow?.done && <span className="ml-[8px] font-medium text-white/35">{Math.round(flow.latency_ms)}ms</span>}
+          {flow?.done && <span className="ml-[8px] font-medium text-ink/35">{Math.round(flow.latency_ms)}ms</span>}
           <BasisTag basis={flow?.basis} />
         </p>
         {!flow?.steps.length ? (
-          <p className="font-medium text-[17px] text-white/45 text-center">순서를 정리하고 있어요···</p>
+          <p className="font-medium text-[17px] text-ink/45 text-center">순서를 정리하고 있어요···</p>
         ) : (
-          <FlowSteps steps={flow.steps} inferred={flow.basis === 'inferred'} dark />
+          <FlowSteps steps={flow.steps} inferred={flow.basis === 'inferred'} dark={!light} />
         )}
         {flow?.guide && (
-          <div className="rise-in bg-white/[0.05] border border-white/10 flex flex-col gap-[6px] items-center text-center px-[24px] py-[14px] rounded-[10px] w-full">
+          <div className="rise-in bg-ink/[0.05] border border-ink/10 flex flex-col gap-[6px] items-center text-center px-[24px] py-[14px] rounded-[10px] w-full">
             <p className="font-bold text-[13px] text-[#f26b1d]">이렇게 답해보세요</p>
-            <p className="font-bold text-[18px] text-white leading-[27px] break-keep">{flow.guide}</p>
+            <p className="font-bold text-[18px] text-ink leading-[27px] break-keep">{flow.guide}</p>
           </div>
         )}
         {flow?.status === 'blocked' && (
-          <p className="font-normal text-[13px] text-white/50 text-center">자료에 없는 숫자가 나와서 뒤 칸은 표시하지 않았습니다.</p>
+          <p className="font-normal text-[13px] text-ink/50 text-center">자료에 없는 숫자가 나와서 뒤 칸은 표시하지 않았습니다.</p>
         )}
       </div>
   );
   const answerSection = (
-      <div className="rise-in bg-[#1e1914] border-2 border-[#f26b1d] flex flex-col gap-[14px] items-center text-center px-[36px] py-[28px] rounded-[12px] w-full">
+      <div className="rise-in bg-card border-2 border-[#f26b1d] flex flex-col gap-[14px] items-center text-center px-[36px] py-[28px] rounded-[12px] w-full">
         <p className="font-bold text-[14px] text-[#f26b1d] w-full">
           추천 답변
-          {answer?.done && <span className="ml-[8px] font-medium text-white/35">{Math.round(answer.latency_ms)}ms</span>}
+          {answer?.done && <span className="ml-[8px] font-medium text-ink/35">{Math.round(answer.latency_ms)}ms</span>}
           <BasisTag basis={answer?.basis} />
         </p>
         <p
           className={`font-bold text-[27px] tracking-[-0.675px] leading-[40px] w-full break-keep ${
-            answer?.text ? 'text-white' : 'text-white/45'
+            answer?.text ? 'text-ink' : 'text-ink/45'
           }`}
         >
           {answer?.text ? (
             <>
-              “<HighlightMany text={answer.text} words={result.keywords} />”
+              “<HighlightMany text={answer.text} words={result.keywords} color={light ? '#dc4a1e' : '#ffb547'} />”
             </>
           ) : (
             '답변을 만들고 있어요···'
           )}
         </p>
         {answer?.status === 'blocked' && (
-          <p className="font-normal text-[13px] text-white/50">
+          <p className="font-normal text-[13px] text-ink/50">
             자료에 없는 숫자가 나와서 뒷부분은 표시하지 않았습니다.
           </p>
         )}
@@ -147,21 +151,21 @@ export function Hud({
   const inferred = (hasAnswer && answer?.basis === 'inferred') || (hasFlow && flow?.basis === 'inferred');
   if (sources.length === 0 && !core) {
     return (
-      <div className="relative flex flex-1 flex-col w-full bg-[#15110d] text-white overflow-hidden">
+      <div className="relative flex flex-1 flex-col w-full bg-page text-ink overflow-hidden">
       <div
         className="pointer-events-none absolute inset-0"
-        style={{ background: 'radial-gradient(1100px 520px at 50% -120px, rgba(255,181,71,0.13), transparent 70%)' }}
+        style={{ background: glow }}
       />
       <div className="relative flex flex-1 flex-col gap-[26px] items-center pb-[36px] pt-[34px] px-[44px] w-full max-w-[1320px] mx-auto">
         {questionHead}
-        <div className="bg-white/[0.05] border border-white/10 flex gap-[12px] items-center justify-center text-center px-[22px] py-[16px] rounded-[10px] w-full">
+        <div className="bg-ink/[0.05] border border-ink/10 flex gap-[12px] items-center justify-center text-center px-[22px] py-[16px] rounded-[10px] w-full">
           {!fromNotes && !building && (
             <span className="size-[20px] text-[#f26b1d] shrink-0">
               <MinusCircleIcon />
             </span>
           )}
           <div className="flex flex-col gap-[2px]">
-            <p className="font-bold text-[18px] text-white leading-[27px]">
+            <p className="font-bold text-[18px] text-ink leading-[27px]">
               {fromNotes
                 ? inferred
                   ? '어느 자료에도 직접 답이 없어서 AI 가 추론한 답이에요'
@@ -171,7 +175,7 @@ export function Hud({
                   : '어느 자료에서도 답을 찾지 못했습니다'}
             </p>
             {fromNotes && (
-              <p className="font-medium text-[14px] text-white/55 leading-[20px]">
+              <p className="font-medium text-[14px] text-ink/55 leading-[20px]">
                 {inferred ? '사실인지 확인하고 말해주세요.' : '슬라이드, 대본, 설명 자료를 함께 봤어요. 한 번 더 확인하고 말해주세요.'}
               </p>
             )}
@@ -182,11 +186,11 @@ export function Hud({
         {fromNotes && hasAnswer && answerSection}
         {fromNotes && wantFlow && (hasFlow || !flow?.done) && flowSection}
         {!fromNotes && !building && <div className="flex flex-col gap-[12px] w-full">
-          <p className="font-bold text-[14px] text-white/55 w-full text-center">이렇게 넘기세요</p>
+          <p className="font-bold text-[14px] text-ink/55 w-full text-center">이렇게 넘기세요</p>
           <div className="flex flex-col gap-[10px] w-full">
             {(result.suggestions ?? []).map((s) => (
-              <div key={s} className="bg-[#1e1914] border border-white/10 flex items-center justify-center px-[24px] py-[20px] rounded-[10px] w-full">
-                <p className="font-bold text-[24px] text-white tracking-[-0.6px] leading-[35px] whitespace-nowrap">
+              <div key={s} className="bg-card border border-ink/10 flex items-center justify-center px-[24px] py-[20px] rounded-[10px] w-full">
+                <p className="font-bold text-[24px] text-ink tracking-[-0.6px] leading-[35px] whitespace-nowrap">
                   “{s}”
                 </p>
               </div>
@@ -199,10 +203,10 @@ export function Hud({
   }
 
   return (
-    <div className="relative flex flex-1 flex-col w-full bg-[#15110d] text-white overflow-hidden">
+    <div className="relative flex flex-1 flex-col w-full bg-page text-ink overflow-hidden">
       <div
         className="pointer-events-none absolute inset-0"
-        style={{ background: 'radial-gradient(1100px 520px at 50% -120px, rgba(255,181,71,0.13), transparent 70%)' }}
+        style={{ background: glow }}
       />
       <div className="relative flex flex-1 flex-col gap-[26px] items-center pb-[36px] pt-[34px] px-[44px] w-full max-w-[1320px] mx-auto">
       <div className="flex flex-col gap-[16px] items-center w-full">
@@ -216,10 +220,10 @@ export function Hud({
               <span
                 key={type}
                 className={`flex items-center px-[16px] py-[7px] rounded-full ${
-                  active ? 'bg-[#f26b1d]' : 'border border-white/12'
+                  active ? 'bg-[#f26b1d]' : 'border border-ink/12'
                 }`}
               >
-                <span className={`text-[15px] whitespace-nowrap ${active ? 'font-bold text-white' : 'font-medium text-white/35'}`}>
+                <span className={`text-[15px] whitespace-nowrap ${active ? 'font-bold text-white' : 'font-medium text-ink/35'}`}>
                   {type}
                 </span>
               </span>
@@ -230,15 +234,15 @@ export function Hud({
 
       {core && (
         <div className="flex flex-col gap-[12px] w-full">
-          <p className="font-bold text-[11px] text-[#7ee2a0] tracking-[1.54px] w-full text-center">
+          <p className={`font-bold text-[11px] ${light ? 'text-[#2f7a47]' : 'text-[#7ee2a0]'} tracking-[1.54px] w-full text-center`}>
             연습에서 확정한 답: {core.label}
             {core.source === 'answer' ? (
-              <span className="ml-[8px] text-white/50">연습에서 내가 한 답</span>
+              <span className="ml-[8px] text-ink/50">연습에서 내가 한 답</span>
             ) : (
-              core.edited && <span className="ml-[8px] text-white/50">발표자 수정</span>
+              core.edited && <span className="ml-[8px] text-ink/50">발표자 수정</span>
             )}
           </p>
-          <FlowSteps steps={core.steps} dark />
+          <FlowSteps steps={core.steps} dark={!light} />
         </div>
       )}
 
@@ -250,11 +254,11 @@ export function Hud({
       {showFlow && flowSection}
 
       {isLimitation && !showAnswer && !showFlow && !core ? (
-        <div className="bg-[#1e1914] border-2 border-[#f26b1d] flex flex-col gap-[14px] items-center text-center px-[36px] py-[26px] rounded-[12px] w-full">
+        <div className="bg-card border-2 border-[#f26b1d] flex flex-col gap-[14px] items-center text-center px-[36px] py-[26px] rounded-[12px] w-full">
           <p className="font-bold text-[14px] text-[#f26b1d] w-full">추천 답변</p>
           <div className="flex flex-col gap-[12px] w-full">
             {(result.suggestions ?? []).map((s) => (
-              <p key={s} className="font-bold text-[27px] text-white tracking-[-0.675px] leading-[40px] w-full">
+              <p key={s} className="font-bold text-[27px] text-ink tracking-[-0.675px] leading-[40px] w-full">
                 “{s}”
               </p>
             ))}
@@ -264,7 +268,7 @@ export function Hud({
         mode === 'keywords' && !core && result.keywords.length > 0 && (
           <>
             <div className="flex flex-col gap-[12px] items-center pt-[4px] w-full">
-              <p className="font-bold text-[14px] text-white/55">키워드</p>
+              <p className="font-bold text-[14px] text-ink/55">키워드</p>
               <div className="flex flex-wrap gap-[10px] justify-center w-full">
                 {result.keywords.map((keyword, i) => (
                   <span
@@ -277,14 +281,14 @@ export function Hud({
                 ))}
               </div>
             </div>
-            <div className="bg-white/10 h-px w-full" />
+            <div className="bg-ink/10 h-px w-full" />
           </>
         )
       )}
 
       <div
         className={`flex flex-col gap-[12px] items-center w-full ${
-          isLimitation ? 'border-t border-white/10 pt-[20px]' : ''
+          isLimitation ? 'border-t border-ink/10 pt-[20px]' : ''
         }`}
       >
         {sources.length > 0 && (
@@ -293,10 +297,10 @@ export function Hud({
             onClick={() => setSourcesOpen((v) => !v)}
             className="flex gap-[8px] items-center"
           >
-            <span className={`size-[14px] text-white/55 transition-transform ${sourcesOpen ? 'rotate-180' : ''}`}>
+            <span className={`size-[14px] text-ink/55 transition-transform ${sourcesOpen ? 'rotate-180' : ''}`}>
               <ChevronDownIcon />
             </span>
-            <span className="font-bold text-[13px] text-white/55 tracking-[0.5px]">
+            <span className="font-bold text-[13px] text-ink/55 tracking-[0.5px]">
               뒷받침 근거 ({sources.length}개) {sourcesOpen ? '접기' : '펼치기'}
             </span>
           </button>
@@ -307,19 +311,19 @@ export function Hud({
               {visibleSources.map((source, index) => (
                 <div
                   key={`${source.slide}-${index}`}
-                  className="lift bg-[#1e1914] border border-white/10 hover:border-[#f26b1d]/60 flex gap-[18px] items-center px-[18px] py-[16px] rounded-[8px] w-full"
+                  className="lift bg-card border border-ink/10 hover:border-[#f26b1d]/60 flex gap-[18px] items-center px-[18px] py-[16px] rounded-[8px] w-full"
                 >
                   <SourceThumb presentationId={presentationId} page={source.slide} />
                   <p className="font-black text-[34px] text-[#f26b1d] tracking-[-1.36px] shrink-0 w-[80px]">
                     p.{source.slide}
                   </p>
-                  <p className="flex-1 font-medium text-[19px] text-white/90 leading-[28px]">“{source.quote}”</p>
+                  <p className="flex-1 font-medium text-[19px] text-ink/90 leading-[28px]">“{source.quote}”</p>
                 </div>
               ))}
             </div>
 
             {visibleSources.some((s) => s.refined) && (
-              <p className="font-medium text-[12px] text-white/35 text-center w-full">
+              <p className="font-medium text-[12px] text-ink/35 text-center w-full">
                 근거 줄은 AI 정리본에서 골랐어요. 슬라이드 원문과 띄어쓰기나 표현이 조금 다를 수 있어요.
               </p>
             )}
@@ -328,18 +332,18 @@ export function Hud({
               <button
                 type="button"
                 onClick={() => setExpanded((prev) => !prev)}
-                className="border border-white/20 flex gap-[8px] h-[40px] items-center px-[16px] rounded-[6px]"
+                className="border border-ink/20 flex gap-[8px] h-[40px] items-center px-[16px] rounded-[6px]"
               >
-                <span className={`size-[16px] text-white transition-transform ${expanded ? 'rotate-180' : ''}`}>
+                <span className={`size-[16px] text-ink transition-transform ${expanded ? 'rotate-180' : ''}`}>
                   <ChevronDownIcon />
                 </span>
-                <span className="font-bold text-[14px] text-white whitespace-nowrap">근거 더보기 (최대 5개)</span>
+                <span className="font-bold text-[14px] text-ink whitespace-nowrap">근거 더보기 (최대 5개)</span>
               </button>
             </div>
           </>
         )}
         <div className={`flex gap-[14px] items-center justify-center w-full ${sources.length === 0 ? 'hidden' : ''}`}>
-          <p className="font-normal text-[13px] text-white/35 whitespace-nowrap">
+          <p className="font-normal text-[13px] text-ink/35 whitespace-nowrap">
             {isLimitation
               ? '한계 질문은 근거보다 답변 문장을 먼저 읽으세요'
               : `응답 ${result.responseMs}ms, Space 로 다음 질문 듣기`}
@@ -382,7 +386,7 @@ const NUM_WITH_UNIT = /(?<![A-Za-z\d])\d[\d,.~]*(?![A-Za-z])\s*(?:%|배|[가-힣
 // 낱말 경계. 한글, 영문, 숫자면 낱말 안이다.
 const WORDCH = /[가-힣ㄱ-ㅎㅏ-ㅣa-zA-Z0-9]/;
 
-function HighlightMany({ text, words }: { text: string; words: string[] }) {
+function HighlightMany({ text, words, color = '#ffb547' }: { text: string; words: string[]; color?: string }) {
   const ranges: [number, number][] = [];
   for (const w of words) {
     if (w.length < 2) continue;
@@ -404,7 +408,7 @@ function HighlightMany({ text, words }: { text: string; words: string[] }) {
   let pos = 0;
   for (const [a, b] of ranges) {
     if (a < pos) continue; // 겹치는 강조는 앞의 것만
-    out.push(text.slice(pos, a), <span key={a} style={{ color: '#ffb547' }}>{text.slice(a, b)}</span>);
+    out.push(text.slice(pos, a), <span key={a} style={{ color }}>{text.slice(a, b)}</span>);
     pos = b;
   }
   out.push(text.slice(pos));

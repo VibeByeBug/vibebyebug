@@ -40,7 +40,7 @@ export function SlideText({
       {useRefined ? (
         <Refined text={refined!} dark={dark} />
       ) : dark ? (
-        <p className="font-normal text-[15px] text-white/75 leading-[25px] whitespace-pre-line">{raw}</p>
+        <p className="font-normal text-[15px] text-ink/75 leading-[25px] whitespace-pre-line">{raw}</p>
       ) : (
         <p className="font-normal text-[13px] text-[#374151] leading-[21px] whitespace-pre-line">{raw}</p>
       )}
@@ -58,11 +58,11 @@ const TONE = {
     body: 'font-medium text-[13px] text-[#374151] leading-[20px]',
   },
   dark: {
-    head: 'font-black text-[21px] text-white leading-[31px] tracking-[-0.3px] mb-[6px] break-keep',
+    head: 'font-black text-[21px] text-ink leading-[31px] tracking-[-0.3px] mb-[6px] break-keep',
     section: 'font-mono font-bold text-[12px] text-[#f26b1d] tracking-[1px] leading-[18px] mt-[14px] mb-[2px]',
-    bullet: 'flex gap-[9px] font-normal text-[15px] text-white/80 leading-[24px]',
-    dot: 'text-white/30 shrink-0',
-    body: 'font-medium text-[15px] text-white/80 leading-[24px]',
+    bullet: 'flex gap-[9px] font-normal text-[15px] text-ink/80 leading-[24px]',
+    dot: 'text-ink/30 shrink-0',
+    body: 'font-medium text-[15px] text-ink/80 leading-[24px]',
   },
 };
 
