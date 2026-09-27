@@ -103,10 +103,28 @@ def _fmt_slides(slides: list[tuple[int, str]]) -> str:
                        for p, t in slides)
 
 
-def numbers_ok(text: str, source: str) -> bool:
-    """문장에 나온 숫자가 전부 자료에 있는가. mock_defense.answer_ok 와 같은 기준."""
+# 글자에 붙은 숫자는 수치가 아니라 이름의 일부다 (BM25, e5-small, gpt-5.4-mini, GPT-4o, H100).
+_NAME_WITH_DIGIT = re.compile(r"[A-Za-z]+[-_]?\d+(?:\.\d+)*[A-Za-z]*(?:-[A-Za-z][A-Za-z0-9]*)*")
+
+
+def _squash(s: str) -> str:
+    """이름 비교용. 대소문자, 띄어쓰기, 하이픈 차이를 없앤다 (e5-small = E5 small)."""
+    return re.sub(r"[^a-z0-9]", "", s.lower())
+
+
+def numbers_ok(text: str, source: str, question: str = "") -> bool:
+    """문장에 나온 숫자가 전부 자료에 있는가. mock_defense.answer_ok 와 같은 기준.
+
+    다만 BM25, e5-small 같은 이름 속 숫자는 이름이 자료에 있거나 발표자가 질문에서 말했다면 통과시킨다.
+    답변이 질문에 나온 이름을 그대로 되받는 것까지 지어낸 숫자로 버리면 "왜 BM25 와 e5-small 을 합쳤나요" 같은
+    질문에 답을 못 낸다. 질문에서 허용하는 것은 이름뿐이다. "95% 인가요" 처럼 질문에 든 수치는 여전히
+    자료에 있어야 한다 (그렇지 않으면 질문의 수치를 그대로 맞장구치는 답을 못 막는다).
+    자료에도 질문에도 없는 이름은 예전처럼 숫자를 자료와 대조한다.
+    """
     src = re.sub(r"[\s,]", "", source)
-    return all(n.replace(",", "") in src for n in _NUM.findall(text))
+    known = _squash(source) + "|" + _squash(question)
+    rest = _NAME_WITH_DIGIT.sub(lambda m: " " if _squash(m.group()) in known else m.group(), text)
+    return all(n.replace(",", "") in src for n in _NUM.findall(rest))
 
 
 def _clean(s: str) -> str:
@@ -223,7 +241,7 @@ class Answerer:
                 sent = _clean(sent)
                 if not sent:
                     continue
-                if not numbers_ok(sent, source):
+                if not numbers_ok(sent, source, question):
                     cancel.set()
                     yield msg(True, "blocked", sent)
                     return
@@ -237,7 +255,7 @@ class Answerer:
             yield msg(True, "no_answer")
             return
         if last:
-            if not numbers_ok(last, source):
+            if not numbers_ok(last, source, question):
                 yield msg(True, "blocked", last)
                 return
             shown.append(last)
@@ -431,7 +449,7 @@ def flow(self, question: str, qtype: str, slides: list[tuple[int, str]], story: 
         link = parts[3] if len(parts) > 3 else ""
         why = parts[4] if len(parts) > 4 else ""
         # 연결 논리도 숫자를 자료와 대조한다. 틀린 숫자면 설명만 버린다(칸은 살린다).
-        if why in ("-", "") or not numbers_ok(_drop_slide_refs(why), all_text):
+        if why in ("-", "") or not numbers_ok(_drop_slide_refs(why), all_text, question):
             why = ""
         # 형식 지시어가 칸에 섞여 나오는 경우가 있었다 ("슬라이드	과정 채점", "<TAB>문제마다...")
         text = re.sub(r"^(?:슬라이드|<?TAB>?|\||\s)+", "", text).strip()
@@ -440,14 +458,14 @@ def flow(self, question: str, qtype: str, slides: list[tuple[int, str]], story: 
         if slide not in by_slide:
             # 주지 않은 슬라이드 번호다. 발표 줄거리에 나온 번호를 가져다 쓰는 경우가 많았는데, 칸을 버리면
             # 흐름도가 통째로 비었다. 내용 숫자가 자료에 있으면 글자가 가장 많이 겹치는 슬라이드로 붙인다.
-            if not by_slide or not numbers_ok(text + " " + detail, all_text):
+            if not by_slide or not numbers_ok(text + " " + detail, all_text, question):
                 return "skip"
             slide = max(by_slide, key=lambda p: _overlap(text + detail, by_slide[p]))
-        if not numbers_ok(text, by_slide[slide]):
+        if not numbers_ok(text, by_slide[slide], question):
             return "blocked"
         text = text[:FLOW_MAX_CHARS + 8]
         # 설명은 칸 제목을 풀어 쓴 것이라 틀린 숫자가 있으면 설명만 버리고 칸은 살린다
-        if detail in ("-", "") or not numbers_ok(_drop_slide_refs(detail), by_slide[slide]):
+        if detail in ("-", "") or not numbers_ok(_drop_slide_refs(detail), by_slide[slide], question):
             detail = ""
         detail = detail[:DETAIL_MAX + 20]
         # 핵심 단어는 칸 안에 그대로 있어야 색을 칠할 수 있다. 숫자만 있는 말은 뺀다(답변 뼈대가 아니다).
@@ -479,7 +497,7 @@ def flow(self, question: str, qtype: str, slides: list[tuple[int, str]], story: 
                 # 가이드도 숫자를 자료와 대조한다. 틀린 숫자가 있으면 가이드만 버린다.
                 # "12번 슬라이드" 의 12 는 슬라이드 번호라 자료 본문에 없다. 이걸 틀린 숫자로 보고
                 # 가이드를 버리는 일이 잦았다. 슬라이드 번호는 빼고 대조한다.
-                if numbers_ok(_drop_slide_refs(got["guide"]), all_text):
+                if numbers_ok(_drop_slide_refs(got["guide"]), all_text, question):
                     guide = got["guide"][:GUIDE_MAX + 10]
                     yield msg(False)
                 continue
