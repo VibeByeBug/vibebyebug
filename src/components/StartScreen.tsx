@@ -3,6 +3,7 @@ import { listPresentations, type SavedPresentation } from '../api';
 import { ArrowRightIcon } from './icons';
 import { StartGuide } from './StartGuide';
 import { useTheme } from '../theme';
+import { DEFAULT_TITLE } from '../constants';
 
 interface StartScreenProps {
   onStart: (title: string) => void;
@@ -71,7 +72,7 @@ export function StartScreen({ onStart, onOpenReport, onResume, loggedIn = false 
 
   function start() {
     setSnap(true);
-    setTimeout(() => onStart(title.trim() || '제목 없는 발표'), 220);
+    setTimeout(() => onStart(title.trim() || DEFAULT_TITLE), 220);
   }
 
   return (
