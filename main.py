@@ -1,7 +1,16 @@
 import asyncio
 import json
 import os
+import sys
 import time
+
+# print() 에 이모지(✅❌⚠️ 등)를 그대로 쓰고 있다. 콘솔이 UTF-8이 아니면(한국어 Windows 기본값인 cp949)
+# 이 글자를 못 옮겨서 UnicodeEncodeError 가 나고, 그 요청(웹소켓 연결 포함)이 그대로 끊긴다.
+# 터미널을 utf-8 로 미리 맞춰둔 개발 환경에서는 안 드러나다가, 다른 컴퓨터의 기본 cmd.exe 에서
+# 서버를 켜면 첫 로그 줄에서 바로 재현된다. 표준출력을 UTF-8로 고정해 콘솔 설정과 무관하게 만든다.
+if hasattr(sys.stdout, "reconfigure"):
+    sys.stdout.reconfigure(encoding="utf-8", errors="replace")
+    sys.stderr.reconfigure(encoding="utf-8", errors="replace")
 
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect
 from fastapi.requests import Request
