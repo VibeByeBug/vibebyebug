@@ -69,7 +69,7 @@ export function Report({ presentationName, presentationId }: ReportProps) {
       </div>
 
       <div className="flex flex-col gap-[14px] items-start w-full">
-        <p className="font-bold text-[15px] text-ink w-full">처리 결과</p>
+        <p className="font-bold text-[15px] text-ink w-full">질문 처리 결과</p>
         <div className="border border-ink/12 flex h-[44px] overflow-hidden rounded-[8px] w-full">
           {(['ok', 'no_evidence', 'ignored'] as const).map((k) =>
             counts[k] ? (
