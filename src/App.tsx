@@ -24,10 +24,18 @@ import { useQaSocket } from './hooks/useQaSocket';
 import { cleanQuestion } from './cleanQuestion';
 import { loadSourceCount, saveSourceCount, type SourceCount } from './settings';
 import { useSpeechRecognition } from './hooks/useSpeechRecognition';
+import { useScreenHistory } from './hooks/useScreenHistory';
 import { mockRecognizedQuestion } from './mocks/questionMock';
 import { DownloadIcon } from './components/icons';
 import type { ScreenName } from './types/flow';
 import type { AnswerMode } from './types/qa';
+
+// 발표 자료(upload)가 있어야 뜨는 화면
+const SESSION_SCREENS: ScreenName[] = [
+  'preparing', 'corePractice', 'material', 'graph', 'mockPractice', 'micConnect', 'recognized', 'textInput', 'hud',
+];
+// 실전 쪽 화면. 모의 연습을 마치면 여기서 들어왔으면 그 화면으로, 아니면 마이크 연결로 간다.
+const LIVE_SCREENS: ScreenName[] = ['micConnect', 'recognized', 'textInput', 'hud'];
 
 
 function App() {
@@ -59,6 +67,32 @@ function App() {
 
   // 몇 번째 질문인지. 실전 화면의 CUE 번호와 슬레이트 줄무늬 신호에 쓴다.
   const [cueNo, setCueNo] = useState(0);
+  const cueNoRef = useRef(cueNo);
+  useEffect(() => {
+    cueNoRef.current = cueNo;
+  }, [cueNo]);
+
+  // 브라우저 뒤로 가기로 앱 안의 이전 화면에 간다. 저절로 넘어가거나 한 번 쓰고 마는 화면은 기록에 쌓지 않는다:
+  //   준비 중 -> 마이크 연결 (돌아가면 다시 저절로 넘어와 갇힌다)
+  //   질문 듣는 중 <-> 실전, 질문 듣는 중 -> 글로 질문하기(인식 실패) (질문 하나마다 칸이 두 개씩 쌓인다)
+  //   글로 질문하기 -> 실전 (보낸 질문 입력칸으로 돌아가지 않는다)
+  //   로그인 -> 다음 화면 (로그인한 뒤 뒤로 가기가 로그인 화면을 다시 띄우지 않는다)
+  // 발표를 마쳐 자료가 없어진 뒤 뒤로 가기로 발표 화면에 돌아오면 처음 화면을 띄운다.
+  const { back: goBack, leave } = useScreenHistory({
+    screen,
+    setScreen,
+    shouldReplace: (from, to) =>
+      (from === 'recognized' && (to === 'hud' || to === 'textInput')) ||
+      from === 'login' ||
+      (from === 'hud' && to === 'recognized') ||
+      (from === 'textInput' && to === 'hud') ||
+      (from === 'preparing' && to === 'micConnect'),
+    resolve: (s) => (SESSION_SCREENS.includes(s) && !uploadRef.current ? 'start' : s),
+  });
+
+  // "돌아가기" 가 갈 화면. 모의 연습과 글로 질문하기는 여러 화면에서 들어온다.
+  const [mockBack, setMockBack] = useState<ScreenName>('micConnect');
+  const [textBack, setTextBack] = useState<ScreenName>('micConnect');
 
   function sendQuestion(text: string) {
     const pid = uploadRef.current?.presentation_id;
@@ -117,6 +151,8 @@ function App() {
     onError: () => {
       finishingRef.current = false;
       setTextFromError(true);
+      // 질문을 듣다가 인식이 실패했다. 돌아가기는 이미 받은 질문이 있으면 실전, 아니면 마이크 연결로.
+      setTextBack(cueNoRef.current > 0 ? 'hud' : 'micConnect');
       setScreen('textInput');
     },
   });
@@ -311,21 +347,54 @@ function App() {
   }
 
   // 발표 마치기: 청중 화면(있으면)을 내리고, 지금 발표 상태를 지운 뒤 처음 화면으로 돌아간다.
-  // 마이크는 화면이 'hud' 를 벗어나면 위 useEffect(146줄)가 자동으로 꺼준다.
+  // 마이크는 실전 화면을 벗어나면 위 useEffect 가 자동으로 꺼준다.
+  // 발표 중에 거친 화면들은 뒤로 가기 기록에서 건너뛴다 (끝난 발표로 뒤로 가기가 다시 들어가지 않게).
   function finishPresentation() {
     if (!window.confirm('발표를 마칠까요? 처음 화면으로 돌아갑니다.')) return;
     clearAudience();
     setUpload(null);
-    setScreen('start');
+    leave((s) => SESSION_SCREENS.includes(s) || s === 'upload' || s === 'uploadFailed' || s === 'login', 'start');
   }
 
+  // ── 발표 중 화면들의 우측 상단 버튼 ────────────────────────────────────
+  // 순서는 어느 화면이든 같다: [화면별 버튼] 지도 · 자료 보강 · 모의 연습 · 발표 마치기
+  const headerBtn =
+    'border border-[#e5e7eb] h-[32px] px-[12px] rounded-[6px] font-bold text-[13px] text-[#6b7280] whitespace-nowrap';
+
   const finishButton = (
+    <button type="button" onClick={finishPresentation} className={headerBtn}>
+      발표 마치기
+    </button>
+  );
+
+  // 지금 불러온 발표(최근 촬영분에서 이어 연 것 포함)로 모의 연습. 마치면 들어온 화면으로 돌아온다.
+  function openMock(from: ScreenName) {
+    setMockBack(from);
+    setScreen('mockPractice');
+  }
+  const mockButton = (
+    <button type="button" onClick={() => openMock(screen)} className={headerBtn}>
+      모의 연습
+    </button>
+  );
+
+  const textAskButton = (
     <button
       type="button"
-      onClick={finishPresentation}
-      className="border border-[#e5e7eb] h-[32px] px-[12px] rounded-[6px] font-bold text-[13px] text-[#6b7280] whitespace-nowrap"
+      onClick={() => {
+        setTextFromError(false);
+        setTextBack(screen);
+        setScreen('textInput');
+      }}
+      className={headerBtn}
     >
-      발표 마치기
+      글로 질문하기
+    </button>
+  );
+
+  const backButton = (target: ScreenName) => (
+    <button type="button" onClick={() => goBack(target)} className={headerBtn}>
+      ← 돌아가기
     </button>
   );
 
@@ -349,10 +418,10 @@ function App() {
               beginPresentation(pendingTitle);
               setPendingTitle(null);
             } else {
-              setScreen('start');
+              goBack('start'); // 처음 화면에서 왔으면 그 칸으로 돌아간다 (처음 화면이 기록에 두 번 쌓이지 않게)
             }
           }}
-          onBack={() => setScreen('start')}
+          onBack={() => goBack('start')}
           pendingTitle={pendingTitle}
         />
       )}
@@ -386,7 +455,8 @@ function App() {
             onUploaded={setUpload}
             onUploadFail={handleUploadFail}
             onSkip={() => setScreen('preparing')}
-            onStartMock={() => setScreen('mockPractice')}
+            // 올린 뒤 바로 연습: 돌아가기는 준비 화면으로 (업로드 화면은 다시 열면 결과가 비어 있다)
+            onStartMock={() => openMock('preparing')}
             // 업로드 화면은 다시 열면 결과가 비므로, 자료 보강을 마치면 준비 화면으로 간다
             onAddMaterial={() => openMaterial('preparing')}
           />
@@ -407,7 +477,18 @@ function App() {
 
       {screen === 'preparing' && upload && (
         <>
-          <Header onNavigate={navigate} label={presentationName} showProfile rightButtons={materialButton} />
+          <Header
+            onNavigate={navigate}
+            label={presentationName}
+            showProfile
+            rightButtons={
+              <>
+                {materialButton}
+                {mockButton}
+                {finishButton}
+              </>
+            }
+          />
           <PreparingScreen
             presentationId={upload.presentation_id}
             onReady={() => setScreen('micConnect')}
@@ -430,7 +511,7 @@ function App() {
             key={materialPage ?? 'all'}
             presentationId={upload.presentation_id}
             initialPage={materialPage}
-            onBack={() => setScreen(materialBack)}
+            onBack={() => goBack(materialBack)}
           />
         </>
       )}
@@ -440,7 +521,7 @@ function App() {
           <Header onNavigate={navigate} label="지도" showProfile={false} />
           <GraphScreen
             presentationId={upload.presentation_id}
-            onBack={() => setScreen(graphBack)}
+            onBack={() => goBack(graphBack)}
             onAddNote={(page) => openMaterial('graph', page)}
           />
         </>
@@ -452,10 +533,17 @@ function App() {
             onNavigate={navigate}
             label="모의 연습"
             rightText={mockProgress.total ? `${mockProgress.index + 1} / ${mockProgress.total} 문항` : undefined}
+            rightButtons={
+              <>
+                {backButton(mockBack)}
+                {finishButton}
+              </>
+            }
           />
           <MockPracticeScreen
             presentationId={upload.presentation_id}
-            onFinish={() => setScreen('micConnect')}
+            // "실전으로": 실전 쪽 화면에서 들어왔으면 그 화면으로 돌아가고, 아니면 마이크 연결로
+            onFinish={() => (LIVE_SCREENS.includes(mockBack) ? goBack(mockBack) : setScreen('micConnect'))}
             onIndexChange={(index, total) => setMockProgress({ index, total })}
           />
         </>
@@ -469,18 +557,11 @@ function App() {
             rightText="대기 중"
             rightButtons={
               <>
-              {materialButton}
-              {graphButton}
-              <button
-                type="button"
-                onClick={() => {
-                  setTextFromError(false);
-                  setScreen('textInput');
-                }}
-                className="border border-[#e5e7eb] h-[32px] px-[12px] rounded-[6px] font-bold text-[13px] text-[#6b7280] whitespace-nowrap"
-              >
-                글로 질문하기
-              </button>
+                {textAskButton}
+                {graphButton}
+                {materialButton}
+                {mockButton}
+                {finishButton}
               </>
             }
           />
@@ -496,7 +577,15 @@ function App() {
             listening={listening}
             label="Space 로 질문 듣기"
             rightText={listening ? '듣는 중, 질문이 끝나면 Space' : undefined}
-            rightButtons={micToggle}
+            rightButtons={
+              <>
+                {micToggle}
+                {graphButton}
+                {materialButton}
+                {mockButton}
+                {finishButton}
+              </>
+            }
             showProfile={false}
           />
           <RecognizedQuestion
@@ -519,7 +608,12 @@ function App() {
             rightText="음성 인식 대체"
             rightButtons={
               <>
+                {backButton(textBack)}
                 {micToggle}
+                {graphButton}
+                {materialButton}
+                {mockButton}
+                {finishButton}
               </>
             }
             showProfile={false}
@@ -542,6 +636,7 @@ function App() {
                 {micToggle}
                 {graphButton}
                 {materialButton}
+                {mockButton}
                 {finishButton}
               </>
             }
