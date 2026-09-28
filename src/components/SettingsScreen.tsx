@@ -11,9 +11,13 @@ import { MicSmallIcon, WatchIcon } from './icons';
 export function SettingsScreen({
   sourceCount,
   onSourceCountChange,
+  presenterName,
+  onPresenterNameChange,
 }: {
   sourceCount: SourceCount;
   onSourceCountChange: (n: SourceCount) => void;
+  presenterName: string;
+  onPresenterNameChange: (name: string) => void;
 }) {
   const [mic, setMic] = useState<string | null>(null);
   const [needPermission, setNeedPermission] = useState(false);
@@ -57,6 +61,16 @@ export function SettingsScreen({
       <div className="flex flex-col gap-[12px] items-start w-full">
         <p className="font-black text-[30px] text-ink tracking-[-0.8px] w-full text-center">설정</p>
         <div className="flex flex-col items-start w-full">
+          <Row title="발표자 이름" desc="시작 화면 슬레이트의 DIRECTOR 칸에 적힙니다">
+            <input
+              type="text"
+              value={presenterName}
+              onChange={(e) => onPresenterNameChange(e.target.value)}
+              placeholder="발표자"
+              className="h-[40px] w-[220px] rounded-[8px] border border-ink/20 bg-transparent px-[14px] font-medium text-[15px] text-ink outline-none focus:border-[#f26b1d] placeholder:text-ink/35"
+            />
+          </Row>
+
           <Row title="화면 모드" desc="기본은 검은 무대입니다. 밝은 곳에서 보기 편하게 라이트로 바꿀 수 있어요">
             <div className="flex gap-[8px] items-start">
               {(

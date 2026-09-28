@@ -24,3 +24,23 @@ export function saveSourceCount(n: SourceCount) {
     // 저장이 막혀 있어도 이번 발표 동안은 화면 상태로 유지된다
   }
 }
+
+// 슬레이트 판의 DIRECTOR 칸. 발표자 이름을 적어두면 다음에 열 때도 그대로 있다.
+const PRESENTER_KEY = 'readyq.presenterName';
+export const DEFAULT_PRESENTER_NAME = '발표자';
+
+export function loadPresenterName(): string {
+  try {
+    return localStorage.getItem(PRESENTER_KEY)?.trim() || DEFAULT_PRESENTER_NAME;
+  } catch {
+    return DEFAULT_PRESENTER_NAME;
+  }
+}
+
+export function savePresenterName(name: string) {
+  try {
+    localStorage.setItem(PRESENTER_KEY, name);
+  } catch {
+    // 저장이 막혀 있어도 이번 발표 동안은 화면 상태로 유지된다
+  }
+}

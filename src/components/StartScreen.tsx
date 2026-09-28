@@ -8,16 +8,26 @@ import { DEFAULT_TITLE } from '../constants';
 interface StartScreenProps {
   onStart: (title: string) => void;
   onOpenReport: () => void;
-  onOpenLibrary: () => void; // 그동안 올린 자료 전체를 보고 관리하는 화면
+  onOpenLibrary: () => void; // 그동안 올린 발표 전체를 보고 관리하는 화면
   onResume: (p: SavedPresentation) => void; // 서버에 남아 있는 발표를 다시 연다
   loggedIn?: boolean; // 로그인 전(랜딩)에는 최근 발표와 회고를 숨긴다
+  presenterName: string; // 슬레이트 DIRECTOR 칸. 이 브라우저에 저장해 두고 다음 발표에도 쓴다
+  onPresenterNameChange: (name: string) => void;
 }
 
 // 시작 화면 = 검은 무대. 조명이 커서를 천천히 따라오고, 오른쪽 슬레이트 판에 발표 이름이 쓰인다.
 // 시작하면 슬레이트 팔이 "딱" 닫힌 뒤 넘어간다.
 // 라이트 모드에서는 무대 바닥이 종이(paper)가 되고 글자는 슬레이트 잉크(slateInk)로 바뀐다.
 // 슬레이트 판과 필름 스트립은 소품이라 두 모드 모두 검은색 그대로 둔다.
-export function StartScreen({ onStart, onOpenReport, onOpenLibrary, onResume, loggedIn = false }: StartScreenProps) {
+export function StartScreen({
+  onStart,
+  onOpenReport,
+  onOpenLibrary,
+  onResume,
+  loggedIn = false,
+  presenterName,
+  onPresenterNameChange,
+}: StartScreenProps) {
   const light = useTheme().theme === 'light';
   // 최근 촬영분: 서버에 남아 있는 발표. 다시 올리지 않고 이어서 열 수 있다.
   const [recent, setRecent] = useState<SavedPresentation[]>([]);
@@ -202,9 +212,21 @@ export function StartScreen({ onStart, onOpenReport, onOpenLibrary, onResume, lo
               <span className="font-slate font-medium text-[12px] tracking-[1px] text-white/55">
                 DATE <span className="font-hand text-[26px] tracking-normal text-white ml-[6px]">{today}</span>
               </span>
-              <span className="font-slate font-medium text-[12px] tracking-[1px] text-white/55">
-                DIRECTOR <span className="font-hand text-[26px] tracking-normal text-white ml-[6px]">발표자</span>
-              </span>
+              <label className="flex items-baseline font-slate font-medium text-[12px] tracking-[1px] text-white/55">
+                DIRECTOR
+                <input
+                  type="text"
+                  value={presenterName}
+                  onChange={(e) => onPresenterNameChange(e.target.value)}
+                  onFocus={(e) => e.target.select()}
+                  onKeyUp={(e) => {
+                    if (e.key === 'Enter') start();
+                  }}
+                  placeholder="발표자"
+                  size={Math.max(2, presenterName.length || 3)}
+                  className="bg-transparent font-hand text-[26px] tracking-normal text-white placeholder:text-white/30 outline-none ml-[6px] border-b border-transparent focus:border-[#f26b1d] transition-colors"
+                />
+              </label>
             </div>
           </div>
         </div>
@@ -223,7 +245,7 @@ export function StartScreen({ onStart, onOpenReport, onOpenLibrary, onResume, lo
               light ? 'text-slateInk/50 hover:text-slateInk' : 'text-white/50 hover:text-white'
             }`}
           >
-            자료 보관함 전체 보기 →
+전체 발표 보기 →
           </button>
         </div>
         {/* 필름 스트립도 소품이라 두 모드 모두 검은 필름에 흰 글씨 */}

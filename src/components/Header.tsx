@@ -166,7 +166,7 @@ export function Header({
                         activeMenu === 'library' ? 'font-bold text-[#f26b1d]' : 'font-medium text-[#1a1a1a]'
                       }`}
                     >
-                      자료 보관함
+                      발표 목록
                     </span>
                   </button>
                   <div className="bg-[#e5e7eb] h-px w-full" />
