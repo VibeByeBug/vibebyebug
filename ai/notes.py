@@ -262,8 +262,15 @@ class NoteStore:
         return added
 
     def delete(self, note_id: str) -> None:
-        self.notes = [n for n in self.notes if n["id"] != note_id]
+        self.delete_many([note_id])
+
+    def delete_many(self, note_ids: list[str]) -> int:
+        """여러 개를 한 번에 지운다. 지운 개수를 돌려준다. 하나씩 지우면 매번 파일을 다시 쓴다."""
+        gone = set(note_ids)
+        before = len(self.notes)
+        self.notes = [n for n in self.notes if n["id"] not in gone]
         self._save()
+        return before - len(self.notes)
 
     def _save(self) -> None:
         self.path.parent.mkdir(parents=True, exist_ok=True)
