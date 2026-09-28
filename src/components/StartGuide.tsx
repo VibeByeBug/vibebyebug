@@ -94,6 +94,7 @@ export function StartGuide({ onStart }: { onStart: () => void }) {
       <div className="curtain-valance" />
       <div className="curtain curtain-left" />
       <div className="curtain curtain-right" />
+      {!light && <div className="stage-grain pointer-events-none absolute inset-0" />}
       {/* 무대 조명 */}
       <div
         className="pointer-events-none absolute inset-0"

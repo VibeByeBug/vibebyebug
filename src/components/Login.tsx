@@ -1,3 +1,4 @@
+import { useEffect, useRef } from 'react';
 import { useTheme } from '../theme';
 import { DEFAULT_TITLE } from '../constants';
 
@@ -13,14 +14,49 @@ interface LoginProps {
 export function Login({ onLogin, onBack, pendingTitle }: LoginProps) {
   // 라이트 모드: 무대 바닥은 종이, 글자는 잉크. 슬레이트 판은 소품이라 검은 판에 흰 글씨 그대로.
   const light = useTheme().theme === 'light';
+  const stage = useRef<HTMLDivElement>(null);
+
+  // 스포트라이트: 시작 화면과 같은 방식으로 커서를 천천히 따라간다 (리렌더 없이 CSS 변수만 바꾼다)
+  useEffect(() => {
+    const el = stage.current;
+    if (!el) return;
+    const reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    let tx = 0.5, ty = 0.2, x = tx, y = ty, raf = 0;
+    const onMove = (e: MouseEvent) => {
+      const r = el.getBoundingClientRect();
+      tx = (e.clientX - r.left) / r.width;
+      ty = (e.clientY - r.top) / r.height;
+    };
+    const tick = () => {
+      x += (tx - x) * 0.12;
+      y += (ty - y) * 0.12;
+      el.style.setProperty('--sx', `${x * 100}%`);
+      el.style.setProperty('--sy', `${y * 100}%`);
+      raf = requestAnimationFrame(tick);
+    };
+    if (!reduce) {
+      el.addEventListener('mousemove', onMove);
+      raf = requestAnimationFrame(tick);
+    }
+    return () => {
+      el.removeEventListener('mousemove', onMove);
+      cancelAnimationFrame(raf);
+    };
+  }, []);
+
   return (
-    <div className="relative flex flex-1 min-h-screen w-full items-center justify-center overflow-hidden bg-page text-ink px-[16px]">
+    <div
+      ref={stage}
+      className="relative flex flex-1 min-h-screen w-full items-center justify-center overflow-hidden bg-page text-ink px-[16px]"
+      style={{ ['--sx' as string]: '50%', ['--sy' as string]: '20%' }}
+    >
       <div
         className="pointer-events-none absolute inset-0"
         style={{
-          background: `radial-gradient(760px 520px at 50% 20%, rgba(255,181,71,${light ? 0.3 : 0.14}), transparent 70%)`,
+          background: `radial-gradient(620px circle at var(--sx) var(--sy), rgba(255,181,71,${light ? 0.32 : 0.16}), transparent 62%)`,
         }}
       />
+      {!light && <div className="stage-grain pointer-events-none absolute inset-0" />}
       <div
         className={`pointer-events-none absolute inset-y-0 left-0 w-[70px] bg-gradient-to-r to-transparent ${
           light ? 'from-slateInk/[0.06]' : 'from-[#4a1712]'
@@ -41,7 +77,20 @@ export function Login({ onLogin, onBack, pendingTitle }: LoginProps) {
           READY-<span className="text-[#f26b1d]">Q</span>
         </button>
 
-        <div className="w-full">
+        <div
+          className="tilt w-full"
+          onMouseMove={(e) => {
+            const r = e.currentTarget.getBoundingClientRect();
+            const dx = (e.clientX - r.left) / r.width - 0.5;
+            const dy = (e.clientY - r.top) / r.height - 0.5;
+            e.currentTarget.style.setProperty('--ry', `${dx * 8}deg`);
+            e.currentTarget.style.setProperty('--rx', `${-dy * 6}deg`);
+          }}
+          onMouseLeave={(e) => {
+            e.currentTarget.style.setProperty('--ry', '0deg');
+            e.currentTarget.style.setProperty('--rx', '0deg');
+          }}
+        >
           <div className="slate-stripes h-[26px] rounded-t-[8px]" />
           <div className="bg-[#111111] text-white rounded-b-[12px] px-[28px] pt-[24px] pb-[26px] flex flex-col gap-[18px] shadow-[0_40px_70px_-20px_rgba(0,0,0,0.8)]">
             <div className="flex flex-col gap-[6px] items-center text-center">
