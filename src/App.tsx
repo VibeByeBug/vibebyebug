@@ -34,8 +34,10 @@ import type { AnswerMode } from './types/qa';
 const SESSION_SCREENS: ScreenName[] = [
   'preparing', 'corePractice', 'material', 'graph', 'mockPractice', 'micConnect', 'recognized', 'textInput', 'hud',
 ];
-// 실전 쪽 화면. 모의 연습을 마치면 여기서 들어왔으면 그 화면으로, 아니면 마이크 연결로 간다.
-const LIVE_SCREENS: ScreenName[] = ['micConnect', 'recognized', 'textInput', 'hud'];
+// 발표 하나에 딸린 화면 (올리기 포함). 발표를 마치면 뒤로 가기 기록에서 건너뛴다.
+const SESSION_FLOW: ScreenName[] = [...SESSION_SCREENS, 'upload', 'uploadFailed'];
+// 로그인해야 들어가는 화면
+const LOGIN_SCREENS: ScreenName[] = ['myHistory', 'report'];
 
 
 function App() {
@@ -54,7 +56,7 @@ function App() {
   const [textFromError, setTextFromError] = useState(true); // 음성 인식 실패로 온 입력인지
   // 실전 화면에 한 번에 보여줄 근거 카드 수. 이 브라우저에 저장해 두고 다음 발표에도 쓴다.
   const [sourceCount, setSourceCount] = useState<SourceCount>(loadSourceCount);
-  const { lastResult, lastAnswer, lastFlow, notice, ask } = useQaSocket();
+  const { lastResult, lastAnswer, lastFlow, notice, ask, reset: resetQa } = useQaSocket();
 
   // 음성 인식 콜백은 인식을 시작한 순간의 값을 붙잡고 있어서, 최신 발표와 모드는 ref 로 읽는다
   const uploadRef = useRef(upload);
@@ -72,22 +74,33 @@ function App() {
     cueNoRef.current = cueNo;
   }, [cueNo]);
 
+  // 지금 발표의 번호. 발표를 시작하거나 이어 열 때마다 새 번호, 마치면 null.
+  // 뒤로 가기 기록의 칸마다 적어 두고, 끝난 발표(또는 다른 발표)의 칸으로는 돌아가지 않는다.
+  const sessionRef = useRef<number | null>(null);
+  const sessionSeq = useRef(0);
+
   // 브라우저 뒤로 가기로 앱 안의 이전 화면에 간다. 저절로 넘어가거나 한 번 쓰고 마는 화면은 기록에 쌓지 않는다:
   //   준비 중 -> 마이크 연결 (돌아가면 다시 저절로 넘어와 갇힌다)
   //   질문 듣는 중 <-> 실전, 질문 듣는 중 -> 글로 질문하기(인식 실패) (질문 하나마다 칸이 두 개씩 쌓인다)
   //   글로 질문하기 -> 실전 (보낸 질문 입력칸으로 돌아가지 않는다)
   //   로그인 -> 다음 화면 (로그인한 뒤 뒤로 가기가 로그인 화면을 다시 띄우지 않는다)
-  // 발표를 마쳐 자료가 없어진 뒤 뒤로 가기로 발표 화면에 돌아오면 처음 화면을 띄운다.
+  // 지금 띄울 수 없는 칸(끝난 발표의 화면, 로그아웃한 뒤의 내 기록, 로그인한 뒤의 로그인 화면)은 건너뛴다.
   const { back: goBack, leave } = useScreenHistory({
     screen,
     setScreen,
     shouldReplace: (from, to) =>
       (from === 'recognized' && (to === 'hud' || to === 'textInput')) ||
       from === 'login' ||
-      (from === 'hud' && to === 'recognized') ||
+      (from === 'hud' && (to === 'recognized' || to === 'textInput')) || // textInput: 음성 인식이 없는 브라우저
       (from === 'textInput' && to === 'hud') ||
       (from === 'preparing' && to === 'micConnect'),
-    resolve: (s) => (SESSION_SCREENS.includes(s) && !uploadRef.current ? 'start' : s),
+    getSession: () => sessionRef.current,
+    resolve: (s, session) => {
+      if (s === 'login' && loggedIn) return 'start';
+      if (LOGIN_SCREENS.includes(s) && !loggedIn) return 'start';
+      if (SESSION_FLOW.includes(s) && (session === null || session !== sessionRef.current)) return 'start';
+      return s;
+    },
   });
 
   // "돌아가기" 가 갈 화면. 모의 연습과 글로 질문하기는 여러 화면에서 들어온다.
@@ -137,8 +150,12 @@ function App() {
     }
     setQuestion({ partialText: text, finalText: text, isConfirmed: true });
     sendQuestion(text);
-    setTimeout(() => setScreen((s) => (s === 'recognized' ? 'hud' : s)), 900);
+    setAnswerPending(true);
   }
+
+  // 말로 보낸 질문의 답은 실전 화면에서 본다. 질문 듣는 중이나 글로 질문하기 화면에 있으면 잠깐 뒤 실전으로 넘긴다.
+  // 타이머 한 번으로 넘기면, 그사이 지도 등으로 나갔다 돌아왔을 때 답으로 못 넘어가고 멈춘 화면에 남는다.
+  const [answerPending, setAnswerPending] = useState(false);
 
   const {
     start: startRecognition,
@@ -157,11 +174,21 @@ function App() {
     },
   });
 
+  useEffect(() => {
+    if (!answerPending || listening || (screen !== 'recognized' && screen !== 'textInput')) return;
+    const t = setTimeout(() => {
+      setAnswerPending(false);
+      setScreen('hud');
+    }, 900);
+    return () => clearTimeout(t);
+  }, [answerPending, listening, screen]);
+
   // 질문 듣기 시작: 받아 적는 화면으로 가서 처음부터 모은다
   function startQuestion() {
     heardRef.current = '';
     interimRef.current = '';
     finishingRef.current = false;
+    setAnswerPending(false);
     setQuestionMiss(false);
     setQuestion({ partialText: '', finalText: '', isConfirmed: false });
     setScreen('recognized');
@@ -178,8 +205,9 @@ function App() {
   const toggleQuestion = () => (listening ? finishQuestion() : startQuestion());
 
   // 실전 화면을 벗어나면 마이크를 끈다 (설정, 리포트 등으로 가도 계속 듣고 있으면 안 된다)
+  // 마이크 연결 화면도 끈다: 거기서는 켤 수도 끌 수도 없어서, 뒤로 가기로 돌아오면 모르는 새 계속 듣게 된다.
   useEffect(() => {
-    if (!['recognized', 'hud', 'textInput', 'micConnect', 'graph'].includes(screen)) stopRecognition();
+    if (!['recognized', 'hud', 'textInput', 'graph'].includes(screen)) stopRecognition();
   }, [screen, stopRecognition]);
 
   // 지도 화면(지식 지도, 슬라이드 지도). 보고 나면 원래 화면으로 돌아간다.
@@ -314,6 +342,7 @@ function App() {
   function handleConnectMic() {
     heardRef.current = '';
     interimRef.current = '';
+    setAnswerPending(false);
     setQuestionMiss(false);
     setQuestion({ partialText: '', finalText: '', isConfirmed: false });
     setScreen('recognized');
@@ -329,31 +358,50 @@ function App() {
     const text = cleanQuestion(typed) || typed.trim();
     setQuestion({ partialText: text, finalText: text, isConfirmed: true });
     sendQuestion(text);
+    setAnswerPending(false);
     setScreen('hud');
   }
 
   // 서버에 남아 있는 발표를 다시 연다. 파일을 또 올리지 않고 준비 화면으로 바로 간다.
   // (준비 상태를 물으면 서버가 알아서 다시 준비를 시작한다)
   function resumePresentation(p: SavedPresentation) {
+    startSession();
     setPresentationName(p.title);
     setUpload({ presentation_id: p.presentation_id, filename: p.title, slides: 0, sizeMb: p.size_mb });
     setScreen('preparing');
   }
 
   function beginPresentation(title: string) {
+    startSession();
     setPresentationName(title);
     setUpload(null);
     setScreen('upload');
   }
 
-  // 발표 마치기: 청중 화면(있으면)을 내리고, 지금 발표 상태를 지운 뒤 처음 화면으로 돌아간다.
+  // 새 발표. 질문 번호와 지난 발표의 답을 비운다 (안 그러면 새 발표의 실전 화면에 지난 발표의 근거가 뜬다).
+  function startSession() {
+    sessionSeq.current += 1;
+    sessionRef.current = sessionSeq.current;
+    setCueNo(0);
+    cueNoRef.current = 0;
+    setAnswerPending(false);
+    resetQa();
+  }
+
+  // 발표를 끝낸다: 청중 화면(있으면)을 내리고, 지금 발표 상태를 지운 뒤 처음 화면으로 돌아간다.
   // 마이크는 실전 화면을 벗어나면 위 useEffect 가 자동으로 꺼준다.
   // 발표 중에 거친 화면들은 뒤로 가기 기록에서 건너뛴다 (끝난 발표로 뒤로 가기가 다시 들어가지 않게).
-  function finishPresentation() {
-    if (!window.confirm('발표를 마칠까요? 처음 화면으로 돌아갑니다.')) return;
+  function endSession() {
     clearAudience();
     setUpload(null);
-    leave((s) => SESSION_SCREENS.includes(s) || s === 'upload' || s === 'uploadFailed' || s === 'login', 'start');
+    sessionRef.current = null;
+    setAnswerPending(false);
+    leave((s) => SESSION_FLOW.includes(s) || s === 'login', 'start');
+  }
+
+  function finishPresentation() {
+    if (!window.confirm('발표를 마칠까요? 처음 화면으로 돌아갑니다.')) return;
+    endSession();
   }
 
   // ── 발표 중 화면들의 우측 상단 버튼 ────────────────────────────────────
@@ -384,6 +432,7 @@ function App() {
       onClick={() => {
         setTextFromError(false);
         setTextBack(screen);
+        setAnswerPending(false);
         setScreen('textInput');
       }}
       className={headerBtn}
@@ -399,10 +448,12 @@ function App() {
   );
 
   // 헤더의 이동. 로그인한 상태에서 'login' 으로 가는 건 로그아웃이다(랜딩으로 돌아간다).
+  // 발표 중이었으면 그 발표도 끝낸다 (로그아웃한 채로 뒤로 가기가 발표 화면에 다시 들어가지 않게).
   function navigate(target: ScreenName) {
     if (target === 'login' && loggedIn) {
       setLoggedIn(false);
-      setScreen('start');
+      if (sessionRef.current !== null) endSession();
+      else setScreen('start');
       return;
     }
     setScreen(target);
@@ -542,9 +593,12 @@ function App() {
           />
           <MockPracticeScreen
             presentationId={upload.presentation_id}
-            // "실전으로": 실전 쪽 화면에서 들어왔으면 그 화면으로 돌아가고, 아니면 마이크 연결로
-            onFinish={() => (LIVE_SCREENS.includes(mockBack) ? goBack(mockBack) : setScreen('micConnect'))}
-            onIndexChange={(index, total) => setMockProgress({ index, total })}
+            // "실전으로"/"건너뛰기": 들어온 화면으로 돌아간다. 준비 화면에서 왔으면 준비가 끝나야 실전(마이크 연결)으로 넘어간다.
+            onFinish={() => goBack(mockBack)}
+            // 같은 값이면 상태를 그대로 둔다. 새 객체를 넣으면 다시 그려질 때마다 이 함수가 새로 불려 끝없이 다시 그린다.
+            onIndexChange={(index, total) =>
+              setMockProgress((p) => (p.index === index && p.total === total ? p : { index, total }))
+            }
           />
         </>
       )}

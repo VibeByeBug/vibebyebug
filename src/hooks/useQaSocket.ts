@@ -13,6 +13,7 @@ interface UseQaSocketResult {
   rawMessage: string | null;
   ask: (text: string, presentationId: string, mode: AnswerMode) => void;
   requestMode: (mode: AnswerMode) => void; // 직전 질문을 다른 모드로 다시 받기
+  reset: () => void; // 받은 답을 비운다 (새 발표를 시작할 때)
 }
 
 export function useQaSocket(): UseQaSocketResult {
@@ -107,5 +108,12 @@ export function useQaSocket(): UseQaSocketResult {
     socket.send(JSON.stringify({ type: 'cue.extra', mode }));
   }, []);
 
-  return { isConnected, lastResult, lastAnswer, lastFlow, notice, rawMessage, ask, requestMode };
+  const reset = useCallback(() => {
+    setLastResult(null);
+    setLastAnswer(null);
+    setLastFlow(null);
+    setNotice(null);
+  }, []);
+
+  return { isConnected, lastResult, lastAnswer, lastFlow, notice, rawMessage, ask, requestMode, reset };
 }
