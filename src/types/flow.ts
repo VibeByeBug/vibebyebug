@@ -14,6 +14,7 @@ export type ScreenName =
   | 'hud'
   | 'report'
   | 'myHistory'
+  | 'library'
   | 'settings';
 
 export type PreparingStatus = 'uploading' | 'analyzing' | 'ready' | 'failed';

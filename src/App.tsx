@@ -9,6 +9,7 @@ import { MockPracticeScreen } from './components/MockPracticeScreen';
 import { CorePracticeScreen } from './components/CorePracticeScreen';
 import { GraphScreen } from './components/GraphScreen';
 import { MaterialScreen } from './components/MaterialScreen';
+import { MaterialLibraryScreen } from './components/MaterialLibraryScreen';
 import { MyHistoryScreen } from './components/MyHistoryScreen';
 import { PreparingScreen } from './components/PreparingScreen';
 import { RecognizedQuestion } from './components/RecognizedQuestion';
@@ -27,6 +28,7 @@ import { loadSourceCount, saveSourceCount, type SourceCount } from './settings';
 import { useSpeechRecognition } from './hooks/useSpeechRecognition';
 import { useScreenHistory } from './hooks/useScreenHistory';
 import { mockRecognizedQuestion } from './mocks/questionMock';
+import { DEFAULT_TITLE } from './constants';
 import { DownloadIcon } from './components/icons';
 import type { ScreenName } from './types/flow';
 import type { AnswerMode } from './types/qa';
@@ -445,6 +447,7 @@ function App() {
               setReportTarget(null);
               setScreen('myHistory');
             }}
+            onOpenLibrary={() => setScreen('library')}
             onResume={resumePresentation}
           />
         </>
@@ -709,6 +712,19 @@ function App() {
               setReportTarget({ pid, title });
               setScreen('report');
             }}
+          />
+        </>
+      )}
+
+      {screen === 'library' && (
+        <>
+          <Header onNavigate={navigate} label="자료 보관함" activeMenu="library" />
+          <MaterialLibraryScreen
+            onResume={(p) => {
+              resumePresentation(p);
+            }}
+            onNew={() => beginPresentation(DEFAULT_TITLE)}
+            currentPresentationId={upload?.presentation_id}
           />
         </>
       )}

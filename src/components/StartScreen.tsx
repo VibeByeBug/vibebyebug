@@ -8,6 +8,7 @@ import { DEFAULT_TITLE } from '../constants';
 interface StartScreenProps {
   onStart: (title: string) => void;
   onOpenReport: () => void;
+  onOpenLibrary: () => void; // 그동안 올린 자료 전체를 보고 관리하는 화면
   onResume: (p: SavedPresentation) => void; // 서버에 남아 있는 발표를 다시 연다
   loggedIn?: boolean; // 로그인 전(랜딩)에는 최근 발표와 회고를 숨긴다
 }
@@ -16,7 +17,7 @@ interface StartScreenProps {
 // 시작하면 슬레이트 팔이 "딱" 닫힌 뒤 넘어간다.
 // 라이트 모드에서는 무대 바닥이 종이(paper)가 되고 글자는 슬레이트 잉크(slateInk)로 바뀐다.
 // 슬레이트 판과 필름 스트립은 소품이라 두 모드 모두 검은색 그대로 둔다.
-export function StartScreen({ onStart, onOpenReport, onResume, loggedIn = false }: StartScreenProps) {
+export function StartScreen({ onStart, onOpenReport, onOpenLibrary, onResume, loggedIn = false }: StartScreenProps) {
   const light = useTheme().theme === 'light';
   // 최근 촬영분: 서버에 남아 있는 발표. 다시 올리지 않고 이어서 열 수 있다.
   const [recent, setRecent] = useState<SavedPresentation[]>([]);
@@ -213,7 +214,18 @@ export function StartScreen({ onStart, onOpenReport, onResume, loggedIn = false 
       <div className="relative px-[24px] md:px-[96px] pb-[36px] flex flex-col gap-[10px]">
         {loggedIn && (
         <>
-        <p className={`font-bold text-[15px] ${light ? 'text-slateInk/70' : 'text-white/70'}`}>최근 촬영분</p>
+        <div className="flex items-baseline justify-between">
+          <p className={`font-bold text-[15px] ${light ? 'text-slateInk/70' : 'text-white/70'}`}>최근 촬영분</p>
+          <button
+            type="button"
+            onClick={onOpenLibrary}
+            className={`font-bold text-[13px] transition-colors ${
+              light ? 'text-slateInk/50 hover:text-slateInk' : 'text-white/50 hover:text-white'
+            }`}
+          >
+            자료 보관함 전체 보기 →
+          </button>
+        </div>
         {/* 필름 스트립도 소품이라 두 모드 모두 검은 필름에 흰 글씨 */}
         <div className="bg-[#0b0907] text-white rounded-[6px] px-[10px] py-[8px] flex flex-col gap-[8px]">
           <div className="film-holes text-white/20" />
