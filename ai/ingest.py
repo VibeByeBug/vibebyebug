@@ -41,9 +41,10 @@ def from_pdf(path: Path) -> list[dict]:
     chunks = []
     for i, page in enumerate(doc, start=1):
         chunks.append({"page": i, "text": _clean(page.get_text()), "notes": ""})
-    # 묶음 경계는 공백이 빠진 자료에만 필요하다. 읽는 데 장당 0.1초가 들어서 필요할 때만 구한다.
-    if needs_spacing("\n".join(c["text"] for c in chunks)):
-        for c, page in zip(chunks, doc):
+    # 공백 판정은 슬라이드마다 한다. 문서 전체로 하면 대부분 멀쩡한 자료에 섞인 한두 장(흔히 큰 제목 슬라이드)
+    # 이 전체 평균에 묻혀 놓친다. 묶음 경계는 공백이 빠진 장에만 필요하다(장당 0.1초 들어서).
+    for c, page in zip(chunks, doc):
+        if needs_spacing(c["text"]):
             c["bounds"] = _run_bounds(page, c["text"])
     doc.close()
 
@@ -251,12 +252,12 @@ def ingest(path: Path) -> list[dict]:
     else:
         raise ValueError(f"지원하지 않는 형식: {suffix} (.pdf 또는 .pptx만)")
 
-    # 공백 판정은 자료 전체로 한다. 슬라이드마다 하면 짧은 장에서 흔들린다.
-    spacing = needs_spacing("\n".join(c["text"] for c in raw))
-
     out = []
     for c in raw:
-        text = restore_spacing(c["text"], c.get("bounds")) if spacing else c["text"]
+        # 슬라이드마다 따로 본다(needs_spacing 이 짧은 장에서 흔들리지 않게 최소 한글 30자를 요구한다).
+        # 문서 전체 평균으로 봤을 때는, 제목처럼 한 장만 공백이 빠진 경우를 대부분 멀쩡한 나머지 장들이
+        # 가려서 놓쳤다.
+        text = restore_spacing(c["text"], c.get("bounds")) if needs_spacing(c["text"]) else c["text"]
         c = {**c, "text": join_wrapped(text)}
         notes = c.get("notes", "")
         body = c["text"] if not notes else f"{c['text']}\n\n[노트] {notes}"
