@@ -150,12 +150,19 @@ function App() {
     }
     setQuestion({ partialText: text, finalText: text, isConfirmed: true });
     sendQuestion(text);
-    setAnswerPending(true);
+    // 실전 화면에서 질문 끝을 눌렀으면 이미 답을 보고 있다. 안 세우면, 나중에 뒤로 가기로 들른 글로 질문하기
+    // 화면이 저절로 실전으로 넘어가 버린다.
+    if (screenRef.current !== 'hud') setAnswerPending(true);
   }
 
   // 말로 보낸 질문의 답은 실전 화면에서 본다. 질문 듣는 중이나 글로 질문하기 화면에 있으면 잠깐 뒤 실전으로 넘긴다.
   // 타이머 한 번으로 넘기면, 그사이 지도 등으로 나갔다 돌아왔을 때 답으로 못 넘어가고 멈춘 화면에 남는다.
   const [answerPending, setAnswerPending] = useState(false);
+  // 음성 인식 콜백은 시작한 순간의 화면을 붙잡고 있어서 지금 화면은 ref 로 읽는다
+  const screenRef = useRef(screen);
+  useEffect(() => {
+    screenRef.current = screen;
+  }, [screen]);
 
   const {
     start: startRecognition,
@@ -386,22 +393,24 @@ function App() {
     cueNoRef.current = 0;
     setAnswerPending(false);
     resetQa();
+    clearAudience(); // 청중 화면에 지난 발표의 슬라이드가 남지 않게
   }
 
-  // 발표를 끝낸다: 청중 화면(있으면)을 내리고, 지금 발표 상태를 지운 뒤 처음 화면으로 돌아간다.
+  // 발표를 끝낸다: 청중 화면(있으면)을 내리고, 지금 발표 상태를 지운다.
   // 마이크는 실전 화면을 벗어나면 위 useEffect 가 자동으로 꺼준다.
-  // 발표 중에 거친 화면들은 뒤로 가기 기록에서 건너뛴다 (끝난 발표로 뒤로 가기가 다시 들어가지 않게).
   function endSession() {
     clearAudience();
     setUpload(null);
     sessionRef.current = null;
     setAnswerPending(false);
-    leave((s) => SESSION_FLOW.includes(s) || s === 'login', 'start');
   }
 
+  // 발표 마치기: 발표를 끝내고 처음 화면으로. 발표 중에 거친 화면들은 뒤로 가기 기록에서 건너뛴다
+  // (끝난 발표로 뒤로 가기가 다시 들어가지 않게).
   function finishPresentation() {
     if (!window.confirm('발표를 마칠까요? 처음 화면으로 돌아갑니다.')) return;
     endSession();
+    leave((s) => SESSION_FLOW.includes(s) || s === 'login', 'start');
   }
 
   // ── 발표 중 화면들의 우측 상단 버튼 ────────────────────────────────────
@@ -448,12 +457,13 @@ function App() {
   );
 
   // 헤더의 이동. 로그인한 상태에서 'login' 으로 가는 건 로그아웃이다(랜딩으로 돌아간다).
-  // 발표 중이었으면 그 발표도 끝낸다 (로그아웃한 채로 뒤로 가기가 발표 화면에 다시 들어가지 않게).
+  // 발표 중이었으면 그 발표도 끝낸다. 발표 화면과 내 기록처럼 로그인해야 보는 화면은 뒤로 가기 기록에서 건너뛴다
+  // (로그아웃한 채로 다시 들어가지 않게, 처음 화면이 기록에 두 번 쌓이지 않게).
   function navigate(target: ScreenName) {
     if (target === 'login' && loggedIn) {
       setLoggedIn(false);
       if (sessionRef.current !== null) endSession();
-      else setScreen('start');
+      leave((s) => SESSION_FLOW.includes(s) || LOGIN_SCREENS.includes(s) || s === 'login', 'start');
       return;
     }
     setScreen(target);
@@ -542,7 +552,12 @@ function App() {
           />
           <PreparingScreen
             presentationId={upload.presentation_id}
-            onReady={() => setScreen('micConnect')}
+            onReady={() => {
+              // 준비가 끝나면 이 칸은 마이크 연결로 바뀐다. 준비 화면으로 돌아가려던 버튼들도 마이크 연결로 돌린다.
+              setMockBack((b) => (b === 'preparing' ? 'micConnect' : b));
+              setMaterialBack((b) => (b === 'preparing' ? 'micConnect' : b));
+              setScreen('micConnect');
+            }}
             onRetry={() => setScreen('upload')}
           />
         </>
