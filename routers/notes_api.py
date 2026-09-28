@@ -21,6 +21,7 @@ import engine_store
 import notes as notes_mod
 import slide_refine
 from indexing import DATA_DIR, chunks_path
+from quality_report import first_readable_line
 
 router = APIRouter(prefix="/api/notes", tags=["Presenter Notes"])
 
@@ -72,7 +73,7 @@ async def get_notes(pid: str):
     rows = _rows(pid)
     refined = slide_refine.load(refined_path(pid)) or {}
     slides = [{"page": r["page"],
-               "title": next((l for l in r["text"].split("\n") if l.strip()), "")[:40],
+               "title": first_readable_line(r["text"], 40),
                "text": r["text"], "refined": refined.get(r["page"])} for r in rows]
     return {"slides": slides, "notes": notes_mod.NoteStore(notes_path(pid)).notes}
 
