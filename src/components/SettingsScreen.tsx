@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from 'react';
 import type { SourceCount } from '../settings';
 import { useTheme, type Theme } from '../theme';
 import { MicSmallIcon, WatchIcon } from './icons';
+import { MicRehearsal } from './MicRehearsal';
 
 // 설정. 지금 실제로 동작하는 것만 둔다.
 // 답변 보기(키워드, 흐름도, 추천 답변) 고르기는 없앴다. 실전 화면은 추천 답변과 흐름도를 항상 같이 보여준다.
@@ -127,6 +128,13 @@ export function SettingsScreen({
                 </button>
               )}
             </div>
+          </Row>
+
+          <Row
+            title="마이크 점검"
+            desc="질문자가 있을 자리(강의실 뒤쪽 등)에서 실제로 말해보고, 음량과 인식 글자가 잘 잡히는지 시연 전에 확인해요"
+          >
+            <MicRehearsal />
           </Row>
 
           <Row title="갤럭시 워치" desc="손목에서 질문 유형과 슬라이드 번호 보기">
