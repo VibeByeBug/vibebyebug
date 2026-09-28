@@ -34,12 +34,35 @@ interface Item {
 const SOURCE_LABEL = { rehearsal: '리허설', script: '발표 대본', doc: '설명 자료' } as const;
 const KIND_LABEL = { repeat: '슬라이드 반복', explain: '보충 설명', fact: '새 사실', filler: '군말' } as const;
 
-async function post(url: string, body: unknown) {
-  const res = await fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+async function post(url: string, body: unknown, signal?: AbortSignal) {
+  const res = await fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body), signal });
   const data = await res.json().catch(() => ({}));
   if (!res.ok) throw new Error(data.detail ?? `요청 실패 (${res.status})`);
   return data;
 }
+
+// AI 정리 요청을 중간에 취소할 수 있게 한다.
+// 취소한 뒤에 늦게 도착한 응답이 화면을 덮어쓰지 않도록, begin() 이 준 것이 지금 요청인지 isCurrent 로 본다.
+// (취소하고 바로 다시 정리하면 앞 요청의 마무리가 뒤 요청의 busy 를 꺼버릴 수 있다.)
+function useAbortable() {
+  const ref = useRef<AbortController | null>(null);
+  useEffect(() => () => ref.current?.abort(), []); // 화면을 떠나면 진행 중인 요청도 끊는다
+  return {
+    begin() {
+      ref.current?.abort();
+      const c = new AbortController();
+      ref.current = c;
+      return c;
+    },
+    isCurrent: (c: AbortController) => ref.current === c,
+    cancel() {
+      ref.current?.abort();
+      ref.current = null;
+    },
+  };
+}
+
+const isAbort = (e: unknown) => e instanceof DOMException && e.name === 'AbortError';
 
 // 처음 체크 상태: 보충 설명은 저장, 중복과 군말은 저장 안 함.
 // 슬라이드 반복은 답변 근거로는 안 쓰고 검색용 표현으로만 저장하므로 기본 체크.
@@ -193,9 +216,11 @@ function Rehearsal({
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [savedMsg, setSavedMsg] = useState<string | null>(null);
+  const [addedIds, setAddedIds] = useState<string[]>([]); // 방금 저장한 묶음 (되돌리기용)
   const [showRaw, setShowRaw] = useState(false);
   const [take, setTake] = useState(1); // 이 슬라이드에서 몇 번째 녹음인가. 저장할 때마다 하나 올라간다
   const [secs, setSecs] = useState(0);
+  const ab = useAbortable();
   const slide = slides[index];
 
   // 음성 인식 결과는 이어 붙인다. 발표자가 텍스트 칸에서 직접 고칠 수도 있다.
@@ -224,11 +249,14 @@ function Rehearsal({
     const to = Math.max(0, Math.min(slides.length - 1, next));
     if (to === index) return;
     stop();
+    ab.cancel(); // 정리 중에 다른 슬라이드로 넘어가면, 늦게 온 결과가 그 슬라이드에 뜨지 않게 끊는다
+    setBusy(false);
     setIndex(to);
     setTranscript('');
     setPartial('');
     setItems(null);
     setSavedMsg(null);
+    setAddedIds([]);
     setError(null);
     setTake(1);
     setSecs(0);
@@ -236,20 +264,31 @@ function Rehearsal({
 
   async function organize() {
     stop();
+    const c = ab.begin();
     setBusy(true);
     setError(null);
+    setSavedMsg(null);
+    setAddedIds([]);
     try {
-      const r = await post(`${API_URL}/api/notes/${presentationId}/classify`, {
-        text: transcript,
-        source: 'rehearsal',
-        page: slide?.page,
-      });
+      const r = await post(
+        `${API_URL}/api/notes/${presentationId}/classify`,
+        { text: transcript, source: 'rehearsal', page: slide?.page },
+        c.signal,
+      );
+      if (!ab.isCurrent(c)) return;
       setItems((r.items as Item[]).map((it) => ({ ...it, checked: initialCheck(it, 'rehearsal') })));
     } catch (e) {
+      if (isAbort(e) || !ab.isCurrent(c)) return;
       setError(e instanceof Error ? e.message : '정리하지 못했습니다');
     } finally {
-      setBusy(false);
+      if (ab.isCurrent(c)) setBusy(false);
     }
+  }
+
+  // 정리 중에 취소. 서버는 정리만 하고 아무것도 저장하지 않으므로 결과를 버리면 끝이다.
+  function cancelOrganize() {
+    ab.cancel();
+    setBusy(false);
   }
 
   if (!slide) return <p className="font-medium text-[14px] text-ink/55 text-center py-[40px]">슬라이드를 불러오는 중···</p>;
@@ -381,29 +420,54 @@ function Rehearsal({
           <span className="font-medium text-[12px] text-ink/40">
             {transcript.trim() ? `${transcript.trim().length}자` : ''}
           </span>
-          <button
-            type="button"
-            onClick={organize}
-            disabled={!transcript.trim() || busy}
-            className="cta h-[42px] px-[20px] rounded-[8px] bg-[#f26b1d] font-bold text-[15px] text-white disabled:opacity-40"
-          >
-            {busy ? 'AI가 정리하는 중···' : '정리하기 →'}
-          </button>
+          <div className="flex gap-[8px] items-center">
+            {busy && (
+              <button
+                type="button"
+                onClick={cancelOrganize}
+                className="h-[42px] px-[16px] rounded-[8px] border border-ink/25 font-bold text-[14px] text-ink/80 hover:border-ink/50 hover:text-ink"
+              >
+                취소
+              </button>
+            )}
+            <button
+              type="button"
+              onClick={organize}
+              disabled={!transcript.trim() || busy}
+              className="cta h-[42px] px-[20px] rounded-[8px] bg-[#f26b1d] font-bold text-[15px] text-white disabled:opacity-40"
+            >
+              {busy ? 'AI가 정리하는 중···' : '정리하기 →'}
+            </button>
+          </div>
         </div>
         {error && <p className="font-medium text-[13px] text-err">{error}</p>}
-        {savedMsg && <p className="font-medium text-[13px] text-ok">{savedMsg}</p>}
+        {savedMsg && (
+          <SavedNotice
+            message={savedMsg}
+            ids={addedIds}
+            presentationId={presentationId}
+            onUndone={(notes, removed) => {
+              onSaved(notes);
+              setAddedIds([]);
+              setSavedMsg(`${removed}개를 지웠어요.`);
+            }}
+          />
+        )}
         {items && (
           <Review
             items={items}
             setItems={setItems}
             presentationId={presentationId}
             source="rehearsal"
-            onSaved={(n, added) => {
+            discardLabel="정리 취소"
+            onDiscard={() => setItems(null)}
+            onSaved={(n, added, ids) => {
               onSaved(n);
               setItems(null);
               setTranscript('');
               setTake((t) => t + 1);
               setSecs(0);
+              setAddedIds(ids);
               setSavedMsg(`${added}개 저장했어요. 더 말하거나 다음 슬라이드로 넘어가도 됩니다.`);
             }}
           />
@@ -503,7 +567,10 @@ function DocInput({ presentationId, onSaved }: { presentationId: string; onSaved
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [savedMsg, setSavedMsg] = useState<string | null>(null);
+  const [addedIds, setAddedIds] = useState<string[]>([]); // 방금 저장한 묶음 (되돌리기용)
+  const [fileName, setFileName] = useState<string | null>(null); // 정리 중인 파일
   const fileRef = useRef<HTMLInputElement>(null);
+  const ab = useAbortable();
 
   // 입력칸에 파일을 끌어다 놓으면 "파일로 올리기" 와 똑같이 정리한다. 정리하는 중에는 받지 않는다.
   const { dragging, bind } = useFileDrop({
@@ -514,34 +581,55 @@ function DocInput({ presentationId, onSaved }: { presentationId: string; onSaved
   });
 
   async function organizeText() {
+    const c = ab.begin();
     setBusy(true);
     setError(null);
+    setSavedMsg(null);
+    setAddedIds([]);
     try {
-      const r = await post(`${API_URL}/api/notes/${presentationId}/classify`, { text, source });
+      const r = await post(`${API_URL}/api/notes/${presentationId}/classify`, { text, source }, c.signal);
+      if (!ab.isCurrent(c)) return;
       setItems((r.items as Item[]).map((it) => ({ ...it, checked: initialCheck(it, source) })));
     } catch (e) {
+      if (isAbort(e) || !ab.isCurrent(c)) return;
       setError(e instanceof Error ? e.message : '정리하지 못했습니다');
     } finally {
-      setBusy(false);
+      if (ab.isCurrent(c)) setBusy(false);
     }
   }
 
   async function organizeFile(file: File) {
+    const c = ab.begin();
     setBusy(true);
     setError(null);
+    setSavedMsg(null);
+    setAddedIds([]);
+    setFileName(file.name);
     try {
       const body = new FormData();
       body.append('file', file);
       body.append('source', source);
-      const res = await fetch(`${API_URL}/api/notes/${presentationId}/classify-file`, { method: 'POST', body });
+      const res = await fetch(`${API_URL}/api/notes/${presentationId}/classify-file`, { method: 'POST', body, signal: c.signal });
       const data = await res.json();
       if (!res.ok) throw new Error(data.detail ?? '파일을 정리하지 못했습니다');
+      if (!ab.isCurrent(c)) return;
       setItems((data.items as Item[]).map((it) => ({ ...it, checked: initialCheck(it, source) })));
     } catch (e) {
+      if (isAbort(e) || !ab.isCurrent(c)) return;
       setError(e instanceof Error ? e.message : '파일을 정리하지 못했습니다');
     } finally {
-      setBusy(false);
+      if (ab.isCurrent(c)) {
+        setBusy(false);
+        setFileName(null);
+      }
     }
+  }
+
+  // 정리 중에 취소. 서버는 정리만 하고 아무것도 저장하지 않으므로 결과를 버리면 끝이다.
+  function cancelOrganize() {
+    ab.cancel();
+    setBusy(false);
+    setFileName(null);
   }
 
   return (
@@ -599,28 +687,58 @@ function DocInput({ presentationId, onSaved }: { presentationId: string; onSaved
             파일로 올리기 (txt, md, pdf)
           </button>
           <span className="font-normal text-[12px] text-ink/45 break-keep">또는 입력칸으로 끌어다 놓기</span>
+          {busy && fileName && (
+            <span className="max-w-[220px] truncate font-medium text-[13px] text-ink/55" title={fileName}>
+              {fileName}
+            </span>
+          )}
         </div>
-        <button
-          type="button"
-          onClick={organizeText}
-          disabled={!text.trim() || busy}
-          className="cta bg-[#f26b1d] h-[42px] px-[20px] rounded-[8px] font-bold text-[15px] text-white disabled:opacity-40"
-        >
-          {busy ? 'AI가 정리하는 중···' : '정리하기 →'}
-        </button>
+        <div className="flex gap-[8px] items-center">
+          {busy && (
+            <button
+              type="button"
+              onClick={cancelOrganize}
+              className="h-[42px] px-[16px] rounded-[8px] border border-ink/25 font-bold text-[14px] text-ink/80 hover:border-ink/50 hover:text-ink"
+            >
+              취소
+            </button>
+          )}
+          <button
+            type="button"
+            onClick={organizeText}
+            disabled={!text.trim() || busy}
+            className="cta bg-[#f26b1d] h-[42px] px-[20px] rounded-[8px] font-bold text-[15px] text-white disabled:opacity-40"
+          >
+            {busy ? 'AI가 정리하는 중···' : '정리하기 →'}
+          </button>
+        </div>
       </div>
       {error && <p className="font-medium text-[13px] text-err">{error}</p>}
-      {savedMsg && <p className="font-medium text-[13px] text-ok">{savedMsg}</p>}
+      {savedMsg && (
+        <SavedNotice
+          message={savedMsg}
+          ids={addedIds}
+          presentationId={presentationId}
+          onUndone={(notes, removed) => {
+            onSaved(notes);
+            setAddedIds([]);
+            setSavedMsg(`${removed}개를 지웠어요.`);
+          }}
+        />
+      )}
       {items && (
         <Review
           items={items}
           setItems={setItems}
           presentationId={presentationId}
           source={source}
-          onSaved={(n, added) => {
+          discardLabel="업로드 취소"
+          onDiscard={() => setItems(null)}
+          onSaved={(n, added, ids) => {
             onSaved(n);
             setItems(null);
             setText('');
+            setAddedIds(ids);
             setSavedMsg(`${added}개 저장했어요.`);
           }}
         />
@@ -636,12 +754,16 @@ function Review({
   presentationId,
   source,
   onSaved,
+  onDiscard,
+  discardLabel = '취소',
 }: {
   items: Item[];
   setItems: (v: Item[]) => void;
   presentationId: string;
   source: 'rehearsal' | 'script' | 'doc';
-  onSaved: (notes: Note[], added: number) => void;
+  onSaved: (notes: Note[], added: number, addedIds: string[]) => void;
+  onDiscard: () => void; // 저장하지 않고 정리 결과를 버린다
+  discardLabel?: string;
 }) {
   const [busy, setBusy] = useState(false);
   const [showHidden, setShowHidden] = useState(false);
@@ -661,7 +783,7 @@ function Review({
           .filter((it) => it.checked && it.kind !== 'filler')
           .map(({ page, kind, text, para, section }) => ({ page, kind, text, para, section })),
       });
-      onSaved(r.notes, r.added);
+      onSaved(r.notes, r.added, r.added_ids ?? []);
     } finally {
       setBusy(false);
     }
@@ -734,15 +856,71 @@ function Review({
         <span className="font-normal text-[12px] text-ink/40 break-keep">
           슬라이드 반복은 답변 근거가 아니라 질문을 찾는 표현으로만 저장돼요.
         </span>
+        <div className="flex gap-[8px] items-center">
+          <button
+            type="button"
+            onClick={onDiscard}
+            disabled={busy}
+            className="h-[42px] px-[16px] rounded-[8px] border border-ink/25 font-bold text-[14px] text-ink/80 hover:border-ink/50 hover:text-ink disabled:opacity-40"
+          >
+            {discardLabel}
+          </button>
+          <button
+            type="button"
+            onClick={save}
+            disabled={busy || count === 0}
+            className="cta h-[42px] px-[20px] rounded-[8px] bg-sel font-bold text-[15px] text-selInk disabled:opacity-40"
+          >
+            {busy ? '저장 중···' : `체크한 ${count}개 저장`}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// 저장 직후 안내. 방금 저장한 묶음을 한 번에 지울 수 있다 (하나씩 지우려면 저장된 설명 탭에서).
+// 저장할 때 비슷한 기존 설명을 더 자세한 글로 바꾼 것은 되돌리지 않는다. 새로 생긴 설명만 지운다.
+function SavedNotice({
+  message,
+  ids,
+  presentationId,
+  onUndone,
+}: {
+  message: string;
+  ids: string[];
+  presentationId: string;
+  onUndone: (notes: Note[], removed: number) => void;
+}) {
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  async function undo() {
+    setBusy(true);
+    setError(null);
+    try {
+      const r = await post(`${API_URL}/api/notes/${presentationId}/delete-many`, { ids });
+      onUndone(r.notes, r.removed);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : '지우지 못했습니다');
+      setBusy(false);
+    }
+  }
+
+  return (
+    <div className="flex flex-wrap items-center gap-x-[12px] gap-y-[4px]">
+      <p className="font-medium text-[13px] text-ok">{message}</p>
+      {ids.length > 0 && (
         <button
           type="button"
-          onClick={save}
-          disabled={busy || count === 0}
-          className="cta h-[42px] px-[20px] rounded-[8px] bg-sel font-bold text-[15px] text-selInk disabled:opacity-40"
+          onClick={undo}
+          disabled={busy}
+          className="font-bold text-[12px] text-ink/55 underline underline-offset-2 hover:text-err disabled:opacity-40"
         >
-          {busy ? '저장 중···' : `체크한 ${count}개 저장`}
+          {busy ? '지우는 중···' : `방금 저장한 ${ids.length}개 지우기`}
         </button>
-      </div>
+      )}
+      {error && <span className="font-medium text-[13px] text-err">{error}</span>}
     </div>
   );
 }
@@ -759,6 +937,8 @@ function Saved({
   onChange: (n: Note[]) => void;
 }) {
   const [showRepeat, setShowRepeat] = useState(false);
+  const [selected, setSelected] = useState<Set<string>>(new Set());
+  const [busy, setBusy] = useState(false);
   const shown = notes.filter((n) => showRepeat || n.kind !== 'repeat');
   const groups = new Map<number, Note[]>();
   for (const n of shown) {
@@ -766,18 +946,81 @@ function Saved({
     groups.set(k, [...(groups.get(k) ?? []), n]);
   }
   const title = (p: number) => (p ? `p.${p} ${slides.find((s) => s.page === p)?.title ?? ''}` : '프로젝트 전반');
+  const shownIds = shown.map((n) => n.id);
+  const allSelected = shownIds.length > 0 && shownIds.every((id) => selected.has(id));
+  const toggleOne = (id: string) =>
+    setSelected((s) => {
+      const next = new Set(s);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
 
   async function remove(id: string) {
     const res = await fetch(`${API_URL}/api/notes/${presentationId}/${id}`, { method: 'DELETE' });
     onChange((await res.json()).notes);
+    setSelected((s) => {
+      if (!s.has(id)) return s;
+      const next = new Set(s);
+      next.delete(id);
+      return next;
+    });
+  }
+
+  async function removeSelected() {
+    setBusy(true);
+    try {
+      const res = await fetch(`${API_URL}/api/notes/${presentationId}/delete-many`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ ids: [...selected] }),
+      });
+      const data = await res.json();
+      onChange(data.notes);
+      setSelected(new Set());
+    } finally {
+      setBusy(false);
+    }
   }
 
   return (
     <div className="flex flex-col gap-[16px] w-full max-w-[900px] mx-auto">
-      <label className="flex gap-[8px] items-center justify-center font-medium text-[13px] text-ink/55 cursor-pointer">
-        <input type="checkbox" checked={showRepeat} onChange={() => setShowRepeat((v) => !v)} className="accent-[#f26b1d]" />
-        검색용 표현(슬라이드 반복)도 보기
-      </label>
+      <div className="flex flex-wrap items-center justify-center gap-x-[16px] gap-y-[8px]">
+        <label className="flex gap-[8px] items-center font-medium text-[13px] text-ink/55 cursor-pointer">
+          <input
+            type="checkbox"
+            checked={showRepeat}
+            onChange={() => {
+              setShowRepeat((v) => !v);
+              setSelected(new Set()); // 목록이 바뀌면 선택도 비운다 (숨겨진 항목이 선택된 채로 남지 않게)
+            }}
+            className="accent-[#f26b1d]"
+          />
+          검색용 표현(슬라이드 반복)도 보기
+        </label>
+        {shownIds.length > 0 && (
+          <>
+            <span className="h-[14px] w-px bg-ink/15" />
+            <label className="flex gap-[8px] items-center font-medium text-[13px] text-ink/55 cursor-pointer">
+              <input
+                type="checkbox"
+                checked={allSelected}
+                onChange={() => setSelected(allSelected ? new Set() : new Set(shownIds))}
+                className="accent-[#f26b1d]"
+              />
+              전체 선택
+            </label>
+            <button
+              type="button"
+              onClick={removeSelected}
+              disabled={selected.size === 0 || busy}
+              className="h-[30px] px-[14px] rounded-[7px] border border-ink/20 font-bold text-[13px] text-ink/75 hover:border-err hover:text-err disabled:opacity-40"
+            >
+              {busy ? '지우는 중···' : selected.size > 0 ? `선택한 ${selected.size}개 지우기` : '선택 지우기'}
+            </button>
+          </>
+        )}
+      </div>
       {groups.size === 0 && (
         <p className="rounded-[10px] border border-dashed border-ink/15 px-[14px] py-[18px] text-center font-medium text-[14px] text-ink/50">
           아직 저장된 설명이 없어요. 리허설 녹음이나 대본으로 모아보세요.
@@ -794,8 +1037,17 @@ function Saved({
             {list.map((n) => (
               <div
                 key={n.id}
-                className="group flex gap-[12px] items-start rounded-[10px] border border-ink/10 bg-card px-[16px] py-[12px] transition-colors hover:bg-cardHover"
+                className={`group flex gap-[12px] items-start rounded-[10px] border px-[16px] py-[12px] transition-colors hover:bg-cardHover ${
+                  selected.has(n.id) ? 'border-[#f26b1d]/60 bg-cardHover' : 'border-ink/10 bg-card'
+                }`}
               >
+                <input
+                  type="checkbox"
+                  checked={selected.has(n.id)}
+                  onChange={() => toggleOne(n.id)}
+                  className="mt-[3px] shrink-0 accent-[#f26b1d]"
+                  aria-label="이 설명 선택"
+                />
                 <span
                   className={`font-bold text-[12px] shrink-0 mt-[2px] w-[74px] ${
                     n.kind === 'fact' ? 'text-warn' : n.kind === 'repeat' ? 'text-ink/40' : 'text-ok'

@@ -40,7 +40,7 @@ from pathlib import Path
 import caption
 import render
 from ingest import NoTextError, ingest
-from quality_report import MIN_LETTERS, letters
+from quality_report import MIN_LETTERS, garbled, letters
 
 NOTE_MARK = "\n\n[노트] "
 
@@ -96,9 +96,15 @@ def build(path: Path | str, slides_dir: Path | str | None = None,
 
     total = _page_count(path)
     by_page = {r["page"]: r for r in text_rows}
+
     # 노트는 글자 수에서 뺀다. 슬라이드 본문이 이미지인데 노트만 있는 경우가 흔하다.
-    need = [p for p in range(1, total + 1)
-            if letters(_split_notes(by_page.get(p, {}).get("text", ""))[0]) < MIN_LETTERS]
+    # 글자가 없는 장뿐 아니라, 있어도 폰트가 깨져 엉뚱한 음절만 반복되는 장도 다시 읽어야 한다
+    # (quality_report.garbled — 글자 수 기준만으로는 "양호"로 잘못 판정된다).
+    def _unusable(p: int) -> bool:
+        text = _split_notes(by_page.get(p, {}).get("text", ""))[0]
+        return letters(text) < MIN_LETTERS or garbled(text)
+
+    need = [p for p in range(1, total + 1) if _unusable(p)]
 
     result = {
         "rows": text_rows,

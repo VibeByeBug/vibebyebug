@@ -22,6 +22,8 @@ import json
 import re
 from pathlib import Path
 
+from quality_report import first_readable_line
+
 ROLES = ("소개", "문제", "방법", "결과", "근거", "한계", "제안")
 RELATIONS = ("근거", "원인", "방법", "결과", "예시", "한계", "이어짐")
 
@@ -118,8 +120,7 @@ def build(rows: list[dict], notes: list[dict] | None = None) -> dict:
     # 역할을 못 받은 슬라이드도 점으로는 그린다
     for p in sorted(by_page):
         if p not in seen_nodes:
-            first = next((l for l in by_page[p].split("\n") if l.strip()), "")
-            graph["nodes"].append({"page": p, "role": "소개", "title": first[:24]})
+            graph["nodes"].append({"page": p, "role": "소개", "title": first_readable_line(by_page[p], 24)})
     graph["nodes"].sort(key=lambda n: n["page"])
     graph["edges"] = graph["edges"][:20]
     return graph

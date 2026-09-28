@@ -28,13 +28,61 @@ GLYPH_ONLY = re.compile(
 # 이 아래면 검색 대상으로 무의미하다고 본 기준 (한글+영문 글자 수)
 MIN_LETTERS = 20
 
+_HANGUL = re.compile(r"[가-힣]")
+
 
 def letters(text: str) -> int:
     return len(re.findall(r"[가-힣A-Za-z]", text))
 
 
+def garbled(text: str, min_syllables: int = 15, max_top_ratio: float = 0.25) -> bool:
+    """PDF 글꼴이 깨져 엉뚱한 음절로 뒤바뀐 슬라이드를 잡는다.
+
+    글자 수는 멀쩡해 보여도(MIN_LETTERS 는 통과) 실제로는 몇 안 되는 음절이 반복될 뿐인 경우가 있다.
+    PowerPoint 등에서 내보낸 PDF 의 임베디드 폰트에 글자-코드 매핑(ToUnicode)이 빠지거나 깨지면
+    PyMuPDF 가 "문문문문", "세세세세" 처럼 엉뚱한 음절을 그대로 뽑는다 — 우리 쪽 처리 전에 이미 이렇다.
+    실제로 겪은 사례: 23장 중 16장이 이 증상이었는데, MIN_LETTERS 만 보는 기준으로는 전부 "양호"였다.
+
+    기준은 "가장 많이 나온 음절의 비율" 하나만 본다. "고유 음절 비율"도 같이 써봤는데,
+    실전 슬라이드 하나(UI 화면을 옮겨 적은 긴 캡션, 450자)가 정상인데도 조사·흔한 낱말이
+    자연스럽게 반복돼 고유 비율이 0.34 까지 떨어져 오탐이 났다. 반면 실제로 깨진 장은 한
+    음절이 30~100% 를 차지해서(예: "세"가 453자 중 250자), 이 값만으로도 뚜렷하게 갈린다.
+    """
+    syls = _HANGUL.findall(text)
+    if len(syls) < min_syllables:
+        return False
+    top = max((syls.count(s) for s in set(syls)), default=0)
+    return (top / len(syls)) > max_top_ratio
+
+
+def first_readable_line(text: str, max_len: int | None = None) -> str:
+    """"첫 줄"이 아니라 "폰트가 안 깨진 첫 줄"을 고른다. 슬라이드 제목, 지도 이름표에 쓴다.
+
+    깨진 PDF 는 페이지 전체가 아니라 제목 텍스트박스만 다른(깨진) 폰트인 경우가 있었다
+    (실제로 겪음: 본문은 멀쩡한데 제목 줄만 "문문문" 처럼 나옴). garbled() 의 기준은 줄 하나에는
+    너무 느슨해서(최소 15음절), 짧은 줄 전용으로 더 엄격한 기준을 쓴다.
+    """
+    lines = [l.strip() for l in text.split("\n") if l.strip()]
+    for line in lines:
+        # 페이지 번호("15")나 구분 기호만 있는 줄은 안 깨졌어도 제목감이 아니다
+        if letters(line) >= 2 and not _line_garbled(line):
+            return line[:max_len] if max_len else line
+    # 전부 깨졌으면(드묾) 그래도 첫 줄을 돌려준다 — 빈 제목보다는 낫다
+    first = lines[0] if lines else ""
+    return first[:max_len] if max_len else first
+
+
+def _line_garbled(line: str) -> bool:
+    syls = _HANGUL.findall(line)
+    if len(syls) < 2:
+        return False
+    uniq = set(syls)
+    top = max((syls.count(s) for s in uniq), default=0)
+    return (len(uniq) / len(syls)) < 0.5 or (top / len(syls)) > 0.4
+
+
 def analyze(rows: list[dict]) -> dict:
-    dead = [r for r in rows if letters(r["text"]) < MIN_LETTERS]
+    dead = [r for r in rows if letters(r["text"]) < MIN_LETTERS or garbled(r["text"])]
     glyph = [r for r in rows if GLYPH_ONLY.match(r["text"])]
     # 글머리표는 나오는데 본문이 짧음 = 본문이 이미지로 깔린 전형적 패턴
     bullet_no_body = [

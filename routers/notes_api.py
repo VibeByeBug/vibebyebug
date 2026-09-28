@@ -21,6 +21,7 @@ import engine_store
 import notes as notes_mod
 import slide_refine
 from indexing import DATA_DIR, chunks_path
+from quality_report import first_readable_line
 
 router = APIRouter(prefix="/api/notes", tags=["Presenter Notes"])
 
@@ -63,12 +64,16 @@ class SaveRequest(BaseModel):
     source: str = "rehearsal"
 
 
+class DeleteManyRequest(BaseModel):
+    ids: list[str]
+
+
 @router.get("/{pid}")
 async def get_notes(pid: str):
     rows = _rows(pid)
     refined = slide_refine.load(refined_path(pid)) or {}
     slides = [{"page": r["page"],
-               "title": next((l for l in r["text"].split("\n") if l.strip()), "")[:40],
+               "title": first_readable_line(r["text"], 40),
                "text": r["text"], "refined": refined.get(r["page"])} for r in rows]
     return {"slides": slides, "notes": notes_mod.NoteStore(notes_path(pid)).notes}
 
@@ -140,7 +145,17 @@ async def save(pid: str, req: SaveRequest):
     added = store.add([i.model_dump() for i in req.items], req.source)
     # 검색 색인을 다시 만든다 (19장 기준 1~2초). 이벤트 루프를 막지 않게 스레드로.
     await asyncio.to_thread(_sync, pid, store)
-    return {"added": len(added), "notes": store.notes}
+    # added_ids 는 방금 저장한 묶음을 되돌릴 때 쓴다 (delete-many)
+    return {"added": len(added), "added_ids": [n["id"] for n in added], "notes": store.notes}
+
+
+@router.post("/{pid}/delete-many")
+async def delete_many(pid: str, req: DeleteManyRequest):
+    """방금 저장한 묶음을 한 번에 지운다. 검색 색인은 한 번만 다시 만든다."""
+    store = notes_mod.NoteStore(notes_path(pid))
+    removed = store.delete_many(req.ids)
+    await asyncio.to_thread(_sync, pid, store)
+    return {"removed": removed, "notes": store.notes}
 
 
 @router.delete("/{pid}/{note_id}")
