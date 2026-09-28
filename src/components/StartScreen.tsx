@@ -94,6 +94,7 @@ export function StartScreen({ onStart, onOpenReport, onResume, loggedIn = false 
             : 'radial-gradient(640px circle at var(--sx) var(--sy), rgba(255,181,71,0.16), transparent 62%), radial-gradient(900px 220px at 60% 100%, rgba(242,107,29,0.16), transparent 70%)',
         }}
       />
+      {!light && <div className="stage-grain pointer-events-none absolute inset-0" />}
       {/* 양옆 커튼 그림자. 라이트는 붉은 커튼 대신 종이 가장자리가 살짝 어두워진다 */}
       <div
         className={`pointer-events-none absolute inset-y-0 left-0 w-[70px] bg-gradient-to-r to-transparent ${

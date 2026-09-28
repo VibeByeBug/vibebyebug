@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import type { SavedPresentation, UploadResult } from './api';
+import { FilmLeader } from './components/FilmLeader';
 import { Header } from './components/Header';
 import { Hud } from './components/Hud';
 import { Login } from './components/Login';
@@ -410,6 +411,7 @@ function App() {
 
   return (
     <div className="flex flex-col min-h-screen w-full">
+      <FilmLeader />
       {screen === 'login' && (
         <Login
           onLogin={() => {

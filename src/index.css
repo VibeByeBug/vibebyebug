@@ -308,6 +308,60 @@ body.theme-dark { background-color: #15110d; color: #f5f5f4; }
   .highlight-sweep { animation: none; }
 }
 
+/* ── 필름 그레인(입자) 텍스처 ─────────────────────────────────────────
+   어두운 무대 위에 살짝 얹으면 화면이 아니라 필름처럼 보인다. SVG 노이즈라 이미지 파일이 없어도 된다. */
+.stage-grain {
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='120' height='120'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+  opacity: 0.05;
+  mix-blend-mode: overlay;
+}
+
+/* ── 필름 리더(오프닝 카운트다운) ──────────────────────────────────────
+   3·2·1 이 돌고, 다 세면 홍채(iris)가 닫히듯 화면이 가운데로 오므라들며 사라진다. */
+.film-leader {
+  clip-path: circle(150% at 50% 50%);
+  transition: clip-path 620ms cubic-bezier(0.7, 0, 0.15, 1);
+  animation: leader-flicker 2.6s steps(1) infinite;
+}
+.film-leader-out { clip-path: circle(0% at 50% 50%); }
+
+@keyframes leader-flicker {
+  0%, 18%, 22%, 46%, 54%, 100% { filter: brightness(1); }
+  20% { filter: brightness(1.12); }
+  50% { filter: brightness(0.9); }
+}
+
+/* 필름 앞뒤로 흔히 보이는 세로 긁힘 자국. 은은하게 고정해둔다(움직이면 산만하다) */
+.film-scratches {
+  background-image:
+    repeating-linear-gradient(90deg, rgba(255, 255, 255, 0.05) 0 1px, transparent 1px 180px),
+    radial-gradient(circle at 50% 45%, rgba(255, 255, 255, 0.06), transparent 65%);
+  mix-blend-mode: screen;
+}
+
+/* 카운트다운 숫자가 바뀔 때마다 톡 튀어 들어온다 */
+@keyframes leader-pop {
+  from { opacity: 0; transform: scale(0.7); }
+  to { opacity: 1; transform: scale(1); }
+}
+.leader-count { animation: leader-pop 180ms cubic-bezier(0.2, 0.8, 0.2, 1) both; }
+
+/* 링 테두리를 도는 점 하나 — 옛날 필름 리더의 시계 바늘처럼, 숫자 하나마다 한 바퀴 돈다 */
+.leader-sweep {
+  background: conic-gradient(from -90deg, rgba(255, 255, 255, 0.9) 0deg 3deg, transparent 3deg 360deg);
+  -webkit-mask: radial-gradient(circle, transparent 77%, black 79%, black 100%);
+  mask: radial-gradient(circle, transparent 77%, black 79%, black 100%);
+  animation: leader-rotate 620ms linear;
+}
+@keyframes leader-rotate {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .film-leader, .leader-count, .leader-sweep { animation: none; transition: none; }
+}
+
 /* 사후 리포트를 PDF 로 저장할 때. 무대 색을 그대로 인쇄하면 잉크만 먹고 글자가 안 보인다.
    막대 그래프는 색을 남긴다 (배경색을 지우면 비율이 안 보인다) */
 @media print {
