@@ -151,6 +151,12 @@ export async function listPresentations(): Promise<SavedPresentation[]> {
   return (data.files ?? []) as SavedPresentation[];
 }
 
+// 자료 보관함(전체 발표 목록)에서 지운다. 서버가 PDF 와 청크(검색 색인)를 같이 지운다.
+export async function deletePresentation(presentationId: string): Promise<void> {
+  const res = await fetch(`${API_URL}/api/upload/${presentationId}`, { method: 'DELETE' });
+  if (!res.ok) throw new Error(`삭제하지 못했습니다 (${res.status})`);
+}
+
 // Q&A 기록 (/api/logs). 실전에서 받은 질문마다 ReadyQ 가 직접 남긴다.
 export interface QaLogRow {
   at: string;

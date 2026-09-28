@@ -1,6 +1,6 @@
 import { useState, type ReactNode } from 'react';
 import type { ScreenName } from '../types/flow';
-import { ChevronDownIcon, ClockIcon, LogoutIcon, MicSmallIcon, SettingsIcon } from './icons';
+import { ChevronDownIcon, ClockIcon, DocumentIcon, LogoutIcon, MicSmallIcon, SettingsIcon } from './icons';
 import { useTheme } from '../theme';
 
 interface HeaderProps {
@@ -10,7 +10,7 @@ interface HeaderProps {
   rightText?: string;
   rightButtons?: ReactNode;
   showProfile?: boolean;
-  activeMenu?: 'history' | 'settings';
+  activeMenu?: 'history' | 'library' | 'settings';
   onNavigate: (screen: ScreenName) => void;
   cueKey?: number; // 바뀔 때마다 아래 슬레이트 줄무늬가 한 칸 밀린다 (새 질문 신호)
   dark?: boolean; // 시작 화면(검은 무대)용
@@ -146,6 +146,27 @@ export function Header({
                       }`}
                     >
                       설정
+                    </span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setMenuOpen(false);
+                      onNavigate('library');
+                    }}
+                    className={`flex gap-[10px] h-[40px] items-center px-[11px] rounded-[6px] ${
+                      activeMenu === 'library' ? 'bg-[#fff3eb]' : ''
+                    }`}
+                  >
+                    <span className={`size-[17px] ${activeMenu === 'library' ? 'text-[#f26b1d]' : 'text-[#1a1a1a]'}`}>
+                      <DocumentIcon />
+                    </span>
+                    <span
+                      className={`text-[14px] whitespace-nowrap ${
+                        activeMenu === 'library' ? 'font-bold text-[#f26b1d]' : 'font-medium text-[#1a1a1a]'
+                      }`}
+                    >
+                      발표 목록
                     </span>
                   </button>
                   <div className="bg-[#e5e7eb] h-px w-full" />

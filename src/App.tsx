@@ -9,6 +9,7 @@ import { MockPracticeScreen } from './components/MockPracticeScreen';
 import { CorePracticeScreen } from './components/CorePracticeScreen';
 import { GraphScreen } from './components/GraphScreen';
 import { MaterialScreen } from './components/MaterialScreen';
+import { MaterialLibraryScreen } from './components/MaterialLibraryScreen';
 import { MyHistoryScreen } from './components/MyHistoryScreen';
 import { PreparingScreen } from './components/PreparingScreen';
 import { RecognizedQuestion } from './components/RecognizedQuestion';
@@ -23,10 +24,11 @@ import { UploadFailedScreen } from './components/UploadFailedScreen';
 import { UploadScreen } from './components/UploadScreen';
 import { useQaSocket } from './hooks/useQaSocket';
 import { cleanQuestion } from './cleanQuestion';
-import { loadSourceCount, saveSourceCount, type SourceCount } from './settings';
+import { loadSourceCount, saveSourceCount, loadPresenterName, savePresenterName, type SourceCount } from './settings';
 import { useSpeechRecognition } from './hooks/useSpeechRecognition';
 import { useScreenHistory } from './hooks/useScreenHistory';
 import { mockRecognizedQuestion } from './mocks/questionMock';
+import { DEFAULT_TITLE } from './constants';
 import { DownloadIcon } from './components/icons';
 import type { ScreenName } from './types/flow';
 import type { AnswerMode } from './types/qa';
@@ -55,6 +57,8 @@ function App() {
   const [textFromError, setTextFromError] = useState(true); // 음성 인식 실패로 온 입력인지
   // 실전 화면에 한 번에 보여줄 근거 카드 수. 이 브라우저에 저장해 두고 다음 발표에도 쓴다.
   const [sourceCount, setSourceCount] = useState<SourceCount>(loadSourceCount);
+  // 슬레이트 판의 DIRECTOR 칸. 이 브라우저에 저장해 두고 다음 발표에도 쓴다.
+  const [presenterName, setPresenterName] = useState<string>(loadPresenterName);
   const { lastResult, lastAnswer, lastFlow, notice, ask } = useQaSocket();
 
   // 음성 인식 콜백은 인식을 시작한 순간의 값을 붙잡고 있어서, 최신 발표와 모드는 ref 로 읽는다
@@ -433,6 +437,11 @@ function App() {
           <Header onNavigate={navigate} guest={!loggedIn} />
           <StartScreen
             loggedIn={loggedIn}
+            presenterName={presenterName}
+            onPresenterNameChange={(name) => {
+              setPresenterName(name);
+              savePresenterName(name);
+            }}
             onStart={(title) => {
               if (loggedIn) {
                 beginPresentation(title);
@@ -445,6 +454,7 @@ function App() {
               setReportTarget(null);
               setScreen('myHistory');
             }}
+            onOpenLibrary={() => setScreen('library')}
             onResume={resumePresentation}
           />
         </>
@@ -713,6 +723,19 @@ function App() {
         </>
       )}
 
+      {screen === 'library' && (
+        <>
+          <Header onNavigate={navigate} label="발표 목록" activeMenu="library" />
+          <MaterialLibraryScreen
+            onResume={(p) => {
+              resumePresentation(p);
+            }}
+            onNew={() => beginPresentation(DEFAULT_TITLE)}
+            currentPresentationId={upload?.presentation_id}
+          />
+        </>
+      )}
+
       {screen === 'settings' && (
         <>
           <Header onNavigate={navigate} label="설정" activeMenu="settings" />
@@ -721,6 +744,11 @@ function App() {
             onSourceCountChange={(n) => {
               setSourceCount(n);
               saveSourceCount(n);
+            }}
+            presenterName={presenterName}
+            onPresenterNameChange={(name) => {
+              setPresenterName(name);
+              savePresenterName(name);
             }}
           />
         </>
