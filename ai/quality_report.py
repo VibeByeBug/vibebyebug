@@ -28,13 +28,31 @@ GLYPH_ONLY = re.compile(
 # 이 아래면 검색 대상으로 무의미하다고 본 기준 (한글+영문 글자 수)
 MIN_LETTERS = 20
 
+_HANGUL = re.compile(r"[가-힣]")
+
 
 def letters(text: str) -> int:
     return len(re.findall(r"[가-힣A-Za-z]", text))
 
 
+def garbled(text: str, min_syllables: int = 15, min_unique_ratio: float = 0.35, max_top_ratio: float = 0.25) -> bool:
+    """PDF 글꼴이 깨져 엉뚱한 음절로 뒤바뀐 슬라이드를 잡는다.
+
+    글자 수는 멀쩡해 보여도(MIN_LETTERS 는 통과) 실제로는 몇 안 되는 음절이 반복될 뿐인 경우가 있다.
+    PowerPoint 등에서 내보낸 PDF 의 임베디드 폰트에 글자-코드 매핑(ToUnicode)이 빠지거나 깨지면
+    PyMuPDF 가 "문문문문", "세세세세" 처럼 엉뚱한 음절을 그대로 뽑는다 — 우리 쪽 처리 전에 이미 이렇다.
+    실제로 겪은 사례: 23장 중 16장이 이 증상이었는데, MIN_LETTERS 만 보는 기준으로는 전부 "양호"였다.
+    """
+    syls = _HANGUL.findall(text)
+    if len(syls) < min_syllables:
+        return False
+    uniq = set(syls)
+    top = max((syls.count(s) for s in uniq), default=0)
+    return (len(uniq) / len(syls)) < min_unique_ratio or (top / len(syls)) > max_top_ratio
+
+
 def analyze(rows: list[dict]) -> dict:
-    dead = [r for r in rows if letters(r["text"]) < MIN_LETTERS]
+    dead = [r for r in rows if letters(r["text"]) < MIN_LETTERS or garbled(r["text"])]
     glyph = [r for r in rows if GLYPH_ONLY.match(r["text"])]
     # 글머리표는 나오는데 본문이 짧음 = 본문이 이미지로 깔린 전형적 패턴
     bullet_no_body = [
