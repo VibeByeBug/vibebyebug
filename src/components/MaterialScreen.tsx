@@ -937,6 +937,8 @@ function Saved({
   onChange: (n: Note[]) => void;
 }) {
   const [showRepeat, setShowRepeat] = useState(false);
+  const [selected, setSelected] = useState<Set<string>>(new Set());
+  const [busy, setBusy] = useState(false);
   const shown = notes.filter((n) => showRepeat || n.kind !== 'repeat');
   const groups = new Map<number, Note[]>();
   for (const n of shown) {
@@ -944,18 +946,81 @@ function Saved({
     groups.set(k, [...(groups.get(k) ?? []), n]);
   }
   const title = (p: number) => (p ? `p.${p} ${slides.find((s) => s.page === p)?.title ?? ''}` : '프로젝트 전반');
+  const shownIds = shown.map((n) => n.id);
+  const allSelected = shownIds.length > 0 && shownIds.every((id) => selected.has(id));
+  const toggleOne = (id: string) =>
+    setSelected((s) => {
+      const next = new Set(s);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
 
   async function remove(id: string) {
     const res = await fetch(`${API_URL}/api/notes/${presentationId}/${id}`, { method: 'DELETE' });
     onChange((await res.json()).notes);
+    setSelected((s) => {
+      if (!s.has(id)) return s;
+      const next = new Set(s);
+      next.delete(id);
+      return next;
+    });
+  }
+
+  async function removeSelected() {
+    setBusy(true);
+    try {
+      const res = await fetch(`${API_URL}/api/notes/${presentationId}/delete-many`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ ids: [...selected] }),
+      });
+      const data = await res.json();
+      onChange(data.notes);
+      setSelected(new Set());
+    } finally {
+      setBusy(false);
+    }
   }
 
   return (
     <div className="flex flex-col gap-[16px] w-full max-w-[900px] mx-auto">
-      <label className="flex gap-[8px] items-center justify-center font-medium text-[13px] text-ink/55 cursor-pointer">
-        <input type="checkbox" checked={showRepeat} onChange={() => setShowRepeat((v) => !v)} className="accent-[#f26b1d]" />
-        검색용 표현(슬라이드 반복)도 보기
-      </label>
+      <div className="flex flex-wrap items-center justify-center gap-x-[16px] gap-y-[8px]">
+        <label className="flex gap-[8px] items-center font-medium text-[13px] text-ink/55 cursor-pointer">
+          <input
+            type="checkbox"
+            checked={showRepeat}
+            onChange={() => {
+              setShowRepeat((v) => !v);
+              setSelected(new Set()); // 목록이 바뀌면 선택도 비운다 (숨겨진 항목이 선택된 채로 남지 않게)
+            }}
+            className="accent-[#f26b1d]"
+          />
+          검색용 표현(슬라이드 반복)도 보기
+        </label>
+        {shownIds.length > 0 && (
+          <>
+            <span className="h-[14px] w-px bg-ink/15" />
+            <label className="flex gap-[8px] items-center font-medium text-[13px] text-ink/55 cursor-pointer">
+              <input
+                type="checkbox"
+                checked={allSelected}
+                onChange={() => setSelected(allSelected ? new Set() : new Set(shownIds))}
+                className="accent-[#f26b1d]"
+              />
+              전체 선택
+            </label>
+            <button
+              type="button"
+              onClick={removeSelected}
+              disabled={selected.size === 0 || busy}
+              className="h-[30px] px-[14px] rounded-[7px] border border-ink/20 font-bold text-[13px] text-ink/75 hover:border-err hover:text-err disabled:opacity-40"
+            >
+              {busy ? '지우는 중···' : selected.size > 0 ? `선택한 ${selected.size}개 지우기` : '선택 지우기'}
+            </button>
+          </>
+        )}
+      </div>
       {groups.size === 0 && (
         <p className="rounded-[10px] border border-dashed border-ink/15 px-[14px] py-[18px] text-center font-medium text-[14px] text-ink/50">
           아직 저장된 설명이 없어요. 리허설 녹음이나 대본으로 모아보세요.
@@ -972,8 +1037,17 @@ function Saved({
             {list.map((n) => (
               <div
                 key={n.id}
-                className="group flex gap-[12px] items-start rounded-[10px] border border-ink/10 bg-card px-[16px] py-[12px] transition-colors hover:bg-cardHover"
+                className={`group flex gap-[12px] items-start rounded-[10px] border px-[16px] py-[12px] transition-colors hover:bg-cardHover ${
+                  selected.has(n.id) ? 'border-[#f26b1d]/60 bg-cardHover' : 'border-ink/10 bg-card'
+                }`}
               >
+                <input
+                  type="checkbox"
+                  checked={selected.has(n.id)}
+                  onChange={() => toggleOne(n.id)}
+                  className="mt-[3px] shrink-0 accent-[#f26b1d]"
+                  aria-label="이 설명 선택"
+                />
                 <span
                   className={`font-bold text-[12px] shrink-0 mt-[2px] w-[74px] ${
                     n.kind === 'fact' ? 'text-warn' : n.kind === 'repeat' ? 'text-ink/40' : 'text-ok'
