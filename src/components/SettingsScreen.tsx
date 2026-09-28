@@ -72,11 +72,11 @@ export function SettingsScreen({
             />
           </Row>
 
-          <Row title="화면 모드" desc="기본은 검은 무대입니다. 밝은 곳에서 보기 편하게 라이트로 바꿀 수 있어요">
+          <Row title="화면 모드" desc="기본은 다크입니다. 밝은 곳에서 보기 편하게 라이트로 바꿀 수 있어요">
             <div className="flex gap-[8px] items-start">
               {(
                 [
-                  ['dark', '검은 무대'],
+                  ['dark', '다크'],
                   ['light', '라이트'],
                 ] as [Theme, string][]
               ).map(([value, label]) => (
