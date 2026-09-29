@@ -1,0 +1,304 @@
+import { useEffect, useRef, useState } from 'react';
+import { listPresentations, type SavedPresentation } from '../api';
+import { ArrowRightIcon } from './icons';
+import { StartGuide } from './StartGuide';
+import { useTheme } from '../theme';
+import { DEFAULT_TITLE } from '../constants';
+
+interface StartScreenProps {
+  onStart: (title: string) => void;
+  onOpenReport: () => void;
+  onOpenLibrary: () => void; // 그동안 올린 발표 전체를 보고 관리하는 화면
+  onResume: (p: SavedPresentation) => void; // 서버에 남아 있는 발표를 다시 연다
+  loggedIn?: boolean; // 로그인 전(랜딩)에는 최근 발표와 회고를 숨긴다
+  presenterName: string; // 슬레이트 DIRECTOR 칸. 이 브라우저에 저장해 두고 다음 발표에도 쓴다
+  onPresenterNameChange: (name: string) => void;
+}
+
+// 시작 화면 = 검은 무대. 조명이 커서를 천천히 따라오고, 오른쪽 슬레이트 판에 발표 이름이 쓰인다.
+// 시작하면 슬레이트 팔이 "딱" 닫힌 뒤 넘어간다.
+// 라이트 모드에서는 무대 바닥이 종이(paper)가 되고 글자는 슬레이트 잉크(slateInk)로 바뀐다.
+// 슬레이트 판과 필름 스트립은 소품이라 두 모드 모두 검은색 그대로 둔다.
+export function StartScreen({
+  onStart,
+  onOpenReport,
+  onOpenLibrary,
+  onResume,
+  loggedIn = false,
+  presenterName,
+  onPresenterNameChange,
+}: StartScreenProps) {
+  const light = useTheme().theme === 'light';
+  // 최근 촬영분: 서버에 남아 있는 발표. 다시 올리지 않고 이어서 열 수 있다.
+  const [recent, setRecent] = useState<SavedPresentation[]>([]);
+  useEffect(() => {
+    if (!loggedIn) return;
+    let stop = false;
+    listPresentations()
+      .then((list) => !stop && setRecent(list.slice(0, 3)))
+      .catch(() => setRecent([])); // 서버가 꺼져 있으면 그냥 안 보여준다
+    return () => {
+      stop = true;
+    };
+  }, [loggedIn]);
+  const [title, setTitle] = useState('');
+  const [snap, setSnap] = useState(false);
+  const stage = useRef<HTMLDivElement>(null);
+  const titleInput = useRef<HTMLInputElement>(null);
+  const today = new Date().toISOString().slice(0, 10).replace(/-/g, '.');
+
+  // 스포트라이트: 커서 위치를 천천히 따라간다 (보간 0.12). 리렌더 없이 CSS 변수만 바꾼다.
+  useEffect(() => {
+    const el = stage.current;
+    if (!el) return;
+    const reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    let tx = 0.7, ty = 0.2, x = tx, y = ty, raf = 0;
+    const onMove = (e: MouseEvent) => {
+      const r = el.getBoundingClientRect();
+      tx = (e.clientX - r.left) / r.width;
+      ty = (e.clientY - r.top) / r.height;
+    };
+    const tick = () => {
+      x += (tx - x) * 0.12;
+      y += (ty - y) * 0.12;
+      el.style.setProperty('--sx', `${x * 100}%`);
+      el.style.setProperty('--sy', `${y * 100}%`);
+      raf = requestAnimationFrame(tick);
+    };
+    if (!reduce) {
+      el.addEventListener('mousemove', onMove);
+      raf = requestAnimationFrame(tick);
+    }
+    return () => {
+      el.removeEventListener('mousemove', onMove);
+      cancelAnimationFrame(raf);
+    };
+  }, []);
+
+  // 아래 소개 무대의 "새 발표 준비하기": 맨 위 슬레이트로 올라가 발표 이름 칸에 바로 쓰게 한다
+  function backToSlate() {
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+    setTimeout(() => titleInput.current?.focus(), 500);
+  }
+
+  function start() {
+    setSnap(true);
+    setTimeout(() => onStart(title.trim() || DEFAULT_TITLE), 220);
+  }
+
+  return (
+    <div className={`flex flex-col ${light ? 'bg-paper' : 'bg-stage'}`}>
+    {/* 첫 화면: 화면 높이를 채운다 (헤더 60px + 줄무늬 6px 을 뺀 높이) */}
+    <div
+      ref={stage}
+      className={`relative flex min-h-[calc(100vh-66px)] flex-col overflow-hidden ${
+        light ? 'bg-paper text-slateInk' : 'bg-stage text-white'
+      }`}
+      style={{ ['--sx' as string]: '70%', ['--sy' as string]: '20%' }}
+    >
+      {/* 조명과 무대 바닥. 라이트에서는 종이 위에 스포트 앰버가 은은하게 비친다 */}
+      <div
+        className="pointer-events-none absolute inset-0"
+        style={{
+          background: light
+            ? 'radial-gradient(640px circle at var(--sx) var(--sy), rgba(255,181,71,0.30), transparent 62%), radial-gradient(900px 220px at 60% 100%, rgba(220,74,30,0.10), transparent 70%)'
+            : 'radial-gradient(640px circle at var(--sx) var(--sy), rgba(255,181,71,0.16), transparent 62%), radial-gradient(900px 220px at 60% 100%, rgba(242,107,29,0.16), transparent 70%)',
+        }}
+      />
+      {!light && <div className="stage-grain pointer-events-none absolute inset-0" />}
+      {/* 양옆 커튼 그림자. 라이트는 붉은 커튼 대신 종이 가장자리가 살짝 어두워진다 */}
+      <div
+        className={`pointer-events-none absolute inset-y-0 left-0 w-[70px] bg-gradient-to-r to-transparent ${
+          light ? 'from-slateInk/[0.06]' : 'from-[#4a1712]'
+        }`}
+      />
+      <div
+        className={`pointer-events-none absolute inset-y-0 right-0 w-[70px] bg-gradient-to-l to-transparent ${
+          light ? 'from-slateInk/[0.06]' : 'from-[#4a1712]'
+        }`}
+      />
+      <div
+        className="pointer-events-none absolute inset-x-0 bottom-0 h-[160px] opacity-[0.07]"
+        style={{
+          backgroundImage: `repeating-linear-gradient(0deg, ${light ? '#111111' : '#fff'} 0 1px, transparent 1px 24px)`,
+        }}
+      />
+
+      <div className="relative flex flex-1 flex-col lg:flex-row items-center justify-center gap-[72px] lg:gap-[56px] px-[24px] md:px-[96px] pt-[40px] pb-[24px]">
+        {/* 왼쪽: 문구와 버튼 */}
+        <div className="flex flex-col gap-[20px] max-w-[560px]">
+          <p className="font-black text-[44px] leading-[56px] md:text-[68px] md:leading-[86px] tracking-[-2px] break-keep">
+            예상 밖 질문에도,
+            <br />
+            답변<span className="text-[#f26b1d]"> 큐</span>
+          </p>
+          <p className={`font-normal text-[17px] leading-[29px] ${light ? 'text-slateInk/70' : 'text-white/70'}`}>
+            발표자료와 대본을 올려주세요. <br />
+            질문에 맞는 근거 슬라이드와 순서 구조도를 바로 띄워드려요.<br /> 
+            리허설부터 실전, 발표 리뷰까지 함께합니다.
+          </p>
+          <div className="flex gap-[12px] pt-[8px]">
+            <button
+              type="button"
+              onClick={start}
+              className="cta bg-[#f26b1d] hover:bg-[#e25c10] flex gap-[10px] h-[58px] items-center px-[28px] rounded-[10px]"
+            >
+              <span className="font-bold text-[18px]">새 발표 준비하기</span>
+              <span className="size-[18px]">
+                <ArrowRightIcon />
+              </span>
+            </button>
+            <button
+              type="button"
+              onClick={() =>
+                loggedIn ? onOpenReport() : document.getElementById('how-it-works')?.scrollIntoView({ behavior: 'smooth' })
+              }
+              className={`border transition-colors h-[58px] px-[24px] rounded-[10px] font-bold text-[18px] ${
+                light ? 'border-slateInk/25 hover:border-slateInk/50' : 'border-white/30 hover:border-white/60'
+              }`}
+            >
+              {loggedIn ? '지난 발표 회고 보기' : '사용 방법 보기'}
+            </button>
+          </div>
+        </div>
+
+        {/* 오른쪽: 슬레이트 판. PRODUCTION 칸에 발표 이름을 바로 적는다 */}
+        <div
+          className="clapper tilt w-full max-w-[480px] select-none mt-[48px] lg:mt-0"
+          onMouseMove={(e) => {
+            // 판 가운데를 기준으로 마우스 쪽으로 최대 7도 기운다
+            const r = e.currentTarget.getBoundingClientRect();
+            const dx = (e.clientX - r.left) / r.width - 0.5;
+            const dy = (e.clientY - r.top) / r.height - 0.5;
+            e.currentTarget.style.setProperty('--ry', `${dx * 14}deg`);
+            e.currentTarget.style.setProperty('--rx', `${-dy * 10}deg`);
+          }}
+          onMouseLeave={(e) => {
+            e.currentTarget.style.setProperty('--ry', '0deg');
+            e.currentTarget.style.setProperty('--rx', '0deg');
+          }}
+        >
+          <div className={`clapper-arm slate-stripes h-[58px] rounded-t-[6px] ${snap ? 'snap' : ''}`} />
+          <div className="slate-stripes h-[36px]" />
+          {/* 슬레이트 판은 소품이라 테마와 상관없이 검은 판에 흰 분필 글씨 */}
+          <div className="bg-[#111111] text-white rounded-b-[10px] px-[26px] pt-[20px] pb-[18px] flex flex-col gap-[14px] shadow-[0_40px_70px_-20px_rgba(0,0,0,0.8)]">
+            <div className="flex flex-col gap-[4px]">
+              <span className="font-slate font-medium text-[12px] tracking-[1px] text-white/55">PRODUCTION</span>
+              <input
+                ref={titleInput}
+                type="text"
+                value={title}
+                onChange={(e) => setTitle(e.target.value)}
+                onKeyUp={(e) => {
+                  if (e.key === 'Enter') start();
+                }}
+                placeholder="발표 이름을 적어주세요"
+                className="bg-transparent font-hand text-[40px] leading-[44px] text-white placeholder:text-white/30 outline-none w-full border-b border-white/20 focus:border-[#f26b1d] pb-[2px] transition-colors"
+              />
+            </div>
+            <div className="grid grid-cols-3">
+              {[
+                ['SCENE', 'Q&A'],
+                ['TAKE', '1'],
+                ['ROLL', '01'],
+              ].map(([k, v], i) => (
+                <div key={k} className={`flex flex-col gap-[2px] px-[4px] ${i < 2 ? 'border-r border-white/20' : ''} ${i ? 'pl-[16px]' : ''}`}>
+                  <span className="font-slate font-medium text-[12px] tracking-[1px] text-white/55">{k}</span>
+                  <span className="font-hand text-[56px] leading-[52px] pt-[2px]">{v}</span>
+                </div>
+              ))}
+            </div>
+            <div className="flex justify-between items-baseline border-t border-white/20 pt-[10px]">
+              <span className="font-slate font-medium text-[12px] tracking-[1px] text-white/55">
+                DATE <span className="font-hand text-[26px] tracking-normal text-white ml-[6px]">{today}</span>
+              </span>
+              <label className="flex items-baseline font-slate font-medium text-[12px] tracking-[1px] text-white/55">
+                DIRECTOR
+                <input
+                  type="text"
+                  value={presenterName}
+                  onChange={(e) => onPresenterNameChange(e.target.value)}
+                  onFocus={(e) => e.target.select()}
+                  onKeyUp={(e) => {
+                    if (e.key === 'Enter') start();
+                  }}
+                  placeholder="발표자"
+                  size={Math.max(2, presenterName.length || 3)}
+                  className="bg-transparent font-hand text-[26px] tracking-normal text-white placeholder:text-white/30 outline-none ml-[6px] border-b border-transparent focus:border-[#f26b1d] transition-colors"
+                />
+              </label>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* 최근 발표는 필름 스트립 칸으로 (로그인한 뒤에만) */}
+      <div className="relative px-[24px] md:px-[96px] pb-[36px] flex flex-col gap-[10px]">
+        {loggedIn && (
+        <>
+        <div className="flex items-baseline justify-between">
+          <p className={`font-bold text-[15px] ${light ? 'text-slateInk/70' : 'text-white/70'}`}>최근 촬영분</p>
+          <button
+            type="button"
+            onClick={onOpenLibrary}
+            className={`font-bold text-[13px] transition-colors ${
+              light ? 'text-slateInk/50 hover:text-slateInk' : 'text-white/50 hover:text-white'
+            }`}
+          >
+전체 발표 보기 →
+          </button>
+        </div>
+        {/* 필름 스트립도 소품이라 두 모드 모두 검은 필름에 흰 글씨 */}
+        <div className="bg-[#0b0907] text-white rounded-[6px] px-[10px] py-[8px] flex flex-col gap-[8px]">
+          <div className="film-holes text-white/20" />
+          <div className="flex gap-[10px]">
+            {recent.length === 0 && (
+              <span className="flex-1 self-center px-[16px] font-medium text-[13px] text-white/40">
+                아직 올린 발표가 없어요
+              </span>
+            )}
+            {recent.map((p, i) => (
+              <button
+                key={p.presentation_id}
+                type="button"
+                onClick={() => onResume(p)}
+                title="이 발표로 이어서 하기"
+                className="lift flex-1 min-w-0 bg-[#221c16] hover:bg-[#2d251d] rounded-[4px] px-[16px] py-[12px] flex flex-col gap-[4px] text-left"
+              >
+                <span className="font-slate font-semibold text-[12px] tracking-[1px] text-[#f26b1d]">TAKE {i + 1}</span>
+                <span className="font-bold text-[16px] truncate">{p.title}</span>
+                <span className="text-[12px] text-white/50">
+                  {new Date(p.uploaded_at).toLocaleDateString('ko-KR', { month: 'long', day: 'numeric' })}
+                  {p.ready && <span className="ml-[6px] text-[#7ee2a0]">준비됨</span>}
+                </span>
+              </button>
+            ))}
+            <button
+              type="button"
+              onClick={start}
+              className="flex-1 min-w-0 border border-dashed border-white/25 hover:border-white/50 transition-colors rounded-[4px] font-bold text-[15px] text-white/60"
+            >
+              + 새 발표
+            </button>
+          </div>
+          <div className="film-holes text-white/20" />
+        </div>
+        </>
+        )}
+        {/* 아래 소개로 내려가는 안내 */}
+        <button
+          type="button"
+          onClick={() => document.getElementById('how-it-works')?.scrollIntoView({ behavior: 'smooth' })}
+          className={`nudge self-center flex flex-col items-center gap-[2px] pt-[14px] transition-colors ${
+            light ? 'text-slateInk/55 hover:text-slateInk' : 'text-white/55 hover:text-white'
+          }`}
+        >
+          <span className="font-bold text-[14px]">사용 방법 보기</span>
+          <span className="text-[18px] leading-none">↓</span>
+        </button>
+      </div>
+    </div>
+    <StartGuide onStart={backToSlate} />
+    </div>
+  );
+}

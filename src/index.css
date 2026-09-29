@@ -1,0 +1,376 @@
+@config "../tailwind.config.js";
+@import "tailwindcss";
+
+/* 모드에 따라 바뀌는 색. 라이트가 기본값이고, body.theme-dark 일 때 무대 색으로 덮는다.
+   page = 바탕, ink = 바탕 위 글자와 선. (tailwind.config.js 의 bg-page, text-ink, border-ink/20 …) */
+:root {
+  --page: #f6efe7; /* Paper */
+  --ink: #111111; /* Slate Ink */
+  --card: #ffffff;
+  --card-hover: #faf6f1;
+  --well: #efe7dc;
+  --sel: #111111;
+  --sel-ink: #f6efe7;
+  --ok: #2f7a47;
+  --err: #bf382e;
+  --warn: #c2410c;
+}
+body.theme-dark {
+  --page: #15110d; /* Stage */
+  --ink: #f8f8f8; /* Chalk */
+  --card: #1e1914;
+  --card-hover: #241e18;
+  --well: #0b0907;
+  --sel: #ede6d6;
+  --sel-ink: #15110d;
+  --ok: #7ee2a0;
+  --err: #ff7a70;
+  --warn: #ff9a5c;
+}
+
+body {
+  background-color: var(--page);
+  font-family: "Noto Sans KR", sans-serif;
+  color: #1a1a1a;
+}
+
+/* 라이트 모드 보정: 같은 투명도라도 종이 위 잉크는 무대 위 분필보다 흐려 보인다
+   (예: /35 는 다크에서 대비 3.1, 라이트에서 2.2). 다크와 대비가 같아지도록 라이트에서만 투명도를 올린다.
+   다크는 그대로다. 숫자는 두 모드의 대비를 맞춰 계산한 값. */
+body:not(.theme-dark) .text-ink\/30 { color: color-mix(in oklab, var(--ink) 41%, transparent); }
+body:not(.theme-dark) .text-ink\/35 { color: color-mix(in oklab, var(--ink) 47%, transparent); }
+body:not(.theme-dark) .text-ink\/40 { color: color-mix(in oklab, var(--ink) 53%, transparent); }
+body:not(.theme-dark) .text-ink\/45 { color: color-mix(in oklab, var(--ink) 57%, transparent); }
+body:not(.theme-dark) .text-ink\/50 { color: color-mix(in oklab, var(--ink) 63%, transparent); }
+body:not(.theme-dark) .text-ink\/55 { color: color-mix(in oklab, var(--ink) 67%, transparent); }
+body:not(.theme-dark) .text-ink\/60 { color: color-mix(in oklab, var(--ink) 71%, transparent); }
+body:not(.theme-dark) .text-ink\/65 { color: color-mix(in oklab, var(--ink) 75%, transparent); }
+body:not(.theme-dark) .text-ink\/70 { color: color-mix(in oklab, var(--ink) 79%, transparent); }
+
+/* 라이트 모드일 때(= body 에 theme-dark 가 없을 때) 위 기본값을 그대로 쓴다.
+   무대(다크) 색은 아래 "전체 검은 무대 테마" 구간에서 .theme-dark 로만 들어간다. */
+
+/* ── 슬레이트 컨셉 공통 ─────────────────────────────────────────────
+   배경은 흰색, 검정은 슬레이트 줄무늬와 필름 스트립 같은 포인트에만 쓴다. */
+
+/* 슬레이트 줄무늬 (검정, 흰색 사선) */
+.slate-stripes {
+  background: repeating-linear-gradient(-55deg, #111111 0 14px, #ffffff 14px 28px);
+  background-size: 200% 100%;
+}
+
+/* 새 질문이 들어오면 줄무늬가 한 칸 밀린다 (슬레이트를 "딱" 치는 신호) */
+@keyframes slate-sweep {
+  from { background-position: 0 0; }
+  to { background-position: -56px 0; }
+}
+.slate-sweep { animation: slate-sweep 260ms cubic-bezier(0.2, 0.8, 0.2, 1); }
+
+/* 필름 칸 구멍 (샷 카드 위아래) */
+.film-holes {
+  height: 6px;
+  background-image: linear-gradient(90deg, currentColor 0 12px, transparent 12px 24px);
+  background-size: 24px 100%;
+  background-repeat: repeat-x;
+  border-radius: 2px;
+}
+
+/* 리허설 화면 필름 스트립의 구멍. 넓은 화면은 좌우 세로줄, 좁은 화면(가로 스트립)은 위아래 가로줄 */
+.film-reel { position: relative; }
+.film-reel::before, .film-reel::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 7px;
+  background-image: linear-gradient(180deg, rgba(237, 230, 214, 0.2) 0 11px, transparent 11px 22px);
+  background-size: 100% 22px;
+  pointer-events: none;
+}
+.film-reel::before { left: 7px; }
+.film-reel::after { right: 7px; }
+@media (max-width: 1023px) {
+  .film-reel::before, .film-reel::after {
+    top: auto;
+    bottom: auto;
+    left: 0;
+    right: 0;
+    width: auto;
+    height: 7px;
+    background-image: linear-gradient(90deg, rgba(237, 230, 214, 0.2) 0 11px, transparent 11px 22px);
+    background-size: 22px 100%;
+  }
+  .film-reel::before { top: 7px; }
+  .film-reel::after { bottom: 7px; }
+}
+
+/* ON AIR 탤리 라이트 */
+@keyframes tally-pulse {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(229, 50, 45, 0.45); }
+  50% { box-shadow: 0 0 0 7px rgba(229, 50, 45, 0); }
+}
+.tally-pulse { animation: tally-pulse 1.2s ease-in-out infinite; }
+
+/* 샷 카드가 필름 감기듯 오른쪽에서 밀려 들어온다 */
+@keyframes shot-in {
+  from { opacity: 0; transform: translateX(24px); }
+  to { opacity: 1; transform: none; }
+}
+.shot-in { animation: shot-in 220ms cubic-bezier(0.2, 0.8, 0.2, 1) both; }
+
+/* 질문 글자가 아래에서 올라온다 */
+@keyframes rise-in {
+  from { opacity: 0; transform: translateY(12px); }
+  to { opacity: 1; transform: none; }
+}
+.rise-in { animation: rise-in 200ms ease-out both; }
+
+/* 듣는 중 막대 */
+@keyframes wave {
+  0%, 100% { transform: scaleY(0.35); }
+  50% { transform: scaleY(1); }
+}
+.wave-bar { animation: wave 0.9s ease-in-out infinite; transform-origin: center; }
+
+/* 슬레이트 팔: 올리면 닫히며 살짝 흔들린다 */
+.clapper-arm { transform-origin: 6px 100%; transform: rotate(-14deg); transition: transform 180ms cubic-bezier(0.3, 1.6, 0.5, 1); }
+.clapper:hover .clapper-arm, .clapper-arm.snap { transform: rotate(0deg); }
+
+/* ── 시작 화면 아래 소개 무대: 커튼이 걷힌다 ─────────────────────────
+   무대가 화면에 들어오면(.open) 양쪽 커튼이 바깥쪽으로 모이며 주름진다(scaleX). */
+.curtain {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 50.5%;
+  z-index: 20;
+  background:
+    linear-gradient(180deg, rgba(0, 0, 0, 0.35), transparent 18%, transparent 80%, rgba(0, 0, 0, 0.45)),
+    repeating-linear-gradient(90deg, #4a1410 0 18px, #7a2219 18px 34px, #5e1912 34px 52px, #8b2a1e 52px 60px, #4a1410 60px 78px);
+  transition: transform 1.5s cubic-bezier(0.7, 0, 0.2, 1);
+  box-shadow: inset 0 0 60px rgba(0, 0, 0, 0.55);
+}
+.curtain-left { left: 0; transform-origin: left center; }
+.curtain-right { right: 0; transform-origin: right center; }
+.curtain-stage.open .curtain-left { transform: scaleX(0.07); }
+.curtain-stage.open .curtain-right { transform: scaleX(0.07); }
+/* 커튼 위 가림막(밸런스) */
+.curtain-valance {
+  position: absolute;
+  inset: 0 0 auto 0;
+  height: 46px;
+  z-index: 30;
+  background: repeating-linear-gradient(90deg, #5e1912 0 26px, #7a2219 26px 52px);
+  border-bottom: 3px solid #c9a24a;
+  box-shadow: 0 10px 24px rgba(0, 0, 0, 0.5);
+}
+/* 커튼이 걷힌 뒤 내용이 차례로 */
+.curtain-stage .reveal {
+  opacity: 0;
+  transform: translateY(18px);
+  /* 앞 두 개는 등장(늦게 시작), 뒤 세 개는 마우스 반응(바로). 늦게 시작하는 값은 StartGuide 가 넣는다 */
+  transition: opacity 600ms ease, transform 600ms ease, translate 180ms ease, box-shadow 180ms ease, background-color 180ms ease;
+}
+.curtain-stage.open .reveal { opacity: 1; transform: none; }
+
+/* 첫 화면의 "아래로" 안내 */
+@keyframes nudge {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(6px); }
+}
+.nudge { animation: nudge 1.6s ease-in-out infinite; }
+
+/* 어두운 헤더(시작 화면, 실전 화면)의 오른쪽 버튼들. 버튼은 흰 화면과 같이 쓰므로 여기서 색만 바꾼다. */
+.hdr-dark button { color: rgba(255, 255, 255, 0.82); border-color: rgba(255, 255, 255, 0.22); }
+.hdr-dark div { border-color: rgba(255, 255, 255, 0.22); }
+
+/* 움직임 줄이기 설정이면 페이드만 남긴다 */
+@media (prefers-reduced-motion: reduce) {
+  .slate-sweep, .tally-pulse, .wave-bar { animation: none; }
+  .shot-in, .rise-in { animation: rise-fade 1ms both; }
+  .clapper-arm { transition: none; }
+  .curtain, .curtain-stage .reveal { transition: none; }
+  .nudge { animation: none; }
+}
+@keyframes rise-fade { from { opacity: 0; } to { opacity: 1; } }
+
+/* ── 검은 무대 테마 (기본값, 설정에서 라이트로 바꿀 수 있다) ────────────
+   화면들은 흰 바탕 기준 색(흰 카드, 회색 글자, 회색 테두리)으로 만들어져 있다. 화면 17개를 하나씩 다시
+   칠하는 대신, body 에 .theme-dark 가 붙어 있을 때만(theme.tsx 가 붙였다 뗐다 한다) 그 색들을 무대
+   색으로 바꾼다. 떼면 원래 라이트 색 그대로 보인다.
+   Tailwind 유틸리티는 @layer 안에 있어서, 레이어 밖의 이 규칙이 우선한다. */
+body.theme-dark { background-color: #15110d; color: #f5f5f4; }
+
+/* 표면 */
+.theme-dark .bg-white { background-color: #1c1713; }
+.theme-dark .bg-\[\#fafafa\], .theme-dark .bg-\[\#f9fafb\], .theme-dark .bg-\[\#f3f4f6\],
+.theme-dark .bg-\[\#f2f2f2\], .theme-dark .bg-\[\#fcfcfd\] { background-color: rgba(255, 255, 255, 0.05); }
+.theme-dark .bg-\[\#e5e7eb\] { background-color: rgba(255, 255, 255, 0.14); }
+.theme-dark .hover\:bg-\[\#fafafa\]:hover { background-color: rgba(255, 255, 255, 0.06); }
+/* 강조 바탕 (주황, 초록, 보라, 빨강 옅은 칸) */
+.theme-dark .bg-\[\#fff3eb\], .theme-dark .bg-\[\#fff8f3\], .theme-dark .bg-\[\#fff8f2\],
+.theme-dark .bg-\[\#fff0de\], .theme-dark .bg-\[\#fde3d1\] { background-color: rgba(242, 107, 29, 0.14); }
+.theme-dark .bg-\[\#e8f5ec\], .theme-dark .bg-\[\#f3faf5\] { background-color: rgba(64, 153, 89, 0.16); }
+.theme-dark .bg-\[\#f8f5fe\], .theme-dark .bg-\[\#f1ecfb\] { background-color: rgba(124, 92, 191, 0.18); }
+.theme-dark .bg-\[\#fae5e0\] { background-color: rgba(191, 56, 46, 0.18); }
+/* 검은 버튼(선택된 탭, "설명 추가" 등)은 무대 위에서 안 보이므로 주황으로. 슬레이트 판 같은 div 는 그대로 */
+.theme-dark button.bg-\[\#1a1a1a\], .theme-dark button.bg-\[\#111111\] { background-color: #f26b1d; }
+
+/* 글자 */
+.theme-dark .text-\[\#1a1a1a\], .theme-dark .text-\[\#111111\], .theme-dark .text-black,
+.theme-dark .text-\[\#262626\], .theme-dark .text-\[\#3c4043\] { color: #f5f5f4; }
+.theme-dark .text-\[\#374151\], .theme-dark .text-\[\#4b5563\], .theme-dark .text-\[\#4d4d4d\] { color: rgba(255, 255, 255, 0.78); }
+.theme-dark .text-\[\#6b7280\], .theme-dark .text-\[\#666\], .theme-dark .text-\[\#808080\] { color: rgba(255, 255, 255, 0.6); }
+.theme-dark .text-\[\#9ca3af\], .theme-dark .text-\[\#999\], .theme-dark .text-\[\#c4c8cf\] { color: rgba(255, 255, 255, 0.42); }
+.theme-dark .text-\[\#c2410c\] { color: #ffb08a; }
+.theme-dark .text-\[\#2f7a47\], .theme-dark .text-\[\#409959\] { color: #7ee2a0; }
+.theme-dark .text-\[\#5b3fa0\] { color: #c4b1f5; }
+.theme-dark .text-\[\#bf382e\] { color: #ff7a70; }
+
+/* 테두리 */
+.theme-dark .border-\[\#e5e7eb\], .theme-dark .border-\[\#f3f4f6\], .theme-dark .border-\[\#d1d5db\],
+.theme-dark .border-\[\#e6e6e6\], .theme-dark .border-\[\#dadce0\],
+.theme-dark .hover\:border-\[\#e5e7eb\]:hover { border-color: rgba(255, 255, 255, 0.12); }
+.theme-dark .border-\[\#fbd5bd\] { border-color: rgba(242, 107, 29, 0.35); }
+.theme-dark .border-\[\#b7dfc3\] { border-color: rgba(64, 153, 89, 0.4); }
+
+/* 입력칸 */
+.theme-dark input, .theme-dark textarea { color: #f5f5f4; }
+.theme-dark input::placeholder, .theme-dark textarea::placeholder { color: rgba(255, 255, 255, 0.35); }
+.theme-dark select, .theme-dark option { background-color: #1c1713; color: #f5f5f4; }
+
+/* 슬라이드 순서 지도(SVG)의 칸과 글자 */
+.theme-dark svg rect[fill="#ffffff"] { fill: #1c1713; }
+.theme-dark svg rect[fill="#fff8f3"] { fill: rgba(242, 107, 29, 0.16); }
+.theme-dark svg rect[fill="#e8f5ec"] { fill: rgba(64, 153, 89, 0.2); }
+.theme-dark svg text[fill="#1a1a1a"] { fill: #f5f5f4; }
+.theme-dark svg text[fill="#2f7a47"] { fill: #7ee2a0; }
+/* 점선 칸(파일 올리기 등)은 무대 위에서 테두리가 묻히므로 조금 더 밝게 */
+.theme-dark .border-dashed.border-\[\#e5e7eb\], .theme-dark .border-dashed.border-\[\#d1d5db\] { border-color: rgba(255, 255, 255, 0.28); }
+/* 투명도가 붙은 회색 칸 (지식 지도의 주제 열) */
+.theme-dark .bg-\[\#f3f4f6\]\/70 { background-color: rgba(255, 255, 255, 0.04); }
+
+/* ── 마우스 반응 ─────────────────────────────────────────────────────
+   떠오르기는 transform 대신 translate/scale 속성을 쓴다. 등장 애니메이션(shot-in 등)이 transform 을
+   붙잡고 있어서, transform 으로 띄우면 애니메이션 값에 덮여 움직이지 않는다. */
+
+/* 카드: 올리면 떠오른다 */
+.lift { transition: translate 180ms ease, box-shadow 180ms ease, background-color 180ms ease, border-color 180ms ease; }
+.lift:hover { translate: 0 -4px; box-shadow: 0 16px 32px -16px rgba(0, 0, 0, 0.8); }
+
+/* 주요 버튼: 떠오르며 주황빛, 누르면 눌린다 */
+.cta { transition: translate 150ms ease, box-shadow 150ms ease, scale 100ms ease, background-color 150ms ease; }
+.cta:hover { translate: 0 -2px; box-shadow: 0 12px 30px -8px rgba(242, 107, 29, 0.65); }
+.cta:active { scale: 0.97; translate: 0 0; }
+/* 나머지 버튼도 누를 때 살짝 들어간다 */
+.theme-dark button:active:not(:disabled) { scale: 0.98; }
+
+/* 샷 카드: 한 칸에 올리면 그 칸만 떠오르고 나머지는 흐려진다 */
+.shot-row .shot-card { transition: opacity 200ms ease, translate 200ms ease, box-shadow 200ms ease; }
+.shot-row:hover .shot-card { opacity: 0.5; }
+.shot-row .shot-card:hover { opacity: 1; translate: 0 -6px; box-shadow: 0 18px 36px -16px rgba(242, 107, 29, 0.55); }
+
+/* 사용 방법 카드: 번호가 커진다 */
+.scene-no { display: inline-block; transition: scale 200ms ease; }
+.scene-card:hover .scene-no { scale: 1.15; }
+
+/* 로고의 Q 가 탤리 라이트처럼 깜빡인다 */
+@keyframes flicker {
+  0%, 100% { opacity: 1; }
+  25% { opacity: 0.3; }
+  45% { opacity: 1; }
+  65% { opacity: 0.45; }
+}
+.logo:hover .logo-q { animation: flicker 600ms ease; }
+
+/* 슬레이트 판은 마우스를 따라 입체적으로 기운다 (StartScreen 이 --rx, --ry 를 넣는다) */
+.tilt { transform: perspective(900px) rotateX(var(--rx, 0deg)) rotateY(var(--ry, 0deg)); transition: transform 300ms ease; will-change: transform; }
+
+@media (prefers-reduced-motion: reduce) {
+  .lift:hover, .cta:hover, .shot-row .shot-card:hover { translate: none; }
+  .scene-card:hover .scene-no { scale: none; }
+  .logo:hover .logo-q { animation: none; }
+  .tilt { transform: none; }
+}
+
+/* 청중 화면의 형광펜: 왼쪽에서 오른쪽으로 그어진다 */
+@keyframes highlight-sweep {
+  from { clip-path: inset(0 100% 0 0); }
+  to { clip-path: inset(0 0 0 0); }
+}
+.highlight-sweep {
+  background: rgba(255, 196, 0, 0.32);
+  box-shadow: 0 0 0 2px rgba(242, 107, 29, 0.85);
+  mix-blend-mode: multiply;
+  animation: highlight-sweep 500ms ease-out 150ms both;
+}
+@media (prefers-reduced-motion: reduce) {
+  .highlight-sweep { animation: none; }
+}
+
+/* ── 필름 그레인(입자) 텍스처 ─────────────────────────────────────────
+   어두운 무대 위에 살짝 얹으면 화면이 아니라 필름처럼 보인다. SVG 노이즈라 이미지 파일이 없어도 된다. */
+.stage-grain {
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='120' height='120'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+  opacity: 0.05;
+  mix-blend-mode: overlay;
+}
+
+/* ── 필름 리더(오프닝 카운트다운) ──────────────────────────────────────
+   3·2·1 이 돌고, 다 세면 홍채(iris)가 닫히듯 화면이 가운데로 오므라들며 사라진다. */
+.film-leader {
+  clip-path: circle(150% at 50% 50%);
+  transition: clip-path 620ms cubic-bezier(0.7, 0, 0.15, 1);
+  animation: leader-flicker 2.6s steps(1) infinite;
+}
+.film-leader-out { clip-path: circle(0% at 50% 50%); }
+
+@keyframes leader-flicker {
+  0%, 18%, 22%, 46%, 54%, 100% { filter: brightness(1); }
+  20% { filter: brightness(1.12); }
+  50% { filter: brightness(0.9); }
+}
+
+/* 필름 앞뒤로 흔히 보이는 세로 긁힘 자국. 은은하게 고정해둔다(움직이면 산만하다) */
+.film-scratches {
+  background-image:
+    repeating-linear-gradient(90deg, rgba(255, 255, 255, 0.05) 0 1px, transparent 1px 180px),
+    radial-gradient(circle at 50% 45%, rgba(255, 255, 255, 0.06), transparent 65%);
+  mix-blend-mode: screen;
+}
+
+/* 카운트다운 숫자가 바뀔 때마다 톡 튀어 들어온다 */
+@keyframes leader-pop {
+  from { opacity: 0; transform: scale(0.7); }
+  to { opacity: 1; transform: scale(1); }
+}
+.leader-count { animation: leader-pop 180ms cubic-bezier(0.2, 0.8, 0.2, 1) both; }
+
+/* 링 테두리를 도는 점 하나 — 옛날 필름 리더의 시계 바늘처럼, 숫자 하나마다 한 바퀴 돈다 */
+.leader-sweep {
+  background: conic-gradient(from -90deg, rgba(255, 255, 255, 0.9) 0deg 3deg, transparent 3deg 360deg);
+  -webkit-mask: radial-gradient(circle, transparent 77%, black 79%, black 100%);
+  mask: radial-gradient(circle, transparent 77%, black 79%, black 100%);
+  animation: leader-rotate 620ms linear;
+}
+@keyframes leader-rotate {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .film-leader, .leader-count, .leader-sweep { animation: none; transition: none; }
+}
+
+/* 사후 리포트를 PDF 로 저장할 때. 무대 색을 그대로 인쇄하면 잉크만 먹고 글자가 안 보인다.
+   막대 그래프는 색을 남긴다 (배경색을 지우면 비율이 안 보인다) */
+@media print {
+  .theme-dark { background: #ffffff !important; }
+  .theme-dark p, .theme-dark span, .theme-dark div, .theme-dark button { color: #111111 !important; }
+  .theme-dark .bg-\[\#15110d\], .theme-dark .bg-\[\#1c1713\], .theme-dark .bg-\[\#0b0907\] {
+    background: #ffffff !important;
+  }
+  .theme-dark [class*='border-white'] { border-color: #d8d8d8 !important; }
+  .theme-dark .bg-\[\#f26b1d\] { print-color-adjust: exact; -webkit-print-color-adjust: exact; }
+  header, .no-print { display: none !important; }
+}

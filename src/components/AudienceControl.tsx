@@ -1,0 +1,89 @@
+// 발표자 화면 위쪽의 청중 화면 조종 줄.
+// 근거 슬라이드 후보를 번호로 보여주고, 누르거나 숫자키를 누른 것만 청중 화면(프로젝터)에 보낸다.
+// 자동으로 보내지 않는다: 엉뚱한 슬라이드가 청중에게 뜨면 발표 전체의 신뢰가 깎인다.
+
+export interface AudienceCandidate {
+  page: number;
+  quote: string;
+}
+
+export function AudienceControl({
+  candidates,
+  current,
+  open,
+  blocked = false,
+  onOpen,
+  onSend,
+  onClear,
+}: {
+  candidates: AudienceCandidate[];
+  current: number | null; // 청중 화면에 떠 있는 슬라이드 번호
+  open: boolean; // 청중 화면 창이 열려 있나
+  blocked?: boolean; // 브라우저가 팝업을 막아서 창이 안 열렸다
+  onOpen: () => void;
+  onSend: (i: number) => void;
+  onClear: () => void;
+}) {
+  return (
+    <div className="w-full border-b border-ink/10 bg-well">
+      <div className="mx-auto flex max-w-[1320px] flex-wrap items-center justify-center gap-[8px] px-[16px] py-[8px]">
+        <span className="flex items-center gap-[7px] text-[13px] font-bold text-ink/70">
+          <span className={`size-[8px] rounded-full ${open ? (current ? 'bg-[#e5322d] tally-pulse' : 'bg-[#58d68d]') : 'bg-ink/25'}`} />
+          청중 화면
+          <span className="font-medium text-ink/45">
+            {!open ? '닫힘' : current ? `p.${current} 띄우는 중` : '대기 중'}
+          </span>
+        </span>
+
+        {!open ? (
+          <>
+            <button
+              type="button"
+              onClick={onOpen}
+              className="cta ml-[6px] h-[30px] rounded-full bg-[#f26b1d] px-[14px] text-[13px] font-bold text-white"
+            >
+              청중 화면 열기
+            </button>
+            {/* 크롬은 팝업을 막아도 주소창 오른쪽에 작은 표시만 띄워서, 발표자가 안 열린 이유를 모른다 */}
+            {blocked && (
+              <span className="text-[13px] font-medium text-warn break-keep">
+                브라우저가 팝업을 막았어요. 주소창 오른쪽의 팝업 차단 표시를 눌러 이 사이트를 허용한 뒤 다시 눌러주세요.
+              </span>
+            )}
+          </>
+        ) : (
+          <>
+            <span className="mx-[4px] h-[16px] w-px bg-ink/15" />
+            {candidates.length === 0 && <span className="text-[13px] text-ink/40">띄울 근거 슬라이드가 없어요</span>}
+            {candidates.map((c, i) => {
+              const on = current === c.page;
+              return (
+                <button
+                  key={c.page}
+                  type="button"
+                  onClick={() => onSend(i)}
+                  title={c.quote}
+                  className={`flex h-[30px] items-center gap-[6px] rounded-full border px-[12px] text-[13px] font-bold transition-colors ${
+                    on ? 'border-[#e5322d] bg-[#e5322d] text-white' : 'border-ink/20 text-ink/80 hover:border-[#f26b1d] hover:text-ink'
+                  }`}
+                >
+                  <kbd className={`font-display text-[15px] leading-none ${on ? 'text-white' : 'text-[#f26b1d]'}`}>{i + 1}</kbd>
+                  p.{c.page} 띄우기
+                </button>
+              );
+            })}
+            <button
+              type="button"
+              onClick={onClear}
+              disabled={!current}
+              className="flex h-[30px] items-center gap-[6px] rounded-full border border-ink/20 px-[12px] text-[13px] font-bold text-ink/70 hover:border-ink/50 disabled:opacity-30"
+            >
+              <kbd className="font-display text-[15px] leading-none text-ink/60">0</kbd>
+              내리기
+            </button>
+          </>
+        )}
+      </div>
+    </div>
+  );
+}
