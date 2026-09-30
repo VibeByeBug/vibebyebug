@@ -11,12 +11,30 @@ Space 주소를 열었을 때 보이는 상태 화면만 Gradio 로 만든다.
 
 import os
 
+# ZeroGPU 하드웨어에서는 spaces 를 torch 보다 먼저 들여와야 한다.
+# main 을 먼저 import 하면 sentence-transformers 가 torch 를 올려버려서 늦는다.
+try:
+    import spaces
+except ImportError:  # 로컬이나 CPU Space 에서는 이 패키지가 없다
+    spaces = None
+
 import uvicorn
 
 from main import app
 
 PORT = int(os.environ.get("GRADIO_SERVER_PORT") or os.environ.get("PORT") or 7860)
 FRONTEND = "https://vibebyebug-develop.vercel.app"
+
+
+if spaces is not None:
+    # ZeroGPU 는 켜질 때 @spaces.GPU 가 붙은 함수를 하나도 못 찾으면 앱을 안 띄운다.
+    #   RUNTIME_ERROR: No @spaces.GPU function detected during startup
+    # Ready-Q 는 임베딩까지 전부 CPU 로 돈다. GPU 가 필요해서가 아니라 이 검사를
+    # 통과하려고 두는 함수다. 아무도 부르지 않는다.
+    # 하드웨어를 CPU basic 으로 바꿀 수 있게 되면 이 부분은 지워도 된다.
+    @spaces.GPU(duration=5)
+    def _zerogpu_startup_check() -> str:
+        return "ok"
 
 
 def _status_text() -> str:
