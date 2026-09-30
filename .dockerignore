@@ -1,0 +1,27 @@
+# 백엔드 이미지에 프론트엔드와 로컬 산출물은 넣지 않는다
+node_modules
+dist
+src
+public
+index.html
+package.json
+package-lock.json
+tsconfig*.json
+vite.config.ts
+tailwind.config.js
+.oxlintrc.json
+
+.git
+.venv
+venv
+__pycache__
+**/__pycache__
+*.pyc
+
+# 업로드 자료와 인덱싱 결과는 컨테이너에서 새로 만든다
+data
+uploaded_files
+*.pdf
+*.pptx
+.env
+ai/.env
