@@ -3,8 +3,9 @@ title: Ready-Q Backend
 emoji: 🎬
 colorFrom: red
 colorTo: gray
-sdk: docker
-app_port: 7860
+sdk: gradio
+sdk_version: 6.29.0
+app_file: app.py
 pinned: false
 short_description: 발표 질의응답 프롬프터 Ready-Q 의 백엔드
 ---
@@ -34,5 +35,9 @@ Space Secrets 에 `OPENAI_API_KEY` 를 넣어야 추천 답변과 예상 질문�
 - 디스크는 재시작하면 비워진다. 올린 발표자료와 색인은 남지 않는다.
 - 무료 티어는 한동안 아무도 들어오지 않으면 잠든다. 다시 열면 깨어나는 데 1~2분 걸린다.
 - 발표 준비(색인)는 자료 한 건에 20초 안팎 걸린다.
+- Docker SDK 가 아니라 Gradio SDK 로 올린다. 2026년 7월부터 무료 계정은 Docker Space 를
+  만들 수 없다. `app.py` 가 Gradio 대신 FastAPI 를 7860 포트에 띄운다.
+  `Dockerfile` 은 유료로 바꿀 때를 위해 남겨 뒀다.
+- 임베딩 모델은 처음 켤 때 내려받는다. 서버가 뜬 뒤 1~2분은 발표 준비가 느리다.
 
 코드와 설치 방법은 GitHub 저장소를 참고한다. https://github.com/VibeByeBug/vibebyebug
