@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
+import { API_URL, apiOverridden, saveApiBase } from '../api';
 import type { SourceCount } from '../settings';
 import { useTheme, type Theme } from '../theme';
 import { MicSmallIcon, WatchIcon } from './icons';
@@ -21,6 +22,7 @@ export function SettingsScreen({
   onPresenterNameChange: (name: string) => void;
 }) {
   const [mic, setMic] = useState<string | null>(null);
+  const [server, setServer] = useState(apiOverridden ? API_URL : '');
   const [needPermission, setNeedPermission] = useState(false);
   const { theme, setTheme } = useTheme();
 
@@ -135,6 +137,50 @@ export function SettingsScreen({
             desc="질문자가 있을 자리(강의실 뒤쪽 등)에서 실제로 말해보고, 음량과 인식 글자가 잘 잡히는지 시연 전에 확인해요"
           >
             <MicRehearsal />
+          </Row>
+
+          <Row
+            title="서버 주소"
+            desc="백엔드가 열려 있는 주소. 비워 두면 배포할 때 넣어 둔 주소를 씁니다. 저장하면 화면을 새로 엽니다"
+          >
+            <div className="flex flex-1 flex-col gap-[8px] items-start">
+              <div className="flex flex-wrap gap-[8px] items-center">
+                <input
+                  type="url"
+                  value={server}
+                  onChange={(e) => setServer(e.target.value)}
+                  placeholder={API_URL}
+                  spellCheck={false}
+                  className="h-[40px] w-[320px] max-w-full rounded-[8px] border border-ink/20 bg-transparent px-[14px] font-medium text-[14px] text-ink outline-none focus:border-[#f26b1d] placeholder:text-ink/35"
+                />
+                <button
+                  type="button"
+                  onClick={() => {
+                    saveApiBase(server);
+                    window.location.reload(); // 주소는 화면이 뜰 때 한 번 읽는다
+                  }}
+                  className="flex h-[40px] items-center px-[18px] rounded-[8px] bg-[#f26b1d] font-bold text-[15px] text-white"
+                >
+                  저장
+                </button>
+                {apiOverridden && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      saveApiBase('');
+                      window.location.reload();
+                    }}
+                    className="flex h-[40px] items-center px-[16px] rounded-[8px] border border-ink/20 font-bold text-[15px] text-ink/65 hover:text-ink"
+                  >
+                    되돌리기
+                  </button>
+                )}
+              </div>
+              <p className="font-normal text-[13px] text-ink/50 break-keep">
+                지금 쓰는 곳: <span className="font-mono text-ink/75">{API_URL}</span>
+                {apiOverridden && ' (직접 넣은 주소)'}
+              </p>
+            </div>
           </Row>
 
           <Row title="갤럭시 워치" desc="손목에서 질문 유형과 슬라이드 번호 보기">
