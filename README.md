@@ -4,7 +4,7 @@ emoji: 🎬
 colorFrom: red
 colorTo: gray
 sdk: gradio
-sdk_version: 6.29.0
+sdk_version: 5.50.0
 app_file: app.py
 pinned: false
 short_description: 발표 질의응답 프롬프터 Ready-Q 의 백엔드
@@ -39,5 +39,8 @@ Space Secrets 에 `OPENAI_API_KEY` 를 넣어야 추천 답변과 예상 질문�
   만들 수 없다. `app.py` 가 Gradio 대신 FastAPI 를 7860 포트에 띄운다.
   `Dockerfile` 은 유료로 바꿀 때를 위해 남겨 뒀다.
 - 임베딩 모델은 처음 켤 때 내려받는다. 서버가 뜬 뒤 1~2분은 발표 준비가 느리다.
+- gradio 는 5.50.0 으로 묶어 둔다. 6.x 는 huggingface-hub 1.16 이상을 요구하는데
+  transformers 4.53.2 는 1.0 미만을 요구해서 설치가 통째로 실패한다.
+  gradio 는 상태 화면에만 쓰고, transformers 는 검색 품질에 영향을 줘서 이쪽을 지켰다.
 
 코드와 설치 방법은 GitHub 저장소를 참고한다. https://github.com/VibeByeBug/vibebyebug

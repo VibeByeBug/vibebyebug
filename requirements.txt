@@ -1,7 +1,7 @@
 # Hugging Face Spaces 전용 목록이다. 이 브랜치(hf-space)에서만 쓴다.
 #
 # Spaces 는 이 파일에 자기 것을 얹어서 한 번에 설치한다.
-#   pip install -r requirements.txt "torch<=2.13.0" gradio[oauth,mcp]==6.29.0
+#   pip install -r requirements.txt "torch<=2.13.0" gradio[oauth,mcp]==5.50.0
 #                "uvicorn>=0.14.0" "websockets>=10.4" spaces==0.51.3
 # 그래서 웹 서버 쪽(fastapi, uvicorn, pydantic, websockets, Jinja2, python-multipart)은
 # 버전을 박지 않는다. gradio 가 끌고 오는 것과 부딪히면 설치가 통째로 실패한다.
@@ -17,7 +17,8 @@ PyMuPDF==1.27.2.3
 # ── 검색 ────────────────────────────────────────────────────
 sentence-transformers==5.0.0
 torch==2.13.0              # ZeroGPU 허용 목록에 있는 버전. +cpu 같은 꼬리표를 붙이면 막힌다.
-transformers==4.53.2
+transformers==4.53.2       # huggingface-hub<1.0 을 요구한다. README 의 sdk_version 을
+                           # gradio 6.x 로 올리면 (hub>=1.16) 설치가 통째로 실패한다.
 
 # ── 한국어 처리 ──────────────────────────────────────────────
 kiwipiepy==0.23.2
