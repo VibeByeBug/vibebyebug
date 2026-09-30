@@ -2,11 +2,11 @@
 #
 # 개발용 목록(develop 의 requirements.txt)은 ai/requirements.txt 를 끌어다 쓰지만,
 # 여기서는 두 가지를 바꿔야 해서 따로 적었다.
-#   1. torch 는 CPU 전용 휠을 받는다. 기본 휠은 CUDA 까지 끌고 와서 설치가 몇 배로 커진다.
+#   1. torch 는 버전만 적고 휠 종류는 고르지 않는다. Space 가 ZeroGPU 하드웨어에 올라가서
+#      `torch==2.13.0+cpu` 처럼 꼬리표가 붙으면 설정 검사에서 막힌다.
+#      (CONFIG_ERROR: torch version in requirements.txt is not compatible with ZeroGPU)
 #   2. 안 쓰는 것(google-genai, pywin32)은 뺀다. 빌드 시간이 그만큼 줄어든다.
 # gradio 는 Spaces 가 README 의 sdk_version 대로 알아서 깐다.
-
---extra-index-url https://download.pytorch.org/whl/cpu
 
 # ── 웹 서버 ──────────────────────────────────────────────────
 fastapi==0.141.1
@@ -24,7 +24,7 @@ PyMuPDF==1.27.2.3
 # ── 검색 ────────────────────────────────────────────────────
 numpy==2.2.2
 sentence-transformers==5.0.0
-torch==2.13.0+cpu
+torch==2.13.0
 transformers==4.53.2
 
 # ── 한국어 처리 ──────────────────────────────────────────────
