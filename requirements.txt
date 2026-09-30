@@ -1,30 +1,22 @@
 # Hugging Face Spaces 전용 목록이다. 이 브랜치(hf-space)에서만 쓴다.
 #
-# 개발용 목록(develop 의 requirements.txt)은 ai/requirements.txt 를 끌어다 쓰지만,
-# 여기서는 두 가지를 바꿔야 해서 따로 적었다.
-#   1. torch 는 버전만 적고 휠 종류는 고르지 않는다. Space 가 ZeroGPU 하드웨어에 올라가서
-#      `torch==2.13.0+cpu` 처럼 꼬리표가 붙으면 설정 검사에서 막힌다.
-#      (CONFIG_ERROR: torch version in requirements.txt is not compatible with ZeroGPU)
-#   2. 안 쓰는 것(google-genai, pywin32)은 뺀다. 빌드 시간이 그만큼 줄어든다.
-# gradio 는 Spaces 가 README 의 sdk_version 대로 알아서 깐다.
-
-# ── 웹 서버 ──────────────────────────────────────────────────
-fastapi==0.141.1
-uvicorn==0.53.0
-pydantic==2.13.5
-websockets>=13.0,<17.0      # 없으면 코드는 멀쩡한데 /ws 만 404 로 떨어진다
-python-multipart==0.0.32    # UploadFile 처리. 없으면 업로드 API 가 500
-Jinja2==3.1.6
-python-dotenv==1.2.3
+# Spaces 는 이 파일에 자기 것을 얹어서 한 번에 설치한다.
+#   pip install -r requirements.txt "torch<=2.13.0" gradio[oauth,mcp]==6.29.0
+#                "uvicorn>=0.14.0" "websockets>=10.4" spaces==0.51.3
+# 그래서 웹 서버 쪽(fastapi, uvicorn, pydantic, websockets, Jinja2, python-multipart)은
+# 버전을 박지 않는다. gradio 가 끌고 오는 것과 부딪히면 설치가 통째로 실패한다.
+# 개발용 목록(develop 의 requirements.txt)에서는 그대로 고정해 둔다.
+#
+# 여기 남긴 것만 우리가 버전을 정한다. 검색 결과가 달라지면 안 되는 것들이다.
+# 안 쓰는 google-genai 와 윈도우 전용 pywin32 는 뺐다.
 
 # ── 발표자료 읽기 ────────────────────────────────────────────
 python-pptx==1.0.2
 PyMuPDF==1.27.2.3
 
 # ── 검색 ────────────────────────────────────────────────────
-numpy==2.2.2
 sentence-transformers==5.0.0
-torch==2.13.0
+torch==2.13.0              # ZeroGPU 허용 목록에 있는 버전. +cpu 같은 꼬리표를 붙이면 막힌다.
 transformers==4.53.2
 
 # ── 한국어 처리 ──────────────────────────────────────────────
@@ -32,4 +24,8 @@ kiwipiepy==0.23.2
 
 # ── LLM ─────────────────────────────────────────────────────
 openai==2.45.0
-langgraph==1.2.9            # 모의 디펜스 꼬리질문
+langgraph==1.2.9           # 모의 디펜스 꼬리질문
+
+# ── 설정 / 업로드 ────────────────────────────────────────────
+python-dotenv==1.2.3
+python-multipart           # UploadFile 처리. 없으면 업로드 API 가 500
