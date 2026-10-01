@@ -25,3 +25,8 @@ uploaded_files
 *.pptx
 .env
 ai/.env
+
+# seed/ 는 넣는다. 위의 data, uploaded_files, *.pdf 규칙은 최상위에만 걸리므로
+# seed/data 나 seed/uploaded_files 는 걸리지 않는다. 혹시 몰라 명시해 둔다.
+!seed
+!seed/**
