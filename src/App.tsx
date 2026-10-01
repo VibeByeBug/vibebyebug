@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
+import { renamePresentation } from './api';
 import type { SavedPresentation, UploadResult } from './api';
 import { FilmLeader } from './components/FilmLeader';
 import { Header } from './components/Header';
@@ -464,7 +465,13 @@ function App() {
         <>
           <Header onNavigate={navigate} label={presentationName} rightText="2 / 3 준비" />
           <UploadScreen
-            onUploaded={setUpload}
+            onUploaded={(r) => {
+              setUpload(r);
+              // 시작 화면에서 적은 발표 이름을 서버에도 남긴다.
+              // 안 남기면 목록에는 자료 첫 줄에서 뽑은 이름이 뜬다.
+              const name = presentationName.trim();
+              if (name) void renamePresentation(r.presentation_id, name).catch(() => {});
+            }}
             onUploadFail={handleUploadFail}
             onSkip={() => setScreen('preparing')}
             // 올린 뒤 바로 연습: 돌아가기는 준비 화면으로 (업로드 화면은 다시 열면 결과가 비어 있다)
