@@ -124,6 +124,8 @@ async def judge(pid: str, req: JudgeRequest):
                                 _idf(rq.rows, rq.nouns))
     return {
         "ratio": round(c.ratio, 2),
+        # 근거 줄에서 뽑아낸 요소가 없으면 점수를 낼 수 없다. 화면이 숫자 대신 안내를 띄운다.
+        "measurable": c.measurable,
         "facts": c.facts,
         "covered": c.covered,
         "missed": c.missed,

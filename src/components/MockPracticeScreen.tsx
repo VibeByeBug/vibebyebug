@@ -19,6 +19,8 @@ interface PracticeQuestion {
 
 interface Judgement {
   ratio: number;
+  // 근거 줄에서 뽑아낸 요소가 없으면 점수를 낼 수 없다. 그때는 숫자 대신 안내를 띄운다.
+  measurable?: boolean;
   facts: string[];
   covered: string[];
   missed: string[];
@@ -130,6 +132,8 @@ export function MockPracticeScreen({ presentationId, onFinish, onIndexChange }: 
   }
 
   const ratio = judged ? Math.round(judged.ratio * 100) : 0;
+  // 서버가 measurable 을 주지 않던 때의 응답도 있을 수 있다. 근거 요소가 있으면 잴 수 있다.
+  const measurable = judged ? (judged.measurable ?? judged.facts.length > 0) : false;
 
   return (
     <div className="flex flex-1 items-start justify-center py-[38px] px-[16px] w-full">
@@ -187,14 +191,25 @@ export function MockPracticeScreen({ presentationId, onFinish, onIndexChange }: 
               <div className="border border-ink/12 bg-card flex flex-1 flex-col gap-[16px] px-[24px] py-[22px] rounded-[10px]">
                 <div className="flex items-end justify-between w-full">
                   <p className="font-bold text-[14px] text-ink/55">근거 커버리지</p>
-                  <p className="font-black text-[40px] text-ink tracking-[-1.6px]">{ratio}%</p>
+                  {measurable ? (
+                    <p className="font-black text-[40px] text-ink tracking-[-1.6px]">{ratio}%</p>
+                  ) : (
+                    <p className="font-black text-[22px] text-ink/45 tracking-[-0.6px]">판정 불가</p>
+                  )}
                 </div>
-                <div className="bg-ink/10 flex h-[10px] overflow-hidden rounded-[5px] w-full">
-                  <div className="bg-[#f26b1d] h-[10px] rounded-[5px]" style={{ width: `${ratio}%` }} />
-                </div>
+                {measurable ? (
+                  <div className="bg-ink/10 flex h-[10px] overflow-hidden rounded-[5px] w-full">
+                    <div className="bg-[#f26b1d] h-[10px] rounded-[5px]" style={{ width: `${ratio}%` }} />
+                  </div>
+                ) : (
+                  <p className="font-normal text-[13px] text-ink/60 leading-[20px] w-full break-keep">
+                    이 질문의 근거 줄에서는 맞춰볼 만한 요소를 뽑아내지 못했어요. 답변이 좋았는지 나빴는지
+                    이 점수로는 알 수 없어요. 아래 근거를 직접 보고 판단해주세요.
+                  </p>
+                )}
                 <div className="flex flex-col gap-[10px] w-full">
                   <p className="font-bold text-[13px] text-ink/55 w-full">
-                    {judged.missed.length ? '놓친 근거' : '근거를 다 말했어요'}
+                    {!measurable ? '맞춰볼 근거를 못 찾았어요' : judged.missed.length ? '놓친 근거' : '근거를 다 말했어요'}
                   </p>
                   <div className="flex flex-wrap gap-[8px] w-full">
                     {judged.missed.map((m) => (

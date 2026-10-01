@@ -118,8 +118,18 @@ class Coverage:
     elsewhere: list[str] = None   # 고른 줄 밖이지만 같은 슬라이드에 있는 수치
 
     @property
+    def measurable(self) -> bool:
+        """근거 줄에서 뽑아낸 요소가 있어야 점수를 낼 수 있다.
+
+        흔한 말과 조각난 단어를 걸러내고 나면 아무것도 안 남는 줄이 있다.
+        그때는 분모가 0 이다. 분모가 0 인 것은 만점이 아니라 '잴 수 없음' 이다.
+        이걸 만점으로 보여주면 "잘 모르겠습니다" 가 100% 로 나온다.
+        """
+        return bool(self.facts)
+
+    @property
     def ratio(self) -> float:
-        return len(self.covered) / len(self.facts) if self.facts else 1.0
+        return len(self.covered) / len(self.facts) if self.facts else 0.0
 
     @property
     def off_line(self) -> bool:
@@ -421,8 +431,11 @@ def drill(chunks: Path, questions: Path, shuffle: bool, limit: int) -> int:
         c = judge(ans, q["question"], q["gold_page"], rq, idf)
         results.append(c)
         weak.record(q["gold_page"], q["qtype"], c.facts, c.covered)
-        bar = "#" * int(c.ratio * 10)
-        print(f"  커버리지 {c.ratio:.0%} {bar}")
+        if c.measurable:
+            bar = "#" * int(c.ratio * 10)
+            print(f"  커버리지 {c.ratio:.0%} {bar}")
+        else:
+            print("  커버리지 판정 불가 (근거 줄에서 뽑아낼 요소가 없다)")
         if c.missed:
             print(f"  놓친 것: {', '.join(c.missed)}")
         print(f"  근거 (p{c.gold_slide}): {c.snippet[:90]}")
@@ -434,9 +447,15 @@ def drill(chunks: Path, questions: Path, shuffle: bool, limit: int) -> int:
     if not results:
         return 0
     weak.save(DEFAULT_PATH)
-    avg = sum(c.ratio for c in results) / len(results)
+    scored = [c for c in results if c.measurable]
     print("=" * 60)
-    print(f"답한 질문 {len(results)}개 · 평균 커버리지 {avg:.0%}")
+    if scored:
+        avg = sum(c.ratio for c in scored) / len(scored)
+        skipped = len(results) - len(scored)
+        tail = f" (판정 불가 {skipped}개 제외)" if skipped else ""
+        print(f"답한 질문 {len(results)}개, 평균 커버리지 {avg:.0%}{tail}")
+    else:
+        print(f"답한 질문 {len(results)}개, 점수를 낼 수 있는 질문이 없었다")
     print(f"약점 기록 -> {DEFAULT_PATH} (연습 {weak.sessions}회 누적)")
     print("  실전에서 이 근거들이 키워드 앞쪽에 오게 된다.")
     weak = sorted(results, key=lambda c: c.ratio)[:3]
