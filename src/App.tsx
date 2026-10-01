@@ -356,10 +356,22 @@ function App() {
   // 마이크는 실전 화면을 벗어나면 위 useEffect 가 자동으로 꺼준다.
   // 발표 중에 거친 화면들은 뒤로 가기 기록에서 건너뛴다 (끝난 발표로 뒤로 가기가 다시 들어가지 않게).
   function finishPresentation() {
-    if (!window.confirm('발표를 마칠까요? 처음 화면으로 돌아갑니다.')) return;
+    // 발표를 막 끝낸 사람이 제일 보고 싶은 것은 방금 받은 질문이다. 리포트로 바로 보낸다.
+    // 리포트 화면에 "다음 발표 준비" 가 있어서 거기서 처음 화면으로 나간다.
+    const pid = upload?.presentation_id;
+    const message = pid
+      ? '발표를 마칠까요? 받은 질문을 정리한 리포트를 보여드려요.'
+      : '발표를 마칠까요? 처음 화면으로 돌아갑니다.';
+    if (!window.confirm(message)) return;
     clearAudience();
+    // 리포트는 발표 상태(upload)가 아니라 reportTarget 으로 어느 발표인지 안다.
+    // 지우기 전에 넣어둬야 한다.
+    if (pid) setReportTarget({ pid, title: presentationName });
     setUpload(null);
-    leave((s) => SESSION_SCREENS.includes(s) || s === 'upload' || s === 'uploadFailed' || s === 'login', 'start');
+    leave(
+      (s) => SESSION_SCREENS.includes(s) || s === 'upload' || s === 'uploadFailed' || s === 'login',
+      pid ? 'report' : 'start',
+    );
   }
 
   // ── 발표 중 화면들의 우측 상단 버튼 ────────────────────────────────────
