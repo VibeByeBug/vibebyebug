@@ -26,6 +26,13 @@ uploaded_files
 .env
 ai/.env
 
+# 이름에 한글이 들어간 파일은 이미지에 넣지 않는다.
+# Cloud Run 이 그런 이미지를 가져오지 못한다. 이유는 알려주지 않고 이렇게만 나온다.
+#   ERROR: Revision '...' is not ready and cannot serve traffic. Container import failed.
+# 최소 이미지에 한글 이름 파일 하나만 넣어도 똑같이 실패하는 것을 확인했다.
+# 문서는 백엔드 이미지에 필요 없어서 통째로 뺀다.
+*.md
+
 # seed/ 는 넣는다. 위의 data, uploaded_files, *.pdf 규칙은 최상위에만 걸리므로
 # seed/data 나 seed/uploaded_files 는 걸리지 않는다. 혹시 몰라 명시해 둔다.
 !seed
