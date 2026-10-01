@@ -143,6 +143,14 @@ STOP = {
 
 # 명사 태그 + 숫자/외국어. 뒤에 오는 단위 명사와 합쳐 '3회', '1.47배'로 되살린다.
 NOUN_TAGS = {"NNG", "NNP", "SL"}
+
+# 한 글자 명사를 통째로 버리면 '팀' 같은 말이 사라진다.
+# "팀 구성은 어떻게 되나요?" 가 ['구성'] 만 남아 아무 슬라이드나 집게 된다.
+# 그렇다고 다 살리면 알파벳 한 글자가 섞인다. 발표자료에 Q&A 가 있으면 'Q' 가 키워드로 뜬다.
+# 그래서 한글 명사(NNG, NNP)만 한 글자를 살리고, 자리나 때를 가리키는 말은 뺀다.
+ONE_CHAR_TAGS = {"NNG", "NNP"}
+ONE_CHAR_SKIP = {"때", "밖", "안", "앞", "뒤", "위", "중", "내", "후", "전",
+                 "시", "점", "수", "것", "등", "말", "줄", "면", "간", "식"}
 NUM_TAG = "SN"
 UNIT_TAGS = {"NNB", "NNG"}
 
@@ -238,7 +246,9 @@ class Nouns:
                     i += 2
                     continue
                 out.append(t.form)
-            elif t.tag in NOUN_TAGS and len(t.form) >= 2:
+            elif t.tag in NOUN_TAGS and (
+                    len(t.form) >= 2
+                    or (t.tag in ONE_CHAR_TAGS and t.form not in ONE_CHAR_SKIP)):
                 # 영문 뒤 숫자를 붙인다: YOLOv + 8 -> YOLOv8
                 if (t.tag == "SL" and i + 1 < len(toks) and toks[i + 1].tag == NUM_TAG
                         and len(toks[i + 1].form) <= 2):
