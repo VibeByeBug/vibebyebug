@@ -342,6 +342,27 @@ def _drop_slide_refs(text: str) -> str:
     return re.sub(r"(?:p\.?\s*|슬라이드\s*)\d{1,3}", "", text)
 
 
+def _notes_wording(text: str) -> str:
+    """슬라이드 번호 0 은 보강 자료를 뜻하는 내부 번호다. 화면에 "0번" 으로 나가면 안 된다.
+
+    프롬프트에 "0 번 자료는 보강 자료라고 부르라" 고 적어 뒀지만 모델이 가끔 "0번" 이라고 쓴다.
+    발표자가 그대로 읽으면 청중은 0번 슬라이드를 찾는다.
+
+    앞에 다른 숫자가 붙은 경우는 건드리지 않는다. "10번 슬라이드" 의 0 은 10 의 일부다.
+    """
+    text = re.sub(r"(?<!\d)0\s*번(?:\s*(?:슬라이드|장))?", "보강 자료", text)
+    return re.sub(r"슬라이드\s*(?<!\d)0(?!\d)", "보강 자료", text)
+
+
+def _has_words(text: str) -> bool:
+    """사람이 읽을 수 있는 칸인가. 글자가 두 자 미만이면 아니다.
+
+    모델이 형식을 어기면 칸 제목 자리에 숫자와 기호만 남는 경우가 있었다(", 17번").
+    숫자와 기호를 걷어내고 남는 글자로 센다.
+    """
+    return len(re.sub(r"[^가-힣A-Za-z]", "", text)) >= 2
+
+
 def _stream_text(self, prompt: str, t0: float) -> Iterator[tuple[str, str]]:
     """모델 출력을 줄 단위로 내보낸다. ("line", 줄) / ("end", 남은 글자) / ("error", 이유)"""
     q: queue.Queue = queue.Queue()
@@ -453,7 +474,9 @@ def flow(self, question: str, qtype: str, slides: list[tuple[int, str]], story: 
             why = ""
         # 형식 지시어가 칸에 섞여 나오는 경우가 있었다 ("슬라이드	과정 채점", "<TAB>문제마다...")
         text = re.sub(r"^(?:슬라이드|<?TAB>?|\||\s)+", "", text).strip()
-        if not text:
+        # 모델이 형식을 어겨 칸 제목 자리에 숫자와 기호만 남는 경우가 있었다(", 17번").
+        # 발표자가 읽을 수 없는 칸이라 버린다.
+        if not _has_words(text):
             return "skip"
         if slide not in by_slide:
             # 주지 않은 슬라이드 번호다. 발표 줄거리에 나온 번호를 가져다 쓰는 경우가 많았는데, 칸을 버리면
@@ -467,7 +490,7 @@ def flow(self, question: str, qtype: str, slides: list[tuple[int, str]], story: 
         # 설명은 칸 제목을 풀어 쓴 것이라 틀린 숫자가 있으면 설명만 버리고 칸은 살린다
         if detail in ("-", "") or not numbers_ok(_drop_slide_refs(detail), by_slide[slide], question):
             detail = ""
-        detail = detail[:DETAIL_MAX + 20]
+        detail = _notes_wording(detail)[:DETAIL_MAX + 20]
         # 핵심 단어는 칸 안에 그대로 있어야 색을 칠할 수 있다. 숫자만 있는 말은 뺀다(답변 뼈대가 아니다).
         keys = []
         for k in re.split(r"[,/、]", keys_raw):
@@ -498,7 +521,7 @@ def flow(self, question: str, qtype: str, slides: list[tuple[int, str]], story: 
                 # "12번 슬라이드" 의 12 는 슬라이드 번호라 자료 본문에 없다. 이걸 틀린 숫자로 보고
                 # 가이드를 버리는 일이 잦았다. 슬라이드 번호는 빼고 대조한다.
                 if numbers_ok(_drop_slide_refs(got["guide"]), all_text, question):
-                    guide = got["guide"][:GUIDE_MAX + 10]
+                    guide = _notes_wording(got["guide"])[:GUIDE_MAX + 10]
                     yield msg(False)
                 continue
             if isinstance(got, dict) and len(steps) < FLOW_STEPS:
