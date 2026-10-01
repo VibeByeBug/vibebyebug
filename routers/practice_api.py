@@ -92,12 +92,29 @@ def _make(pid: str) -> list[dict]:
     return made
 
 
+def _tell_engine(pid: str, questions: list[dict]) -> None:
+    """예상 질문을 엔진에 알려준다.
+
+    이걸 해 두면 실전에서 들어온 질문이 예상과 맞았는지 기록에 함께 남고, 사후 리포트가
+    적중률을 낼 수 있다. 알려주지 않으면 적중 여부가 아예 안 남아서 리포트가 늘 비어 있다.
+    실패해도 연습과 발표는 그대로 되어야 하므로 조용히 넘어간다.
+    """
+    try:
+        rq = engine_store.get_engine(pid)
+        if rq is not None:
+            rq.set_expected(questions)
+    except Exception:
+        pass
+
+
 @router.get("/{pid}/questions")
 async def questions(pid: str, refresh: bool = False):
     """예상 질문 목록. 만들어 둔 게 있으면 그대로 준다."""
     path = _path(pid)
     if path.exists() and not refresh:
-        return {"presentation_id": pid, "questions": json.loads(path.read_text(encoding="utf-8")), "made": False}
+        saved = json.loads(path.read_text(encoding="utf-8"))
+        _tell_engine(pid, saved)
+        return {"presentation_id": pid, "questions": saved, "made": False}
 
     if pid in _making:
         raise HTTPException(status_code=409, detail="예상 질문을 만드는 중입니다.")
@@ -106,6 +123,7 @@ async def questions(pid: str, refresh: bool = False):
         made = await asyncio.to_thread(_make, pid)
     finally:
         _making.discard(pid)
+    _tell_engine(pid, made)
     return {"presentation_id": pid, "questions": made, "made": True}
 
 

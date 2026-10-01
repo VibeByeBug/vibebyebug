@@ -72,7 +72,9 @@ def _hit(question: str, cue, expected: list[dict]) -> dict | None:
         return None
 
     top_slide = cue.sources[0].slide
-    slides = {e.get("gold_page") for e in expected}
+    # 예상 질문은 두 군데서 온다. CLI 용 파일은 gold_page, 모의 연습 화면은 page 로 담는다.
+    # 한쪽만 읽으면 슬라이드 비교가 늘 실패해서 적중이 하나도 안 잡힌다.
+    slides = {e.get("gold_page", e.get("page")) for e in expected}
     same_slide = top_slide in slides
 
     best, best_score = None, 0.0
