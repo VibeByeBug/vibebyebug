@@ -44,3 +44,7 @@ dist-ssr
 *.sw?
 .claude/
 public/_test/
+
+# 시연용 발표자료. 저장소에 올리지 않는다.
+# 공개 저장소라 발표자료가 남으면 안 된다. Cloud Run 이미지에는 .gcloudignore 로 들어간다.
+seed/

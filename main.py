@@ -96,6 +96,26 @@ def _preload() -> None:
     engine_store.preload_model()
 
 
+@app.on_event("startup")
+def _place_seed() -> None:
+    """시연용 발표자료를 제자리에 놓고 바로 쓸 수 있게 준비해 둔다.
+
+    Cloud Run 은 인스턴스가 내려가면 올린 자료가 사라진다. 시연 때마다 다시 올리지
+    않도록 미리 담아 둔 한 벌을 옮기고, 색인까지 올려 둔다. 그래야 발표자가 '이어서 하기'
+    를 누른 순간 기다리지 않는다.
+    """
+    try:
+        import seeding
+        from indexing import chunks_path
+
+        for pid in seeding.place_seed():
+            path = chunks_path(pid)
+            if path.exists():
+                engine_store.start_warmup(pid, path)
+    except Exception as e:      # 시연용 자료가 없어도 서버는 떠야 한다
+        print(f"⚠️  시연용 자료를 넣지 못했습니다: {type(e).__name__}: {e}")
+
+
 # HTML 템플릿 폴더 지정
 templates = Jinja2Templates(directory="templates")
 
