@@ -11,6 +11,7 @@ VibeByeBug 팀 — 조은비(PM, QA), 민서정(백엔드), 박서연(프론트�
 |---|---|
 | 데모 | https://vibebyebug-vibebyebug.vercel.app |
 | 백엔드 | https://readyq-167847179810.asia-northeast3.run.app |
+| 발표자료 | [docs/presentation.pdf](docs/presentation.pdf) |
 
 ![청중 질문이 들어오면 추천 답변과 말할 순서가 뜨는 화면](docs/demo.gif)
 
