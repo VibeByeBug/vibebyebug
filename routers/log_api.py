@@ -69,7 +69,12 @@ async def get_presentation_summary(presentation_id: str):
 
     answered = [r for r in rows if r.get("status") == "ok"]
     lat = [r["latency_ms"] for r in answered if r.get("latency_ms") is not None]
-    hits = [r for r in rows if r.get("expected_hit")]
+
+    # 적중 여부는 {"matched": true/false, ...} 로 남는다. 딕셔너리가 있다는 것만 보면
+    # 빗나간 질문까지 적중으로 세어 적중률이 늘 100% 가 된다.
+    # 또 예상 질문을 만들어 둔 발표에서만 남으므로, 분모는 전체가 아니라 판정된 질문 수다.
+    judged = [r for r in rows if isinstance(r.get("expected_hit"), dict)]
+    hits = [r for r in judged if r["expected_hit"].get("matched")]
 
     by_type = {}
     for r in rows:
@@ -84,6 +89,8 @@ async def get_presentation_summary(presentation_id: str):
         "no_evidence": sum(1 for r in rows if r.get("status") == "no_evidence"),
         "ignored": sum(1 for r in rows if r.get("status") == "ignored"),
         "avg_latency_ms": round(sum(lat) / len(lat), 1) if lat else None,
-        "expected_hit_rate": round(100 * len(hits) / len(rows), 1) if rows else None,
+        # 예상 질문을 만들어 둔 적이 없으면 잴 수 없다. 0% 로 쓰면 다 빗나간 것처럼 보인다.
+        "expected_judged": len(judged),
+        "expected_hit_rate": round(100 * len(hits) / len(judged), 1) if judged else None,
         "by_type": by_type,                                   # 유형별 분포
     }

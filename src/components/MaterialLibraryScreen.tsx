@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { deletePresentation, listPresentations, type SavedPresentation } from '../api';
+import { deletePresentation, listPresentations, renamePresentation, type SavedPresentation } from '../api';
 
 // 발표 목록: 그동안 올린 발표 전체. 여기서 이어서 열거나 지우고, 새로 올릴 수 있다.
 // "최근 촬영분"(시작 화면)은 최근 3개만 보여주는 요약이고, 여기는 전체 목록 + 관리 기능이다.
@@ -17,6 +17,21 @@ export function MaterialLibraryScreen({ onResume, onNew, currentPresentationId }
   const [busyId, setBusyId] = useState<string | null>(null); // 하나씩 지울 때
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [bulkBusy, setBulkBusy] = useState(false);
+  // 이름을 고치는 중인 발표. 자료 첫 줄에서 뽑은 이름이 길거나 읽기 어려울 때 바꾼다.
+  const [editing, setEditing] = useState<string | null>(null);
+  const [draft, setDraft] = useState('');
+
+  async function saveName(p: SavedPresentation) {
+    const next = draft.trim();
+    setEditing(null);
+    if (next === p.title) return;
+    try {
+      const title = await renamePresentation(p.presentation_id, next);
+      setRows((cur) => cur?.map((r) => (r.presentation_id === p.presentation_id ? { ...r, title } : r)) ?? cur);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : '이름을 바꾸지 못했습니다');
+    }
+  }
 
   function load() {
     listPresentations()
@@ -151,7 +166,32 @@ export function MaterialLibraryScreen({ onResume, onNew, currentPresentationId }
               />
               <div className="flex flex-col gap-[4px] flex-1 min-w-[220px]">
                 <div className="flex flex-wrap items-center gap-[8px]">
-                  <p className="font-bold text-[17px] text-ink break-keep">{p.title}</p>
+                  {editing === p.presentation_id ? (
+                    <input
+                      autoFocus
+                      value={draft}
+                      onChange={(e) => setDraft(e.target.value)}
+                      onBlur={() => saveName(p)}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter') saveName(p);
+                        if (e.key === 'Escape') setEditing(null);
+                      }}
+                      placeholder="비우면 자료 첫 줄로 돌아가요"
+                      className="h-[30px] w-[280px] max-w-full rounded-[6px] border border-[#f26b1d] bg-transparent px-[8px] font-bold text-[17px] text-ink outline-none placeholder:font-medium placeholder:text-[13px] placeholder:text-ink/35"
+                    />
+                  ) : (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setEditing(p.presentation_id);
+                        setDraft(p.title);
+                      }}
+                      title="눌러서 이름 바꾸기"
+                      className="font-bold text-[17px] text-ink break-keep text-left hover:text-[#f26b1d]"
+                    >
+                      {p.title}
+                    </button>
+                  )}
                   {isCurrent && (
                     <span className="rounded-full bg-sel px-[9px] py-[2px] font-bold text-[11px] text-selInk whitespace-nowrap">
                       지금 보는 중

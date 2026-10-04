@@ -1,7 +1,62 @@
 import type { QuestionType } from './types/mockPractice';
 import type { AnswerMode, CoreCard, FlowStep, QaResult } from './types/qa';
 
-export const API_URL = import.meta.env.VITE_API_URL ?? 'http://localhost:8000';
+// 백엔드 주소. 순서대로 본다.
+//   1. 주소창의 ?api=... (한 번 넣으면 이 브라우저에 저장된다)
+//   2. 저장해 둔 값
+//   3. 빌드할 때 넣은 VITE_API_URL
+//   4. 로컬 개발용 기본값
+//
+// 2번이 있는 이유는, 백엔드를 터널로 여는 동안 주소가 열 때마다 바뀌기 때문이다.
+// 주소가 바뀔 때마다 화면을 다시 배포하지 않으려고 화면 쪽에서 받을 수 있게 했다.
+const OVERRIDE_KEY = 'readyq.apiBase';
+
+function readOverride(): string | null {
+  let fromQuery: string | null = null;
+  try {
+    fromQuery = new URLSearchParams(window.location.search).get('api');
+  } catch {
+    fromQuery = null;
+  }
+  if (fromQuery) {
+    const cleaned = fromQuery.trim().replace(/\/+$/, '');
+    try {
+      localStorage.setItem(OVERRIDE_KEY, cleaned);
+    } catch {
+      // 저장이 막혀 있어도 이번 방문 동안은 쓴다
+    }
+    return cleaned;
+  }
+  try {
+    return localStorage.getItem(OVERRIDE_KEY)?.trim().replace(/\/+$/, '') || null;
+  } catch {
+    return null;
+  }
+}
+
+const override = readOverride();
+
+export const API_URL = override ?? import.meta.env.VITE_API_URL ?? 'http://localhost:8000';
+
+// WebSocket 주소는 API 주소에서 만든다. https 면 wss 가 된다.
+// 직접 지정한 VITE_WS_URL 은 주소를 따로 넣지 않았을 때만 쓴다.
+export const WS_URL =
+  override || !import.meta.env.VITE_WS_URL
+    ? `${API_URL.replace(/^http/, 'ws')}/ws`
+    : import.meta.env.VITE_WS_URL;
+
+// 설정 화면에서 쓴다. 지금 주소를 직접 넣은 것인지 알려준다.
+export const apiOverridden = override !== null;
+
+export function saveApiBase(url: string) {
+  const cleaned = url.trim().replace(/\/+$/, '');
+  try {
+    if (cleaned) localStorage.setItem(OVERRIDE_KEY, cleaned);
+    else localStorage.removeItem(OVERRIDE_KEY);
+  } catch {
+    // 저장이 막혀 있으면 새로고침 후에 원래 주소로 돌아간다
+  }
+}
 
 // 서버 업로드 응답 (/api/upload/pdf)
 export interface UploadResult {
@@ -152,6 +207,17 @@ export async function listPresentations(): Promise<SavedPresentation[]> {
 }
 
 // 자료 보관함(전체 발표 목록)에서 지운다. 서버가 PDF 와 청크(검색 색인)를 같이 지운다.
+// 발표 이름 바꾸기. 빈 값을 보내면 자료 첫 줄에서 뽑은 이름으로 돌아간다.
+export async function renamePresentation(presentationId: string, title: string): Promise<string> {
+  const res = await fetch(`${API_URL}/api/upload/${presentationId}/title`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ title }),
+  });
+  if (!res.ok) throw new Error('이름을 바꾸지 못했습니다');
+  return (await res.json()).title as string;
+}
+
 export async function deletePresentation(presentationId: string): Promise<void> {
   const res = await fetch(`${API_URL}/api/upload/${presentationId}`, { method: 'DELETE' });
   if (!res.ok) throw new Error(`삭제하지 못했습니다 (${res.status})`);
