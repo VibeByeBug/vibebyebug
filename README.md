@@ -11,40 +11,18 @@ VibeByeBug 팀 — 조은비(PM, QA), 민서정(백엔드), 박서연(프론트�
 |---|---|
 | 데모 | https://vibebyebug-vibebyebug.vercel.app |
 | 백엔드 | https://readyq-167847179810.asia-northeast3.run.app |
-| 발표자료 | [docs/presentation.pdf](docs/presentation.pdf) |
 
 ![청중 질문이 들어오면 추천 답변과 말할 순서가 뜨는 화면](docs/demo.gif)
 
 질문을 듣고 추천 답변과 말할 순서를 띄우는 장면이다. 근거 슬라이드와 응답 시간이 함께 표시된다.
 
-<details>
-<summary><b>발표자료 21쪽 펼쳐 보기</b></summary>
+### 발표자료
 
-발표 당시 자료 그대로다. 측정 수치는 아래 <b>측정 결과</b> 절이 더 정확하다.
+[전체 보기 (PDF, 21장)](docs/presentation.pdf)
 
-![1쪽](docs/slides/p01.png)
-![2쪽](docs/slides/p02.png)
-![3쪽](docs/slides/p03.png)
-![4쪽](docs/slides/p04.png)
-![5쪽](docs/slides/p05.png)
-![6쪽](docs/slides/p06.png)
-![7쪽](docs/slides/p07.png)
-![8쪽](docs/slides/p08.png)
-![9쪽](docs/slides/p09.png)
-![10쪽](docs/slides/p10.png)
-![11쪽](docs/slides/p11.png)
-![12쪽](docs/slides/p12.png)
-![13쪽](docs/slides/p13.png)
-![14쪽](docs/slides/p14.png)
-![15쪽](docs/slides/p15.png)
-![16쪽](docs/slides/p16.png)
-![17쪽](docs/slides/p17.png)
-![18쪽](docs/slides/p18.png)
-![19쪽](docs/slides/p19.png)
-![20쪽](docs/slides/p20.png)
-![21쪽](docs/slides/p21.png)
+[![발표자료](docs/slides-overview.png)](docs/presentation.pdf)
 
-</details>
+측정 수치는 아래 측정 결과 절이 더 정확하다. 발표 당시 자료를 고치지 않고 그대로 뒀다.
 
 ※ 데모는 크롬에서 열어야 음성 인식이 동작한다. 발표자료를 올리지 않아도 목록에 있는 자료로 바로 써 볼 수 있다.     
 ※ 백엔드가 잠들어 있으면 자료 준비에 1분 남짓 걸린다.
@@ -95,7 +73,6 @@ VibeByeBug 팀 — 조은비(PM, QA), 민서정(백엔드), 박서연(프론트�
 - 근거 없음 판정: 관련 질문 100% 통과, 무관한 질문 90% 차단, 잡음 10/10 차단
 - 판정 문턱값 0.26 — 0.02~0.50 구간이 같은 성능이라 구간 한가운데를 골랐다
 - 보강 자료 효과: 설명 자료에만 답이 있는 질문의 정답률 0% → 64%
-
 
 ## 구성
 
