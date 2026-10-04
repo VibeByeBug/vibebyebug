@@ -33,6 +33,10 @@ ai/.env
 # 문서는 백엔드 이미지에 필요 없어서 통째로 뺀다.
 *.md
 
+# docs 는 저장소를 보여주는 자료다. 백엔드 이미지에 필요 없다.
+# 최상위 *.pdf 규칙은 하위 폴더에 걸리지 않아서 따로 적는다.
+docs
+
 # seed/ 는 넣는다. 위의 data, uploaded_files, *.pdf 규칙은 최상위에만 걸리므로
 # seed/data 나 seed/uploaded_files 는 걸리지 않는다. 혹시 몰라 명시해 둔다.
 !seed
