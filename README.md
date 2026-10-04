@@ -100,5 +100,5 @@ npm run dev
 ## 문서
 
 - [ai/README.md](ai/README.md) - AI 모듈의 설계 결정과 측정 기록 전부
-- [SETUP.md](SETUP.md) — 설치와 문제 해결
-- [DEPLOY_CLOUDRUN.md](DEPLOY_CLOUDRUN.md) — Cloud Run 배포 절차와 설정값의 이유
+- [SETUP.md](SETUP.md) - 설치와 문제 해결
+- [DEPLOY_CLOUDRUN.md](DEPLOY_CLOUDRUN.md) - Cloud Run 배포 절차와 설정값의 이유
