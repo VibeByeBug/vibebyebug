@@ -17,6 +17,35 @@ VibeByeBug 팀 — 조은비(PM, QA), 민서정(백엔드), 박서연(프론트�
 
 질문을 듣고 추천 답변과 말할 순서를 띄우는 장면이다. 근거 슬라이드와 응답 시간이 함께 표시된다.
 
+<details>
+<summary><b>발표자료 21쪽 펼쳐 보기</b></summary>
+
+발표 당시 자료 그대로다. 측정 수치는 아래 <b>측정 결과</b> 절이 더 정확하다.
+
+![1쪽](docs/slides/p01.png)
+![2쪽](docs/slides/p02.png)
+![3쪽](docs/slides/p03.png)
+![4쪽](docs/slides/p04.png)
+![5쪽](docs/slides/p05.png)
+![6쪽](docs/slides/p06.png)
+![7쪽](docs/slides/p07.png)
+![8쪽](docs/slides/p08.png)
+![9쪽](docs/slides/p09.png)
+![10쪽](docs/slides/p10.png)
+![11쪽](docs/slides/p11.png)
+![12쪽](docs/slides/p12.png)
+![13쪽](docs/slides/p13.png)
+![14쪽](docs/slides/p14.png)
+![15쪽](docs/slides/p15.png)
+![16쪽](docs/slides/p16.png)
+![17쪽](docs/slides/p17.png)
+![18쪽](docs/slides/p18.png)
+![19쪽](docs/slides/p19.png)
+![20쪽](docs/slides/p20.png)
+![21쪽](docs/slides/p21.png)
+
+</details>
+
 ※ 데모는 크롬에서 열어야 음성 인식이 동작한다. 발표자료를 올리지 않아도 목록에 있는 자료로 바로 써 볼 수 있다.     
 ※ 백엔드가 잠들어 있으면 자료 준비에 1분 남짓 걸린다.
 
