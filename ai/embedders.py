@@ -11,6 +11,7 @@ from __future__ import annotations
 
 import math
 import re
+import threading
 from collections import Counter
 
 import numpy as np
@@ -81,6 +82,18 @@ class BM25(Retriever):
 
 # --- 임베딩 (sentence-transformers) ---------------------------------------
 
+# 올려 둔 모델을 모두가 같이 쓴다. 이름이 같으면 한 번만 올린다.
+#
+# 두 가지를 막는다.
+#   1. 동시에 올리다가 터지는 것. 서버가 켜질 때 도는 미리 올리기와, 발표자가 바로 올린
+#      자료를 준비하는 작업이 같은 모델을 동시에 만들면 이렇게 끝난다.
+#        NotImplementedError: Cannot copy out of meta tensor; no data!
+#      모델을 만드는 과정이 여러 스레드에서 동시에 도는 것을 전제로 하지 않는다.
+#   2. 발표마다 모델이 복제되는 것. 이 모델 하나가 470MB 다.
+_MODELS: dict[str, object] = {}
+_MODEL_LOCK = threading.Lock()
+
+
 class STEmbedder(Retriever):
     """로컬 임베딩 모델. 네트워크 왕복이 없고 비용이 0이다."""
 
@@ -91,8 +104,13 @@ class STEmbedder(Retriever):
 
     def _load(self):
         if self._model is None:
-            from sentence_transformers import SentenceTransformer
-            self._model = SentenceTransformer(self.model_id)
+            with _MODEL_LOCK:
+                model = _MODELS.get(self.model_id)
+                if model is None:
+                    from sentence_transformers import SentenceTransformer
+                    model = SentenceTransformer(self.model_id)
+                    _MODELS[self.model_id] = model
+            self._model = model
         return self._model
 
     def _encode(self, texts: list[str]) -> np.ndarray:

@@ -3,8 +3,9 @@ import os
 import uuid
 from datetime import datetime
 from fastapi import APIRouter, UploadFile, File, HTTPException
+from pydantic import BaseModel
 
-from indexing import build_index, chunks_path
+from indexing import DATA_DIR, build_index, chunks_path
 import engine_store
 
 router = APIRouter(
@@ -16,6 +17,27 @@ router = APIRouter(
 UPLOAD_DIR = "uploaded_files"
 if not os.path.exists(UPLOAD_DIR):
     os.makedirs(UPLOAD_DIR)
+
+# 발표자가 붙인 이름. 없으면 자료 첫 줄에서 뽑아 쓴다.
+TITLES = DATA_DIR / "titles.json"
+
+
+def _names() -> dict:
+    try:
+        return json.loads(TITLES.read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return {}
+
+
+def _set_name(presentation_id: str, title: str) -> None:
+    names = _names()
+    title = (title or "").strip()[:60]
+    if title:
+        names[presentation_id] = title
+    else:
+        names.pop(presentation_id, None)      # 비우면 자료 첫 줄로 돌아간다
+    TITLES.parent.mkdir(parents=True, exist_ok=True)
+    TITLES.write_text(json.dumps(names, ensure_ascii=False), encoding="utf-8")
 
 @router.post("/pdf")
 async def upload_pdf(file: UploadFile = File(...)):
@@ -75,9 +97,12 @@ async def upload_pdf(file: UploadFile = File(...)):
 def _title_of(presentation_id: str) -> str:
     """발표 이름. 첫 슬라이드의 첫 줄을 쓴다.
 
-    업로드할 때 발표자가 적은 이름은 화면에만 있고 서버에 없다. 파일 이름도 발표 ID 라
-    사람이 읽을 수 없어서, 자료에서 바로 뽑는다.
+    발표자가 이름을 붙였으면 그걸 쓴다. 안 붙였으면 자료 첫 줄에서 뽑는다.
+    파일 이름은 발표 ID 라 사람이 읽을 수 없다.
     """
+    named = _names().get(presentation_id)
+    if named:
+        return named
     path = chunks_path(presentation_id)
     if not path.exists():
         return "제목 없는 발표"
@@ -119,6 +144,20 @@ async def list_presentations():
     return {"status": "success", "files": files}
 
 
+class TitleRequest(BaseModel):
+    title: str
+
+
+@router.post("/{presentation_id}/title")
+async def rename(presentation_id: str, req: TitleRequest):
+    """발표 이름을 바꾼다. 빈 값을 보내면 자료 첫 줄에서 뽑은 이름으로 돌아간다."""
+    if not os.path.exists(os.path.join(UPLOAD_DIR, f"{presentation_id}.pdf")):
+        raise HTTPException(status_code=404, detail="해당 발표를 찾을 수 없습니다.")
+    _set_name(presentation_id, req.title)
+    return {"status": "success", "presentation_id": presentation_id,
+            "title": _title_of(presentation_id)}
+
+
 @router.delete("/{presentation_id}")
 async def delete_presentation(presentation_id: str):
     """특정 발표 ID의 PDF 파일을 서버에서 삭제합니다."""
@@ -131,6 +170,7 @@ async def delete_presentation(presentation_id: str):
         if chunks.exists():
             chunks.unlink()
         engine_store.drop(presentation_id)
+        _set_name(presentation_id, "")      # 이름만 남으면 목록에 없는 발표가 이름을 들고 있게 된다
         return {"status": "success", "message": f"{presentation_id} 파일이 삭제되었습니다."}
     else:
         raise HTTPException(status_code=404, detail="해당 파일을 찾을 수 없습니다.")

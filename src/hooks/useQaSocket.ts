@@ -1,8 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { toQaResult } from '../api';
+import { WS_URL, toQaResult } from '../api';
 import type { AnswerMode, QaAnswer, QaFlow, QaResult } from '../types/qa';
-
-const WS_URL = import.meta.env.VITE_WS_URL ?? 'ws://localhost:8000/ws';
 
 interface UseQaSocketResult {
   isConnected: boolean;

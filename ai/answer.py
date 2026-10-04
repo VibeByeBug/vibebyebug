@@ -59,12 +59,19 @@ PROMPT = """발표자가 청중 질문에 바로 읽을 수 있는 답변을 2�
 
 # 어느 자료에도 답이 없을 때 쓰는 추론 모드. 발표자가 빈손으로 서 있지 않게 답은 내되,
 # 화면에 "추론한 답" 으로 따로 표시한다(basis="inferred"). 프로젝트에 대한 구체적 사실은 여전히 지어내지 않는다.
-INFER_HEAD = """[추론 모드] 이 질문은 아래 자료에 직접 답이 없다. 그래도 발표자가 말할 수 있는 답을 만들어야 한다.
+INFER_HEAD = """[추론 모드] 이 질문은 아래 자료에 직접 답이 없다. 그래도 발표자가 청중 앞에서 바로
+읽을 수 있는 답을 만들어야 한다.
 아래 규칙 중 "자료 내용만 근거로" 와 "자료로 답할 수 없으면 없음" 은 이렇게 바꾼다.
 - 자료 내용과 일반적인 지식으로 추론해서 답해. "없음" 이라고 하지 마.
-- 추론이라는 게 드러나게 "~로 볼 수 있습니다", "~일 가능성이 큽니다" 처럼 말해. 확정해서 말하지 마.
+- 발표자가 자기 프로젝트를 말하는 1인칭 존댓말을 그대로 쓴다. 주어는 "저희" 다.
+  남의 자료를 설명하는 말투는 쓰지 마. 이런 말이 들어가면 안 된다:
+  "~것으로 보입니다", "~방식이었습니다", "자료에는", "자료상", "발표자료상으로는", "확인이 필요하지만".
+- 확정해서 말하지는 마. 발표자가 자기 판단을 말하는 투로 눅인다.
+  "저희는 ~로 보고 있습니다", "~쪽에 가깝습니다", "~라고 생각합니다" 처럼.
 - 이 프로젝트의 날짜, 기간, 인원, 비용, 수치처럼 자료에 없는 구체적 사실은 지어내지 마.
-  그런 걸 묻는 질문이면 "자료에는 없어서 확인이 필요하지만" 으로 시작하고, 자료로 말할 수 있는 관련 내용을 대신 말해.
+  그런 걸 묻는 질문이면 발표자가 말하듯 먼저 밝힌다.
+  예: "정확한 금액은 발표자료에 담지 않았습니다. 다만 저희는 ~" / "그 숫자는 따로 정리해서 말씀드리겠습니다."
+  그다음 바로 말할 수 있는 관련 내용을 자기 말로 이어간다.
 - 숫자는 자료에 있는 것만 써.
 - 흐름도라면 자료에서 온 칸은 그 슬라이드 번호, 추론한 칸은 슬라이드 번호 0.
 
@@ -342,6 +349,27 @@ def _drop_slide_refs(text: str) -> str:
     return re.sub(r"(?:p\.?\s*|슬라이드\s*)\d{1,3}", "", text)
 
 
+def _notes_wording(text: str) -> str:
+    """슬라이드 번호 0 은 보강 자료를 뜻하는 내부 번호다. 화면에 "0번" 으로 나가면 안 된다.
+
+    프롬프트에 "0 번 자료는 보강 자료라고 부르라" 고 적어 뒀지만 모델이 가끔 "0번" 이라고 쓴다.
+    발표자가 그대로 읽으면 청중은 0번 슬라이드를 찾는다.
+
+    앞에 다른 숫자가 붙은 경우는 건드리지 않는다. "10번 슬라이드" 의 0 은 10 의 일부다.
+    """
+    text = re.sub(r"(?<!\d)0\s*번(?:\s*(?:슬라이드|장))?", "보강 자료", text)
+    return re.sub(r"슬라이드\s*(?<!\d)0(?!\d)", "보강 자료", text)
+
+
+def _has_words(text: str) -> bool:
+    """사람이 읽을 수 있는 칸인가. 글자가 두 자 미만이면 아니다.
+
+    모델이 형식을 어기면 칸 제목 자리에 숫자와 기호만 남는 경우가 있었다(", 17번").
+    숫자와 기호를 걷어내고 남는 글자로 센다.
+    """
+    return len(re.sub(r"[^가-힣A-Za-z]", "", text)) >= 2
+
+
 def _stream_text(self, prompt: str, t0: float) -> Iterator[tuple[str, str]]:
     """모델 출력을 줄 단위로 내보낸다. ("line", 줄) / ("end", 남은 글자) / ("error", 이유)"""
     q: queue.Queue = queue.Queue()
@@ -453,7 +481,9 @@ def flow(self, question: str, qtype: str, slides: list[tuple[int, str]], story: 
             why = ""
         # 형식 지시어가 칸에 섞여 나오는 경우가 있었다 ("슬라이드	과정 채점", "<TAB>문제마다...")
         text = re.sub(r"^(?:슬라이드|<?TAB>?|\||\s)+", "", text).strip()
-        if not text:
+        # 모델이 형식을 어겨 칸 제목 자리에 숫자와 기호만 남는 경우가 있었다(", 17번").
+        # 발표자가 읽을 수 없는 칸이라 버린다.
+        if not _has_words(text):
             return "skip"
         if slide not in by_slide:
             # 주지 않은 슬라이드 번호다. 발표 줄거리에 나온 번호를 가져다 쓰는 경우가 많았는데, 칸을 버리면
@@ -467,7 +497,7 @@ def flow(self, question: str, qtype: str, slides: list[tuple[int, str]], story: 
         # 설명은 칸 제목을 풀어 쓴 것이라 틀린 숫자가 있으면 설명만 버리고 칸은 살린다
         if detail in ("-", "") or not numbers_ok(_drop_slide_refs(detail), by_slide[slide], question):
             detail = ""
-        detail = detail[:DETAIL_MAX + 20]
+        detail = _notes_wording(detail)[:DETAIL_MAX + 20]
         # 핵심 단어는 칸 안에 그대로 있어야 색을 칠할 수 있다. 숫자만 있는 말은 뺀다(답변 뼈대가 아니다).
         keys = []
         for k in re.split(r"[,/、]", keys_raw):
@@ -498,7 +528,7 @@ def flow(self, question: str, qtype: str, slides: list[tuple[int, str]], story: 
                 # "12번 슬라이드" 의 12 는 슬라이드 번호라 자료 본문에 없다. 이걸 틀린 숫자로 보고
                 # 가이드를 버리는 일이 잦았다. 슬라이드 번호는 빼고 대조한다.
                 if numbers_ok(_drop_slide_refs(got["guide"]), all_text, question):
-                    guide = got["guide"][:GUIDE_MAX + 10]
+                    guide = _notes_wording(got["guide"])[:GUIDE_MAX + 10]
                     yield msg(False)
                 continue
             if isinstance(got, dict) and len(steps) < FLOW_STEPS:
