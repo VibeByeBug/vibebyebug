@@ -1,0 +1,161 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1600 1320" width="1600" height="1320" font-family="'Pretendard','Noto Sans KR','Apple SD Gothic Neo','Malgun Gothic',sans-serif">
+  <defs>
+    <marker id="arr" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="9" markerHeight="9" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#2E6BC6"/>
+    </marker>
+    <style>
+      .ln{fill:none;stroke:#2E6BC6;stroke-width:2.5;stroke-linecap:round;stroke-linejoin:round}
+      .ic{fill:#fff;stroke:#2E6BC6;stroke-width:2.8;stroke-linecap:round;stroke-linejoin:round}
+      .scr{fill:#EAF1FB;stroke:#2E6BC6;stroke-width:2}
+      .bx{fill:#fff;stroke:#2E6BC6;stroke-width:2.2}
+      .t{font-size:22px;font-weight:600;fill:#222;text-anchor:middle}
+      .s{font-size:16px;fill:#555;text-anchor:middle}
+      .e{font-size:16px;fill:#2E6BC6}
+      .l{text-anchor:start}
+    </style>
+    <g id="person">
+      <path class="ic" d="M-45,55 C-45,12 -25,-4 0,-4 C25,-4 45,12 45,55 Z"/>
+      <path class="ic" d="M-12,-3 L0,14 L12,-3"/>
+      <circle class="ic" cx="0" cy="-34" r="22"/>
+    </g>
+    <g id="monitor">
+      <rect class="ic" x="-90" y="-60" width="180" height="115" rx="8"/>
+      <rect class="scr" x="-78" y="-49" width="156" height="86" rx="3"/>
+      <path class="ic" d="M-18,55 L-25,82 H25 L18,55"/>
+      <path class="ln" d="M-45,82 H45"/>
+    </g>
+  </defs>
+
+  <rect x="0" y="0" width="1600" height="1320" fill="#fff"/>
+  <text x="800" y="85" font-size="40" font-weight="700" fill="#111" text-anchor="middle">Ready-Q 시스템 구조</text>
+
+  <!-- 발표자 -->
+  <use href="#person" x="170" y="250"/>
+  <text class="t" x="170" y="345">발표자</text>
+
+  <!-- 청중 -->
+  <g transform="translate(170,560)">
+    <use href="#person" transform="translate(-42,8) scale(0.75)"/>
+    <use href="#person" transform="translate(42,8) scale(0.75)"/>
+    <use href="#person" transform="translate(0,0) scale(0.9)"/>
+  </g>
+  <text class="t" x="170" y="650">청중</text>
+
+  <!-- 발표자료 업로드 -->
+  <rect class="bx" x="360" y="205" width="200" height="90" rx="10"/>
+  <text class="t" x="460" y="245">발표자료 업로드</text>
+  <text class="s" x="460" y="272">PDF, 보강 자료</text>
+  <path class="ln" d="M225,250 H355" marker-end="url(#arr)"/>
+
+  <!-- 음성 인식 -->
+  <g transform="translate(460,555)">
+    <rect class="ic" x="-16" y="-55" width="32" height="62" rx="16"/>
+    <path class="ln" d="M-32,-8 A32,32 0 0 0 32,-8"/>
+    <path class="ln" d="M0,24 V46 M-20,46 H20"/>
+    <path class="ln" d="M-50,-40 A45,45 0 0 0 -50,10 M50,-40 A45,45 0 0 1 50,10"/>
+  </g>
+  <text class="t" x="460" y="640">질문 음성 인식</text>
+  <text class="s" x="460" y="665">Chrome Web Speech API</text>
+  <path class="ln" d="M232,560 H395" marker-end="url(#arr)"/>
+
+  <!-- 발표자 화면 -->
+  <use href="#monitor" x="820" y="400"/>
+  <g transform="translate(820,393)">
+    <rect x="-66" y="-36" width="60" height="44" rx="3" fill="#fff" stroke="#2E6BC6" stroke-width="1.6"/>
+    <path class="ln" stroke-width="2" d="M6,-30 H64 M6,-16 H54 M6,-2 H62 M-66,22 H40"/>
+  </g>
+  <text class="t" x="820" y="520">발표자 화면</text>
+  <text class="s" x="820" y="545">React, TypeScript (Vercel)</text>
+  <path class="ln" d="M560,250 H820 V332" marker-end="url(#arr)"/>
+  <path class="ln" d="M505,560 H660 V420 H724" marker-end="url(#arr)"/>
+
+  <!-- 청중 화면 -->
+  <use href="#monitor" x="1310" y="400"/>
+  <g transform="translate(1310,393)">
+    <path class="ln" stroke-width="2" d="M-60,-28 H20 M-60,-12 H50"/>
+    <rect x="-64" y="-2" width="110" height="16" rx="3" fill="#FFE58A" stroke="none"/>
+    <path class="ln" stroke-width="2" d="M-60,6 H40 M-60,26 H30"/>
+  </g>
+  <text class="t" x="1310" y="520">청중 화면 (프로젝터)</text>
+  <text class="s" x="1310" y="545">슬라이드 원본에 근거 줄 형광펜 표시</text>
+  <path class="ln" stroke-dasharray="8 7" d="M918,400 H1212" marker-end="url(#arr)"/>
+  <text class="e" x="1065" y="384" text-anchor="middle">BroadcastChannel</text>
+  <text class="s" x="1065" y="428">슬라이드와 근거 위치만 전달</text>
+  <text class="s" x="1065" y="450">AI가 만든 문장은 보내지 않음</text>
+
+  <!-- 발표자 화면 ↔ 서버 -->
+  <path class="ln" d="M820,560 V640" marker-start="url(#arr)" marker-end="url(#arr)"/>
+  <text class="e" x="805" y="597" text-anchor="end">REST: 자료 업로드</text>
+  <text class="e" x="835" y="597">WebSocket: 질문 → 근거, 답변</text>
+
+  <!-- 서버 -->
+  <g transform="translate(820,722)">
+    <rect class="ic" x="-50" y="-75" width="100" height="150" rx="8"/>
+    <rect class="scr" x="-35" y="-58" width="70" height="20" rx="3"/>
+    <rect class="scr" x="-35" y="-28" width="70" height="20" rx="3"/>
+    <rect class="scr" x="-35" y="2" width="70" height="20" rx="3"/>
+    <circle cx="24" cy="-48" r="3.5" fill="#2E6BC6"/>
+    <circle cx="24" cy="-18" r="3.5" fill="#2E6BC6"/>
+    <circle cx="24" cy="12" r="3.5" fill="#2E6BC6"/>
+    <path class="ln" d="M-28,42 H28 M-28,54 H28"/>
+  </g>
+  <text class="t l" x="895" y="715">FastAPI 서버</text>
+  <text class="s l" x="895" y="742">Google Cloud Run</text>
+
+  <!-- 분기 -->
+  <path class="ln" d="M820,797 V840 M330,840 H1310"/>
+  <path class="ln" d="M330,840 V884" marker-end="url(#arr)"/>
+  <path class="ln" d="M820,840 V888" marker-end="url(#arr)"/>
+  <path class="ln" d="M1310,840 V884" marker-end="url(#arr)"/>
+
+  <!-- 자료 처리 -->
+  <rect class="bx" x="200" y="890" width="260" height="120" rx="10"/>
+  <text class="t" x="330" y="930">자료 처리</text>
+  <text class="s" x="330" y="958">PDF 글자 추출, 띄어쓰기 복원</text>
+  <text class="s" x="330" y="982">이미지 슬라이드 캡션</text>
+
+  <!-- 근거 검색 -->
+  <g transform="translate(820,950)">
+    <circle class="ic" cx="-8" cy="-10" r="34"/>
+    <path class="ln" stroke-width="2" d="M-26,-20 H10 M-26,-8 H4 M-26,4 H8"/>
+    <path class="ln" stroke-width="9" d="M17,15 L44,42"/>
+  </g>
+  <text class="t" x="820" y="1032">근거 검색</text>
+  <text class="s" x="820" y="1057">모델 호출 없음, p95 428ms</text>
+
+  <!-- 추천 답변 생성 -->
+  <rect class="bx" x="1180" y="890" width="260" height="120" rx="10"/>
+  <text class="t" x="1310" y="930">추천 답변 생성</text>
+  <text class="s" x="1310" y="958">말할 순서, 추천 답변</text>
+  <text class="s" x="1310" y="982">숫자 검사, 근거 없음 판정</text>
+  <path class="ln" d="M885,950 H1175" marker-end="url(#arr)"/>
+  <text class="s" x="1030" y="938">근거 슬라이드, 근거 줄</text>
+
+  <!-- 검색 색인 -->
+  <g transform="translate(820,1185)">
+    <ellipse class="ic" cx="0" cy="-45" rx="50" ry="15"/>
+    <path class="ic" d="M-50,-45 V45 A50,15 0 0 0 50,45 V-45"/>
+    <path class="ln" d="M-50,-15 A50,15 0 0 0 50,-15 M-50,15 A50,15 0 0 0 50,15"/>
+  </g>
+  <text class="t l" x="890" y="1180">검색 색인</text>
+  <text class="s l" x="890" y="1206">BM25 + e5-small</text>
+  <path class="ln" d="M460,995 H620 V1185 H765" marker-end="url(#arr)"/>
+  <text class="s l" x="632" y="1100">색인 생성</text>
+  <path class="ln" d="M820,1070 V1122" marker-start="url(#arr)"/>
+
+  <!-- OpenAI (캡션) -->
+  <g transform="translate(330,1185)">
+    <path class="ic" d="M-48,30 H46 A26,26 0 0 0 40,-21 A38,38 0 0 0 -28,-22 A27,27 0 0 0 -48,30 Z"/>
+  </g>
+  <text class="t" x="330" y="1260">OpenAI gpt-4o</text>
+  <text class="s" x="330" y="1285">이미지 슬라이드 인식</text>
+  <path class="ln" d="M330,1010 V1150" marker-end="url(#arr)"/>
+
+  <!-- OpenAI (답변) -->
+  <g transform="translate(1310,1185)">
+    <path class="ic" d="M-48,30 H46 A26,26 0 0 0 40,-21 A38,38 0 0 0 -28,-22 A27,27 0 0 0 -48,30 Z"/>
+  </g>
+  <text class="t" x="1310" y="1260">OpenAI gpt-5.4-mini</text>
+  <text class="s" x="1310" y="1285">질문당 두 번 호출</text>
+  <path class="ln" d="M1310,1010 V1150" marker-end="url(#arr)"/>
+</svg>
