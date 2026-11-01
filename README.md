@@ -4,7 +4,7 @@
 
 **발표 질의응답 프롬프터**
 
-청중 질문을 듣고 근거 슬라이드, 말할 순서, 추천 답변을 발표자 화면에 띄운다.
+청중 질문을 듣고 근거 슬라이드, 말할 순서, 추천 답변을 발표자 화면에 띄워주는 서비스.
 
 🏆 26-2 명지대학교 AI(클로드 코드) 기반 VIBE CODING 실전활용 경진대회 **우수상**
 
@@ -13,13 +13,7 @@
 <img src="docs/demo.gif" width="800" alt="청중 질문이 들어오면 추천 답변과 말할 순서가 뜨는 화면">
 
 ![React](https://img.shields.io/badge/React-61DAFB?logo=react&logoColor=black) ![TypeScript](https://img.shields.io/badge/TypeScript-3178C6?logo=typescript&logoColor=white) ![FastAPI](https://img.shields.io/badge/FastAPI-009688?logo=fastapi&logoColor=white) ![Python](https://img.shields.io/badge/Python-3776AB?logo=python&logoColor=white) ![Vercel](https://img.shields.io/badge/Vercel-000000?logo=vercel&logoColor=white) ![Cloud Run](https://img.shields.io/badge/Cloud_Run-4285F4?logo=googlecloud&logoColor=white)
-
-</div>
-
-> 데모는 크롬에서 열어야 음성 인식이 동작한다. 발표자료를 올리지 않아도 목록에 있는 자료로 바로 써 볼 수 있다.<br>
-> 백엔드가 잠들어 있으면 자료 준비에 1분 남짓 걸린다.
-
-<br>
+    
 
 ## 📌 프로젝트 개요
 
@@ -45,7 +39,6 @@ Ready-Q는 이러한 상황에서 도움을 주기 위해, 발표자료를 미�
 | 발표 중 | 추천 답변 | 말할 순서와 추천 답변을 1.4초에 띄운다 |
 | 발표 후 | 회고 리포트 | 받은 질문과 판정 결과로 약한 부분을 정리한다 |
 
-자료에 근거가 없으면 지어내지 않는 것이 핵심이다. 추론한 답은 추론이라고 표시하고, 자료와 무관한 질문에는 답을 만들지 않도록 했다.
 
 ### 화면 구성
 
@@ -61,7 +54,7 @@ Ready-Q는 이러한 상황에서 도움을 주기 위해, 발표자료를 미�
 
 [![발표자료](docs/slides-overview.png)](docs/presentation.pdf)
 
-[전체 보기 (PDF, 21장)](docs/presentation.pdf). 측정 수치는 아래 측정 결과 절이 더 정확하다. 발표 당시 자료를 고치지 않고 그대로 뒀다.
+[전체 보기 (PDF, 21장)](docs/presentation.pdf). 
 
 <br>
 
@@ -69,7 +62,7 @@ Ready-Q는 이러한 상황에서 도움을 주기 위해, 발표자료를 미�
 
 <p align="center"><img src="docs/architecture.png" width="900" alt="Ready-Q 시스템 구조"></p>
 
-- 실시간으로 근거를 찾는 구간은 외부 모델을 부르지 않는다. 임베딩도 서버에서 직접 돌린다.
+- 실시간으로 근거를 찾는 구간은 외부 모델을 부르지 않고, 임베딩도 서버에서 직접 돌린다.
 - 모델 호출은 추천 답변과 말할 순서를 만들 때 질문당 두 번이다.
 
 ### 기술 스택
@@ -130,7 +123,7 @@ Ready-Q는 이러한 상황에서 도움을 주기 위해, 발표자료를 미�
 
 ## 📊 측정 결과
 
-기술 선택은 전부 측정으로 했다. 자세한 기록은 [ai/README.md](ai/README.md) 에 있다.
+자세한 기록은 [ai/README.md](ai/README.md) 에 있다.
 
 **검색기 비교** (문서 289장, 손으로 쓴 질문 45개, 질문을 하나씩 넣어 측정)
 
@@ -226,5 +219,5 @@ npm install
 npm run dev
 ```
 
-`ai/.env` 에 API 키를 넣어야 추천 답변과 예상 질문이 만들어진다. 키가 없어도 글자가 있는 PDF 의 업로드와 근거 검색까지는 동작한다.
-설치가 막히면 [SETUP.md](SETUP.md), 배포 절차는 [DEPLOY_CLOUDRUN.md](DEPLOY_CLOUDRUN.md) 를 본다.
+`ai/.env` 에 API 키를 넣어야 추천 답변과 예상 질문이 만들어진다. (키가 없어도 글자가 있는 PDF의 업로드와 근거 검색까지는 동작한다.)
+설치가 막히면 [SETUP.md](SETUP.md), 배포 절차는 [DEPLOY_CLOUDRUN.md](DEPLOY_CLOUDRUN.md) 참고.
